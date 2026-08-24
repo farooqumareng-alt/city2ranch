@@ -1,0 +1,45 @@
+import Link from "next/link";
+import { Container } from "@/components/ui/Container";
+import { NAV_LINKS, SITE_NAME } from "@/lib/constants";
+import { MobileMenu } from "@/components/layout/MobileMenu";
+
+export function Nav() {
+  return (
+    <header className="relative z-40 border-b border-ivory/10 bg-navy-deep">
+      <Container className="flex h-20 items-center justify-between">
+        <Link
+          href="/"
+          className="font-serif text-xl tracking-wide text-ivory hover:text-gold"
+        >
+          {SITE_NAME.toUpperCase()}
+        </Link>
+
+        <nav aria-label="Primary" className="hidden md:block">
+          <ul className="flex items-center gap-8">
+            {NAV_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className="font-sans text-sm text-ivory/85 transition-colors hover:text-gold"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="hidden md:block">
+          <Link
+            href="/request-service"
+            className="inline-flex items-center justify-center rounded-sm bg-gold px-5 py-2.5 font-sans text-sm font-medium text-navy-deep transition-colors hover:bg-gold-light"
+          >
+            Request Private Service
+          </Link>
+        </div>
+
+        <MobileMenu />
+      </Container>
+    </header>
+  );
+}
