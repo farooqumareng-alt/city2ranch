@@ -16,7 +16,7 @@ export function MobileMenu() {
         aria-expanded={open}
         aria-controls="mobile-nav-panel"
         aria-label={open ? "Close menu" : "Open menu"}
-        className="flex h-10 w-10 items-center justify-center rounded-sm text-ivory focus-visible:outline-2 focus-visible:outline-gold"
+        className="flex h-10 w-10 items-center justify-center rounded-sm text-navy-deep focus-visible:outline-2 focus-visible:outline-gold"
       >
         <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
         <svg
@@ -43,7 +43,7 @@ export function MobileMenu() {
       <div
         id="mobile-nav-panel"
         hidden={!open}
-        className="absolute inset-x-0 top-full border-t border-ivory/10 bg-navy-deep px-6 py-6"
+        className="absolute inset-x-0 top-full border-t border-navy/10 bg-ivory px-6 py-6"
       >
         <nav aria-label="Mobile">
           <ul className="flex flex-col gap-4">
@@ -52,7 +52,7 @@ export function MobileMenu() {
                 <Link
                   href={link.href}
                   onClick={() => setOpen(false)}
-                  className="block py-1 font-sans text-base text-ivory hover:text-gold"
+                  className="block py-1 font-sans text-base text-navy-deep hover:text-gold"
                 >
                   {link.label}
                 </Link>

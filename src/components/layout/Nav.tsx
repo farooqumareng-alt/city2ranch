@@ -6,13 +6,13 @@ import { NavAuthControl } from "@/components/layout/NavAuthControl";
 
 export function Nav() {
   return (
-    <header className="relative z-40 border-b border-ivory/10 bg-navy-deep">
+    <header className="relative z-40 border-b border-navy/10 bg-ivory">
       <Container className="flex h-20 items-center justify-between">
-        <Link
-          href="/"
-          className="font-serif text-xl tracking-wide text-ivory hover:text-gold"
-        >
-          {SITE_NAME.toUpperCase()}
+        <Link href="/" className="flex items-center" aria-label={SITE_NAME}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a
+              plain <img> avoids next/image's SVG size-inference issues
+              with this file's viewBox-only sizing */}
+          <img src="/logo.svg" alt={SITE_NAME} className="h-11 w-auto sm:h-12" />
         </Link>
 
         <nav aria-label="Primary" className="hidden md:block">
@@ -21,7 +21,7 @@ export function Nav() {
               <li key={link.href}>
                 <Link
                   href={link.href}
-                  className="font-sans text-sm text-ivory/85 transition-colors hover:text-gold"
+                  className="font-sans text-sm text-charcoal/75 transition-colors hover:text-gold"
                 >
                   {link.label}
                 </Link>

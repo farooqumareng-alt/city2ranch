@@ -40,12 +40,12 @@ export function NavAuthControl({
 
   const linkClass =
     variant === "desktop"
-      ? "font-sans text-sm text-ivory/85 transition-colors hover:text-gold"
-      : "block py-1 font-sans text-base text-ivory hover:text-gold";
+      ? "font-sans text-sm text-charcoal/75 transition-colors hover:text-gold"
+      : "block py-1 font-sans text-base text-navy-deep hover:text-gold";
   const signOutButtonClass =
     variant === "desktop"
-      ? "font-sans text-sm text-ivory/60 transition-colors hover:text-gold"
-      : "py-1 font-sans text-base text-ivory/70 hover:text-gold";
+      ? "font-sans text-sm text-charcoal/50 transition-colors hover:text-gold"
+      : "py-1 font-sans text-base text-charcoal/60 hover:text-gold";
 
   // Unknown yet (first client paint, before getUser() resolves): render
   // nothing rather than guessing, to avoid a visible flash from the
