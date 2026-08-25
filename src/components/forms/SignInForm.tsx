@@ -28,9 +28,15 @@ export function SignInForm({ next }: { next?: string }) {
     });
 
     if (signInError) {
+      // Swallowed before this fix — logged so the real Supabase error
+      // (e.g. rate limiting) is visible in DevTools instead of only ever
+      // showing the generic fallback message below.
+      console.error("[sign-in] signInWithOtp failed:", signInError);
       setStatus("error");
       setError(
-        "We couldn't send a sign-in link right now. Please try again shortly."
+        signInError.status === 429
+          ? "You've requested a few sign-in links in a row — please wait a few minutes before trying again."
+          : "We couldn't send a sign-in link right now. Please try again shortly."
       );
       return;
     }
