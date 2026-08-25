@@ -67,6 +67,11 @@ export function NavAuthControl({
       My Orders
     </Link>
   );
+  const profileLink = (
+    <Link href="/profile" className={linkClass}>
+      Profile
+    </Link>
+  );
   const signOutButton = (
     <form action={signOut}>
       <button type="submit" className={signOutButtonClass}>
@@ -79,6 +84,7 @@ export function NavAuthControl({
     return (
       <>
         {accountLink}
+        {profileLink}
         {signOutButton}
       </>
     );
@@ -87,6 +93,7 @@ export function NavAuthControl({
   return (
     <div className="flex items-center gap-4">
       {accountLink}
+      {profileLink}
       {signOutButton}
     </div>
   );

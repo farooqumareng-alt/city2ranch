@@ -144,6 +144,39 @@ export const staff = pgTable(
   (table) => [unique().on(table.authUserId)]
 );
 
+/**
+ * Self-service account info, separate from `orders` — a customer edits
+ * this once on /profile rather than retyping name/phone/address on every
+ * order. All fields nullable: a signed-in customer with no profile yet
+ * (or an existing order placed before this table existed) is a normal
+ * state, not an error — the order form just has nothing to pre-fill
+ * from. No saved payment info here; Stripe Checkout handles that fresh
+ * per order and nothing payment-related is ever stored in our own DB.
+ */
+export const customerProfiles = pgTable(
+  "customer_profiles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    authUserId: uuid("auth_user_id")
+      .notNull()
+      .references(() => authUsers.id),
+    name: text("name"),
+    phone: text("phone"),
+    defaultDeliveryAddressLine1: text("default_delivery_address_line1"),
+    defaultDeliveryAddressLine2: text("default_delivery_address_line2"),
+    defaultDeliveryCity: text("default_delivery_city"),
+    defaultDeliveryState: text("default_delivery_state"),
+    defaultDeliveryZip: text("default_delivery_zip"),
+  },
+  (table) => [unique().on(table.authUserId)]
+);
+
 // ---------------------------------------------------------------------
 // City Pickup order fulfillment (Phase 1 real product)
 // ---------------------------------------------------------------------

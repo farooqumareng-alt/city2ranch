@@ -57,6 +57,20 @@
       "when": 1787685655808,
       "tag": "0007_rls_marketing_leads",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787690820562,
+      "tag": "0008_customer_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787690831213,
+      "tag": "0009_rls_customer_profiles",
+      "breakpoints": true
     }
   ]
 }

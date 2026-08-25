@@ -9,8 +9,23 @@ import type { ActionResult } from "@/lib/actions/types";
 const initialState: ActionResult | undefined = undefined;
 
 type Store = { id: string; name: string; city: string; state: string };
+type ProfileDefaults = {
+  name: string | null;
+  phone: string | null;
+  defaultDeliveryAddressLine1: string | null;
+  defaultDeliveryAddressLine2: string | null;
+  defaultDeliveryCity: string | null;
+  defaultDeliveryState: string | null;
+  defaultDeliveryZip: string | null;
+} | null;
 
-export function OrderPickupForm({ stores }: { stores: Store[] }) {
+export function OrderPickupForm({
+  stores,
+  profile,
+}: {
+  stores: Store[];
+  profile?: ProfileDefaults;
+}) {
   const [state, formAction, pending] = useActionState(submitOrder, initialState);
 
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
@@ -58,6 +73,7 @@ export function OrderPickupForm({ stores }: { stores: Store[] }) {
             name="customerName"
             label="Full name"
             required
+            defaultValue={profile?.name ?? ""}
             error={fieldErrors?.customerName}
           />
           <TextField
@@ -65,6 +81,7 @@ export function OrderPickupForm({ stores }: { stores: Store[] }) {
             type="tel"
             label="Phone"
             required
+            defaultValue={profile?.phone ?? ""}
             error={fieldErrors?.customerPhone}
           />
         </div>
@@ -78,30 +95,35 @@ export function OrderPickupForm({ stores }: { stores: Store[] }) {
             label="Address"
             required
             className="sm:col-span-2"
+            defaultValue={profile?.defaultDeliveryAddressLine1 ?? ""}
             error={fieldErrors?.deliveryAddressLine1}
           />
           <TextField
             name="deliveryAddressLine2"
             label="Address line 2"
             className="sm:col-span-2"
+            defaultValue={profile?.defaultDeliveryAddressLine2 ?? ""}
             error={fieldErrors?.deliveryAddressLine2}
           />
           <TextField
             name="deliveryCity"
             label="City"
             required
+            defaultValue={profile?.defaultDeliveryCity ?? ""}
             error={fieldErrors?.deliveryCity}
           />
           <TextField
             name="deliveryState"
             label="State"
             required
+            defaultValue={profile?.defaultDeliveryState ?? ""}
             error={fieldErrors?.deliveryState}
           />
           <TextField
             name="deliveryZip"
             label="ZIP code"
             required
+            defaultValue={profile?.defaultDeliveryZip ?? ""}
             error={fieldErrors?.deliveryZip}
           />
         </div>

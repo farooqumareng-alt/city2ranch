@@ -16,6 +16,13 @@ const optionalText = z
   .optional()
   .transform((v) => (v === "" ? undefined : v));
 
+const optionalZip = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v === "" ? undefined : v))
+  .refine((v) => v === undefined || /^\d{5}$/.test(v), "Enter a 5-digit ZIP code.");
+
 const email = z.email("Enter a valid email address.");
 const phone = z
   .string()
@@ -93,6 +100,20 @@ export const orderSubmitSchema = z.object({
   customerNotes: optionalText,
 });
 export type OrderSubmitInput = z.infer<typeof orderSubmitSchema>;
+
+// Every field optional — a customer can save just a name and phone
+// without an address, or update one field at a time. Nothing here is
+// required the way an order submission is.
+export const profileUpdateSchema = z.object({
+  name: optionalText,
+  phone: optionalText,
+  defaultDeliveryAddressLine1: optionalText,
+  defaultDeliveryAddressLine2: optionalText,
+  defaultDeliveryCity: optionalText,
+  defaultDeliveryState: optionalText,
+  defaultDeliveryZip: optionalZip,
+});
+export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 
 export const contactSchema = z.object({
   name: requiredText("Name"),

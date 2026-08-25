@@ -5,6 +5,8 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { OrderPickupForm } from "@/components/forms/OrderPickupForm";
 import { getDb } from "@/lib/db";
 import { stores } from "@/lib/db/schema";
+import { getCurrentUser } from "@/lib/supabase/server";
+import { getOwnProfile } from "@/lib/actions/update-profile";
 
 export const metadata: Metadata = {
   title: "Request a City Pickup",
@@ -13,11 +15,15 @@ export const metadata: Metadata = {
 };
 
 export default async function NewOrderPage() {
+  const user = await getCurrentUser();
   const db = getDb();
-  const activeStores = await db
-    .select({ id: stores.id, name: stores.name, city: stores.city, state: stores.state })
-    .from(stores)
-    .where(eq(stores.isActive, true));
+  const [activeStores, profile] = await Promise.all([
+    db
+      .select({ id: stores.id, name: stores.name, city: stores.city, state: stores.state })
+      .from(stores)
+      .where(eq(stores.isActive, true)),
+    user ? getOwnProfile(user.id) : Promise.resolve(null),
+  ]);
 
   return (
     <Container className="flex flex-col gap-10 py-16 sm:py-24">
@@ -33,7 +39,7 @@ export default async function NewOrderPage() {
             store. Please check back soon.
           </p>
         ) : (
-          <OrderPickupForm stores={activeStores} />
+          <OrderPickupForm stores={activeStores} profile={profile} />
         )}
       </div>
     </Container>
