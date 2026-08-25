@@ -79,6 +79,21 @@ export const serviceRequestSchema = z.object({
 });
 export type ServiceRequestInput = z.infer<typeof serviceRequestSchema>;
 
+export const orderSubmitSchema = z.object({
+  storeId: z.uuid("Select a store."),
+  retailerOrderNumber: requiredText("Order/confirmation number"),
+  customerName: requiredText("Full name"),
+  customerPhone: phone,
+  pickupNotes: optionalText,
+  deliveryAddressLine1: requiredText("Address"),
+  deliveryAddressLine2: optionalText,
+  deliveryCity: requiredText("City"),
+  deliveryState: requiredText("State", 2),
+  deliveryZip: zip,
+  customerNotes: optionalText,
+});
+export type OrderSubmitInput = z.infer<typeof orderSubmitSchema>;
+
 export const contactSchema = z.object({
   name: requiredText("Name"),
   email,

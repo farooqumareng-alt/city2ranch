@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { NAV_LINKS, SITE_NAME } from "@/lib/constants";
 import { MobileMenu } from "@/components/layout/MobileMenu";
+import { NavAuthControl } from "@/components/layout/NavAuthControl";
 
 export function Nav() {
   return (
@@ -29,7 +30,8 @@ export function Nav() {
           </ul>
         </nav>
 
-        <div className="hidden md:block">
+        <div className="hidden items-center gap-6 md:flex">
+          <NavAuthControl variant="desktop" />
           <Link
             href="/request-service"
             className="inline-flex items-center justify-center rounded-sm bg-gold px-5 py-2.5 font-sans text-sm font-medium text-navy-deep transition-colors hover:bg-gold-light"

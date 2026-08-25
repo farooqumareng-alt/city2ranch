@@ -8,6 +8,48 @@
       "when": 1787615414852,
       "tag": "0000_common_tinkerer",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787629782376,
+      "tag": "0001_perpetual_iceman",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787629811620,
+      "tag": "0002_rls-policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787661627784,
+      "tag": "0003_revert_service_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787661780256,
+      "tag": "0004_city_pickup",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787661804132,
+      "tag": "0005_rls_city_pickup",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787662325331,
+      "tag": "0006_orders_customer_email",
+      "breakpoints": true
     }
   ]
 }

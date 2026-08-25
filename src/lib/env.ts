@@ -12,3 +12,12 @@ export function formServicesConfigured(): boolean {
 
 export const SERVICE_UNAVAILABLE_MESSAGE =
   "We're unable to submit your request online right now. Please call or email us directly and a concierge will assist you.";
+
+/** Same pattern as formServicesConfigured(), for anything that also needs
+ *  a working Stripe connection (order payment). */
+export function paymentServicesConfigured(): boolean {
+  return formServicesConfigured() && Boolean(process.env.STRIPE_SECRET_KEY);
+}
+
+export const PAYMENT_UNAVAILABLE_MESSAGE =
+  "We're unable to process payment online right now. Please call or email us directly and a concierge will assist you.";

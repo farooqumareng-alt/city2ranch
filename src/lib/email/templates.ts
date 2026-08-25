@@ -95,6 +95,41 @@ export function serviceRequestEmail(fields: {
   });
 }
 
+// Customer-facing transactional emails get slightly more considered
+// framing than the internal "New X" notifications above — this is the
+// customer's own receipt/confirmation, not an internal alert.
+function customerWrap(title: string, bodyHtml: string) {
+  return {
+    subject: `${title} — City2Ranch`,
+    html: `
+      <div style="font-family:Arial,Helvetica,sans-serif;color:#171717;max-width:480px;">
+        <p style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#C9A45C;font-weight:bold;">City2Ranch</p>
+        <h2 style="color:#0B2445;margin-top:4px;">${title}</h2>
+        ${bodyHtml}
+      </div>
+    `,
+  };
+}
+
+export function orderPaymentConfirmedEmail(fields: {
+  storeName: string;
+  totalCents: number;
+  deliveryPin: string;
+  orderUrl: string;
+}) {
+  const total = (fields.totalCents / 100).toFixed(2);
+  return customerWrap(
+    "Payment Confirmed",
+    `
+      <p>Your City Pickup order from <strong>${fields.storeName}</strong> is confirmed. Total charged: <strong>$${total}</strong>.</p>
+      <p>Your delivery PIN:</p>
+      <p style="font-size:28px;letter-spacing:0.2em;color:#C9A45C;font-weight:bold;">${fields.deliveryPin}</p>
+      <p style="color:#666;font-size:13px;">Give this to your driver at delivery to confirm it's you.</p>
+      <p><a href="${fields.orderUrl}" style="color:#0B2445;">Track your order</a></p>
+    `
+  );
+}
+
 export function contactMessageEmail(fields: {
   name: string;
   email: string;

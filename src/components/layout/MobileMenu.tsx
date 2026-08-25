@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { NAV_LINKS } from "@/lib/constants";
+import { NavAuthControl } from "@/components/layout/NavAuthControl";
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
@@ -35,37 +36,43 @@ export function MobileMenu() {
         </svg>
       </button>
 
-      {open ? (
-        <div
-          id="mobile-nav-panel"
-          className="absolute inset-x-0 top-full border-t border-ivory/10 bg-navy-deep px-6 py-6"
-        >
-          <nav aria-label="Mobile">
-            <ul className="flex flex-col gap-4">
-              {NAV_LINKS.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    onClick={() => setOpen(false)}
-                    className="block py-1 font-sans text-base text-ivory hover:text-gold"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-              <li className="pt-2">
+      {/* Rendered (not conditionally mounted) so the server-rendered
+          authSlot inside stays part of the initial payload; visibility is
+          toggled with CSS instead of unmounting, keeping the open/close
+          interaction purely client-side. */}
+      <div
+        id="mobile-nav-panel"
+        hidden={!open}
+        className="absolute inset-x-0 top-full border-t border-ivory/10 bg-navy-deep px-6 py-6"
+      >
+        <nav aria-label="Mobile">
+          <ul className="flex flex-col gap-4">
+            {NAV_LINKS.map((link) => (
+              <li key={link.href}>
                 <Link
-                  href="/request-service"
+                  href={link.href}
                   onClick={() => setOpen(false)}
-                  className="inline-flex w-full items-center justify-center rounded-sm bg-gold px-6 py-2.5 font-sans text-sm font-medium text-navy-deep"
+                  className="block py-1 font-sans text-base text-ivory hover:text-gold"
                 >
-                  Request Private Service
+                  {link.label}
                 </Link>
               </li>
-            </ul>
-          </nav>
-        </div>
-      ) : null}
+            ))}
+            <li className="flex flex-col gap-4">
+              <NavAuthControl variant="mobile" />
+            </li>
+            <li className="pt-2">
+              <Link
+                href="/request-service"
+                onClick={() => setOpen(false)}
+                className="inline-flex w-full items-center justify-center rounded-sm bg-gold px-6 py-2.5 font-sans text-sm font-medium text-navy-deep"
+              >
+                Request Private Service
+              </Link>
+            </li>
+          </ul>
+        </nav>
+      </div>
     </div>
   );
 }
