@@ -16,7 +16,15 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
  * unpredictably.
  */
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Exposes the current pathname to Server Components via headers() —
+  // used by src/app/orders/layout.tsx to send a signed-out visitor back
+  // to the exact page they wanted (e.g. /orders/new) after sign-in,
+  // instead of always dropping them on the generic /orders list.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  const nextInit = { request: { headers: requestHeaders } };
+
+  let response = NextResponse.next(nextInit);
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
@@ -27,7 +35,7 @@ export async function proxy(request: NextRequest) {
         for (const { name, value } of cookiesToSet) {
           request.cookies.set(name, value);
         }
-        response = NextResponse.next({ request });
+        response = NextResponse.next(nextInit);
         for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
         }

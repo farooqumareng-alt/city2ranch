@@ -17,7 +17,6 @@ export const NAV_LINKS: NavLink[] = [
   { label: "How It Works", href: "/how-it-works" },
   { label: "Services", href: "/services" },
   { label: "Service Area", href: "/service-area" },
-  { label: "For Estates & Businesses", href: "/#estates" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];

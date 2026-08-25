@@ -42,8 +42,8 @@ export function Hero() {
         </p>
 
         <div className="flex flex-col gap-4 sm:flex-row">
-          <Button href="/request-service" variant="gold" size="lg">
-            Request Private Service
+          <Button href="/orders/new" variant="gold" size="lg">
+            Request a Pickup
           </Button>
           <Button href="/service-area" variant="outline-light" size="lg">
             Check Service Area
