@@ -50,6 +50,13 @@
       "when": 1787662325331,
       "tag": "0006_orders_customer_email",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787685655808,
+      "tag": "0007_rls_marketing_leads",
+      "breakpoints": true
     }
   ]
 }
