@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { SITE_EYEBROW } from "@/lib/constants";
@@ -37,18 +38,27 @@ export function Hero() {
         </h1>
 
         <p className="max-w-xl font-sans text-lg leading-relaxed text-ivory/80">
-          Groceries, shopping, essentials and everyday conveniences brought
-          directly to your ranch, estate, or rural property.
+          Tell us what you need — groceries, hardware, pharmacy runs, special
+          requests — and we&apos;ll shop, pick up, and deliver it to your
+          ranch, estate, or rural property.
         </p>
 
-        <div className="flex flex-col gap-4 sm:flex-row">
-          <Button href="/orders/new" variant="gold" size="lg">
-            Request a Pickup
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <Button href="/request-service" variant="gold" size="lg">
+            Request Service
           </Button>
           <Button href="/service-area" variant="outline-light" size="lg">
             Check Service Area
           </Button>
         </div>
+
+        <p className="font-sans text-sm text-ivory/60">
+          Already have an order waiting at the store?{" "}
+          <Link href="/orders/new" className="underline decoration-gold/50 underline-offset-4 hover:text-gold">
+            Request a pickup
+          </Link>{" "}
+          instead.
+        </p>
 
         <p className="font-sans text-sm uppercase tracking-wide text-ivory/50">
           By Appointment &middot; Premium Service &middot; Select Rural Routes

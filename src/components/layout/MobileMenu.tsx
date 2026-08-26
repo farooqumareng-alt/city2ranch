@@ -63,11 +63,11 @@ export function MobileMenu() {
             </li>
             <li className="pt-2">
               <Link
-                href="/orders/new"
+                href="/request-service"
                 onClick={() => setOpen(false)}
                 className="inline-flex w-full items-center justify-center rounded-sm bg-gold px-6 py-2.5 font-sans text-sm font-medium text-navy-deep"
               >
-                Request a Pickup
+                Request Service
               </Link>
             </li>
           </ul>

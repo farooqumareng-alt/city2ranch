@@ -33,10 +33,10 @@ export function Nav() {
         <div className="hidden items-center gap-6 md:flex">
           <NavAuthControl variant="desktop" />
           <Link
-            href="/orders/new"
+            href="/request-service"
             className="inline-flex items-center justify-center rounded-sm bg-gold px-5 py-2.5 font-sans text-sm font-medium text-navy-deep transition-colors hover:bg-gold-light"
           >
-            Request a Pickup
+            Request Service
           </Link>
         </div>
 

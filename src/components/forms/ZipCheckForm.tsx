@@ -85,8 +85,8 @@ export function ZipCheckForm() {
             <p className="mt-2 font-sans text-sm text-charcoal/70">
               Your area is currently within a City2Ranch service route.
             </p>
-            <Button href="/orders/new" variant="gold" className="mt-4">
-              Request a Pickup
+            <Button href="/request-service" variant="gold" className="mt-4">
+              Request Service
             </Button>
           </div>
         ) : (
