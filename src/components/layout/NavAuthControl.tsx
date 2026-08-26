@@ -6,10 +6,15 @@ import { usePathname } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { signOut } from "@/lib/actions/sign-out";
 
-/** Routes where AccountSidebar already renders My Orders/Profile/Sign
- *  Out — the top nav's account control would just duplicate it there. */
-function isAccountShellRoute(pathname: string) {
-  return pathname.startsWith("/orders") || pathname.startsWith("/profile");
+/** Routes where a PanelSidebar (AccountSidebar/StaffSidebar/
+ *  DriverSidebar) already renders its own account nav + Sign Out — the
+ *  top nav's account control would just duplicate it there. */
+function isPanelRoute(pathname: string) {
+  return (
+    pathname.startsWith("/orders") ||
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/internal")
+  );
 }
 
 /**
@@ -65,11 +70,11 @@ export function NavAuthControl({
     );
   }
 
-  // On /orders/* and /profile, AccountSidebar already renders My
-  // Orders/Profile/Sign Out — showing them again here would just be a
-  // second, redundant account-nav surface. Nothing to render; "Request a
+  // On /orders/*, /profile, and /internal/*, a PanelSidebar already
+  // renders its own account nav + Sign Out — showing it again here would
+  // just be a second, redundant surface. Nothing to render; "Request a
   // Pickup" (desktop) / the hamburger's other links (mobile) stand alone.
-  if (isAccountShellRoute(pathname)) {
+  if (isPanelRoute(pathname)) {
     return null;
   }
 

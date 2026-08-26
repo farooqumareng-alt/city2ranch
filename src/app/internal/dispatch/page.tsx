@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { asc, eq, inArray } from "drizzle-orm";
-import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { getDb } from "@/lib/db";
 import { orders, stores, drivers } from "@/lib/db/schema";
@@ -50,7 +49,7 @@ export default async function DispatchPage() {
   const driverOptions = activeDrivers.map((d) => ({ value: d.id, label: d.name }));
 
   return (
-    <Container className="flex flex-col gap-10 py-16 sm:py-24">
+    <div className="flex flex-col gap-10">
       <SectionHeading
         eyebrow="STAFF"
         title="Dispatch Queue"
@@ -120,6 +119,6 @@ export default async function DispatchPage() {
           })}
         </div>
       )}
-    </Container>
+    </div>
   );
 }

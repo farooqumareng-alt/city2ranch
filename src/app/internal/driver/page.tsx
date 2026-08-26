@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
 import { getDb } from "@/lib/db";
@@ -45,7 +44,7 @@ export default async function DriverPage() {
     .orderBy(asc(orders.assignedAt));
 
   return (
-    <Container className="flex flex-col gap-10 py-16 sm:py-24">
+    <div className="flex flex-col gap-10">
       <SectionHeading
         eyebrow="DRIVER"
         title="My Deliveries"
@@ -119,6 +118,6 @@ export default async function DriverPage() {
           ))}
         </div>
       )}
-    </Container>
+    </div>
   );
 }
