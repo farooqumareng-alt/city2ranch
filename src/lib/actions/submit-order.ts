@@ -88,6 +88,7 @@ export async function submitOrder(
         deliveryState: data.deliveryState,
         deliveryZip: data.deliveryZip,
         customerNotes: data.customerNotes,
+        serviceType: "pickup",
         status: "priced",
         pricingRuleId: rule.id,
         serviceLabel: rule.serviceLabel,

@@ -59,6 +59,22 @@ describe("canTransition", () => {
     expect(canTransition("picked_up", "failed")).toBe(true);
     expect(canTransition("in_transit", "failed")).toBe(true);
   });
+
+  it("allows a concierge quote to finalize into priced", () => {
+    expect(canTransition("quote_pending", "priced")).toBe(true);
+  });
+
+  it("allows staff to reopen a priced concierge quote to fix a mistake", () => {
+    expect(canTransition("priced", "quote_pending")).toBe(true);
+  });
+
+  it("rejects a concierge order skipping straight from quote_pending to paid", () => {
+    expect(canTransition("quote_pending", "paid")).toBe(false);
+  });
+
+  it("allows cancelling a quote still being built", () => {
+    expect(canTransition("quote_pending", "cancelled")).toBe(true);
+  });
 });
 
 describe("assertTransition", () => {

@@ -189,6 +189,11 @@ export const customerProfiles = pgTable(
 // values purely via `ALTER TYPE order_status ADD VALUE` — additive, no
 // migration of existing rows required.
 export const orderStatusEnum = pgEnum("order_status", [
+  // Concierge orders only start here — the price isn't known until staff
+  // manually builds a quote (see orderFeeLines below). City Pickup orders
+  // skip straight to "priced" since their price is computed instantly at
+  // submission.
+  "quote_pending",
   "priced",
   "payment_pending",
   "paid",
@@ -205,6 +210,25 @@ export const auditActorTypeEnum = pgEnum("audit_actor_type", [
   "staff",
   "driver",
   "system",
+]);
+
+// Named "order_service_type" (not "service_type") because that Postgres
+// type name is already taken by serviceTypeEnum above, used by
+// service_requests — enum *type* names are global even though column
+// names are per-table.
+export const orderServiceTypeEnum = pgEnum("order_service_type", [
+  "pickup",
+  "concierge",
+]);
+
+// Per-item outcome for a Concierge shopping-list line, recorded by staff
+// after the manual, phone-based substitution call described in the
+// approved operating model — not a real-time in-app flow.
+export const orderItemStatusEnum = pgEnum("order_item_status", [
+  "requested",
+  "found",
+  "substituted",
+  "unavailable",
 ]);
 
 /**
@@ -224,6 +248,10 @@ export const stores = pgTable("stores", {
   zip: text("zip").notNull(),
   phone: text("phone"),
   isActive: boolean("is_active").notNull().default(true),
+  // Placeholder market slug — every row is "default" until a second
+  // market actually launches. Exists now purely so adding one later is a
+  // data change, not a schema migration; no market-switcher UI yet.
+  market: text("market").notNull().default("default"),
 });
 
 /**
@@ -274,6 +302,10 @@ export const pricingRules = pgTable("pricing_rules", {
   minFeeCents: integer("min_fee_cents"),
   isActive: boolean("is_active").notNull().default(true),
   note: text("note"),
+  // See stores.market — "exactly one active row" (enforced in
+  // getActivePricingRule()) becomes "exactly one active row per market"
+  // once a second market exists; no functional effect while there's one.
+  market: text("market").notNull().default("default"),
 });
 
 /**
@@ -297,13 +329,24 @@ export const zipMileage = pgTable("zip_mileage", {
     scale: 1,
   }).notNull(),
   label: text("label"),
+  // See stores.market. zip stays globally unique regardless — this is
+  // metadata for a future market-filtered admin view, not a lookup key.
+  market: text("market").notNull().default("default"),
 });
 
 /**
- * A real City Pickup order: the customer already has their own order
- * with a supported retailer; City2Ranch handles pickup and delivery.
- * Pricing fields are a snapshot at request time (see pricingRules above),
- * never recomputed from a later-changed rule.
+ * A real order — either City Pickup (the customer already has their own
+ * order with a supported retailer; City2Ranch handles pickup and
+ * delivery) or Concierge (City2Ranch shops/purchases on the customer's
+ * behalf, per serviceType). One shared table rather than two: every
+ * downstream piece of infrastructure (status machine, audit log, Stripe
+ * webhook, PIN flow, dispatch/driver queries) is keyed on one orders.id,
+ * and duplicating all of that for a second table would be far more code
+ * than the six columns below going nullable.
+ *
+ * Pricing fields are a snapshot at request time (see pricingRules above
+ * for City Pickup, orderFeeLines below for Concierge), never recomputed
+ * from a later-changed rule.
  */
 export const orders = pgTable("orders", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -314,17 +357,31 @@ export const orders = pgTable("orders", {
     .notNull()
     .defaultNow(),
 
-  authUserId: uuid("auth_user_id")
-    .notNull()
-    .references(() => authUsers.id),
+  serviceType: orderServiceTypeEnum("service_type").notNull().default("pickup"),
+  // Set when a concierge order was promoted from a /request-service
+  // submission — null for phone-only intake staff enters directly, and
+  // always null for City Pickup orders.
+  serviceRequestId: uuid("service_request_id").references(
+    () => serviceRequests.id
+  ),
+
+  // Nullable: a concierge order is created by staff before the customer
+  // has necessarily signed in (the source service_requests submission is
+  // guest-open). Claimed later via src/lib/actions/claim-order.ts once
+  // the customer signs in with a matching email. Always set immediately
+  // for City Pickup, which requires sign-in up front.
+  authUserId: uuid("auth_user_id").references(() => authUsers.id),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
   customerPhone: text("customer_phone").notNull(),
 
-  storeId: uuid("store_id")
-    .notNull()
-    .references(() => stores.id),
-  retailerOrderNumber: text("retailer_order_number").notNull(),
+  // storeId/retailerOrderNumber: City Pickup only — null for concierge
+  // orders until staff picks a store while building the quote. An order
+  // always has at most one store; a concierge trip needing a second stop
+  // is represented as an "Additional Stop Fee" line item, not a second
+  // store row (see orderFeeLines).
+  storeId: uuid("store_id").references(() => stores.id),
+  retailerOrderNumber: text("retailer_order_number"),
   pickupReadyAt: timestamp("pickup_ready_at", { withTimezone: true }),
   pickupNotes: text("pickup_notes"),
 
@@ -337,26 +394,35 @@ export const orders = pgTable("orders", {
     .references(() => zipMileage.zip),
   customerNotes: text("customer_notes"),
 
+  // Concierge orders start at "quote_pending" (see orderStatusEnum) and
+  // have no default here that would silently mislabel them — every
+  // insert sets this explicitly.
   status: orderStatusEnum("status").notNull().default("priced"),
 
-  pricingRuleId: uuid("pricing_rule_id")
-    .notNull()
-    .references(() => pricingRules.id),
-  // Snapshotted from pricingRules.serviceLabel at request time — the
-  // customer-facing name, e.g. "Rural Route Service". Never null (the
-  // fallback used when the rule itself has no label is resolved and
-  // stored here), so a later rename of the rule doesn't retroactively
-  // change what a historical order displays.
+  // pricingRuleId/roundTripMiles/baseFeeCents/mileageFeeCents: City
+  // Pickup only — its automated base+mileage calculation. Null for
+  // concierge orders, whose price comes entirely from staff-entered
+  // orderFeeLines instead; there is no automated Concierge pricing yet.
+  pricingRuleId: uuid("pricing_rule_id").references(() => pricingRules.id),
+  // Snapshotted from pricingRules.serviceLabel (City Pickup) or set
+  // directly by staff (Concierge) at request/quote time — the
+  // customer-facing name, e.g. "Rural Route Service" or "Concierge
+  // Shopping & Delivery". Never null, so a later rename of the rule
+  // doesn't retroactively change what a historical order displays.
   serviceLabel: text("service_label").notNull(),
   roundTripMiles: numeric("round_trip_miles", {
     precision: 6,
     scale: 1,
-  }).notNull(),
+  }),
   // Internal cost breakdown only (route economics, driver comp) — the
   // customer never sees "base" or "mileage" as separate line items, only
   // serviceLabel + totalCents.
-  baseFeeCents: integer("base_fee_cents").notNull(),
-  mileageFeeCents: integer("mileage_fee_cents").notNull(),
+  baseFeeCents: integer("base_fee_cents"),
+  mileageFeeCents: integer("mileage_fee_cents"),
+  // The one column everything downstream reads (Stripe, dispatch,
+  // driver, order detail), for both service types. For City Pickup it's
+  // base+mileage; for Concierge it's the sum of orderFeeLines, snapshotted
+  // once when staff finalizes the quote — never derived at read time.
   totalCents: integer("total_cents").notNull(),
   currency: text("currency").notNull().default("usd"),
 
@@ -375,6 +441,58 @@ export const orders = pgTable("orders", {
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   cancellationReason: text("cancellation_reason"),
   failureReason: text("failure_reason"),
+});
+
+/**
+ * A Concierge order's shopping list — one row per requested item.
+ * quantity is free text ("2 gallons", "1 dozen", "3"), not an
+ * integer+unit pair, since staff types it once per item and a units enum
+ * would need to anticipate every unit customers might use. status/
+ * substitutionNote support the manual, phone-based substitution workflow
+ * from the approved operating model: staff calls the customer if an item
+ * is unavailable and records the outcome here — not a real-time in-app
+ * flow, and never editable by the driver.
+ */
+export const orderItems = pgTable("order_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  orderId: uuid("order_id")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  itemName: text("item_name").notNull(),
+  quantity: text("quantity").notNull().default("1"),
+  notes: text("notes"),
+  status: orderItemStatusEnum("status").notNull().default("requested"),
+  substitutionNote: text("substitution_note"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/**
+ * A Concierge order's staff-built quote — one row per named fee (e.g.
+ * "City2Ranch Service Fee", "Shopping/Concierge Fee", "Additional Stop
+ * Fee"). There is no automated Concierge pricing engine; staff enters
+ * these directly. orders.totalCents is recomputed as the sum of these
+ * and snapshotted once when the quote is finalized (see
+ * src/lib/pricing/fee-lines.ts) — never derived at read time, so nothing
+ * downstream (Stripe, dispatch, driver, order detail) needs to change to
+ * support Concierge pricing.
+ */
+export const orderFeeLines = pgTable("order_fee_lines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  orderId: uuid("order_id")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
 });
 
 /**

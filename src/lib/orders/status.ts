@@ -5,6 +5,10 @@
  * driver tap, or a stale page from silently corrupting state.
  */
 export const ORDER_STATUSES = [
+  // Concierge orders only — created before staff has finished building a
+  // quote (no automated pricing engine for Concierge). City Pickup orders
+  // skip straight to "priced", since their price is computed instantly.
+  "quote_pending",
   "priced",
   "payment_pending",
   "paid",
@@ -19,8 +23,15 @@ export const ORDER_STATUSES = [
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  // Staff finishes building the quote (fee lines finalized) -> priced.
+  // Never reached by City Pickup orders, which are created already priced.
+  quote_pending: ["priced", "cancelled"],
   // Customer approves the price -> Stripe Checkout session created.
-  priced: ["payment_pending", "cancelled"],
+  // priced -> quote_pending: staff reopening a concierge quote to fix a
+  // mistake before the customer has started checkout — same shape as the
+  // payment_pending -> priced revert-on-expiry below, just one step
+  // earlier in the flow.
+  priced: ["payment_pending", "cancelled", "quote_pending"],
   // Stripe webhook confirms payment, or the Checkout session expires
   // (reverts to priced so the customer can retry).
   payment_pending: ["paid", "priced", "cancelled"],

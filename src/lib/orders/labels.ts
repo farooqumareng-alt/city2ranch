@@ -4,6 +4,7 @@ import type { OrderStatus } from "@/lib/orders/status";
  *  wording stays consistent across /orders, /internal/dispatch, and
  *  /internal/driver. */
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  quote_pending: "Preparing your quote",
   priced: "Awaiting payment",
   payment_pending: "Payment processing",
   paid: "Confirmed — awaiting driver",
