@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
 import { getDb } from "@/lib/db";
@@ -36,7 +35,7 @@ export default async function OrdersPage() {
     .orderBy(desc(orders.createdAt));
 
   return (
-    <Container className="flex flex-col gap-10 py-16 sm:py-24">
+    <div className="flex flex-col gap-10">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <SectionHeading eyebrow="YOUR ACCOUNT" title="My Orders" />
         <Button href="/orders/new" variant="navy">
@@ -74,6 +73,6 @@ export default async function OrdersPage() {
           ))}
         </div>
       )}
-    </Container>
+    </div>
   );
 }

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
 import { getDb } from "@/lib/db";
@@ -57,7 +56,7 @@ export default async function OrderDetailPage({
   if (!order || order.authUserId !== user.id) notFound();
 
   return (
-    <Container className="flex flex-col gap-10 py-16 sm:py-24">
+    <div className="flex flex-col gap-10">
       <SectionHeading
         eyebrow={ORDER_STATUS_LABELS[order.status]}
         title={`Order from ${order.storeName}`}
@@ -130,6 +129,6 @@ export default async function OrderDetailPage({
           )}
         </div>
       </div>
-    </Container>
+    </div>
   );
 }

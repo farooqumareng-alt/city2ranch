@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ProfileForm } from "@/components/forms/ProfileForm";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -20,7 +19,7 @@ export default async function ProfilePage() {
   const profile = await getOwnProfile(user.id);
 
   return (
-    <Container className="flex flex-col gap-10 py-16 sm:py-24">
+    <div className="flex flex-col gap-10">
       <SectionHeading
         eyebrow="YOUR ACCOUNT"
         title="My Profile"
@@ -29,6 +28,6 @@ export default async function ProfilePage() {
       <div className="max-w-2xl">
         <ProfileForm profile={profile} />
       </div>
-    </Container>
+    </div>
   );
 }

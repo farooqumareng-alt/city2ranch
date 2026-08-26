@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { eq } from "drizzle-orm";
-import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { OrderPickupForm } from "@/components/forms/OrderPickupForm";
 import { getDb } from "@/lib/db";
@@ -26,7 +25,7 @@ export default async function NewOrderPage() {
   ]);
 
   return (
-    <Container className="flex flex-col gap-10 py-16 sm:py-24">
+    <div className="flex flex-col gap-10">
       <SectionHeading
         eyebrow="CITY PICKUP"
         title="Request a City Pickup"
@@ -42,6 +41,6 @@ export default async function NewOrderPage() {
           <OrderPickupForm stores={activeStores} profile={profile} />
         )}
       </div>
-    </Container>
+    </div>
   );
 }
