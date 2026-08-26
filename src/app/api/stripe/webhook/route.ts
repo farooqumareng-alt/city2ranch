@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
     const rows = await db
       .select({ order: orders, storeName: stores.name })
       .from(orders)
-      .innerJoin(stores, eq(orders.storeId, stores.id))
+      // leftJoin: a concierge order may have no store at all.
+      .leftJoin(stores, eq(orders.storeId, stores.id))
       .where(eq(orders.id, orderId));
     const row = rows[0];
     if (!row) {

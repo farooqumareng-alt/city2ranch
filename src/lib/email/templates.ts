@@ -112,16 +112,20 @@ function customerWrap(title: string, bodyHtml: string) {
 }
 
 export function orderPaymentConfirmedEmail(fields: {
-  storeName: string;
+  // Null for a Concierge order — it may have no single associated store.
+  storeName: string | null;
   totalCents: number;
   deliveryPin: string;
   orderUrl: string;
 }) {
   const total = (fields.totalCents / 100).toFixed(2);
+  const orderLine = fields.storeName
+    ? `Your City Pickup order from <strong>${fields.storeName}</strong> is confirmed.`
+    : `Your City2Ranch Concierge order is confirmed.`;
   return customerWrap(
     "Payment Confirmed",
     `
-      <p>Your City Pickup order from <strong>${fields.storeName}</strong> is confirmed. Total charged: <strong>$${total}</strong>.</p>
+      <p>${orderLine} Total charged: <strong>$${total}</strong>.</p>
       <p>Your delivery PIN:</p>
       <p style="font-size:28px;letter-spacing:0.2em;color:#C9A45C;font-weight:bold;">${fields.deliveryPin}</p>
       <p style="color:#666;font-size:13px;">Give this to your driver at delivery to confirm it's you.</p>

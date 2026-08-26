@@ -115,6 +115,80 @@ export const profileUpdateSchema = z.object({
 });
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 
+// A concierge shopping-list row. quantity is free text on purpose — "2
+// gallons", "1 dozen", "3" all need to fit without a unit enum staff
+// would have to fight with for a one-off request.
+export const conciergeOrderItemSchema = z.object({
+  itemName: requiredText("Item name"),
+  quantity: requiredText("Quantity"),
+  notes: optionalText,
+});
+
+/**
+ * Staff-side concierge order intake. Items arrive as one hidden JSON
+ * input (see NewConciergeOrderForm) rather than bracket-notation field
+ * names — every other form in this app is a flat single-record submit,
+ * and a dynamic-row array doesn't fit that shape cleanly.
+ */
+export const conciergeOrderCreateSchema = z.object({
+  customerName: requiredText("Full name"),
+  customerEmail: email,
+  customerPhone: phone,
+  deliveryAddressLine1: requiredText("Address"),
+  deliveryAddressLine2: optionalText,
+  deliveryCity: requiredText("City"),
+  deliveryState: requiredText("State", 2),
+  deliveryZip: zip,
+  customerNotes: optionalText,
+  itemsJson: z
+    .string()
+    .transform((raw, ctx) => {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        ctx.addIssue({ code: "custom", message: "Invalid item list." });
+        return z.NEVER;
+      }
+    })
+    .pipe(z.array(conciergeOrderItemSchema).min(1, "Add at least one item.")),
+});
+export type ConciergeOrderCreateInput = z.infer<typeof conciergeOrderCreateSchema>;
+
+// A quote line as staff types it — a dollar-and-cents string ("75.00"),
+// converted to the integer cents every other price field in this app
+// already uses.
+export const feeLineSchema = z
+  .object({
+    label: requiredText("Fee label"),
+    amount: requiredText("Amount"),
+  })
+  .transform((value, ctx) => {
+    const amountCents = Math.round(Number(value.amount) * 100);
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["amount"],
+        message: "Enter a valid amount greater than zero.",
+      });
+      return z.NEVER;
+    }
+    return { label: value.label, amountCents };
+  });
+
+export const conciergeQuoteFinalizeSchema = z.object({
+  feeLinesJson: z
+    .string()
+    .transform((raw, ctx) => {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        ctx.addIssue({ code: "custom", message: "Invalid fee line list." });
+        return z.NEVER;
+      }
+    })
+    .pipe(z.array(feeLineSchema).min(1, "Add at least one fee line.")),
+});
+
 export const contactSchema = z.object({
   name: requiredText("Name"),
   email,

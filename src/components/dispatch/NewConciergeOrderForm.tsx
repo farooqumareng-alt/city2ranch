@@ -1,0 +1,200 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import { createConciergeOrder } from "@/lib/actions/create-concierge-order";
+import { TextField, TextareaField } from "@/components/ui/FormField";
+import { Button } from "@/components/ui/Button";
+import type { ActionResult } from "@/lib/actions/types";
+
+const initialState: ActionResult | undefined = undefined;
+
+type ItemRow = { itemName: string; quantity: string; notes: string };
+
+const emptyRow = (): ItemRow => ({ itemName: "", quantity: "1", notes: "" });
+
+type SourceRequest = {
+  name: string;
+  email: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  zip: string;
+  shoppingList: string | null;
+};
+
+export function NewConciergeOrderForm({
+  serviceRequestId,
+  source,
+}: {
+  serviceRequestId?: string;
+  source?: SourceRequest;
+}) {
+  const [state, formAction, pending] = useActionState(createConciergeOrder, initialState);
+  const [items, setItems] = useState<ItemRow[]>([emptyRow()]);
+
+  const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
+
+  function updateItem(index: number, patch: Partial<ItemRow>) {
+    setItems((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  function addRow() {
+    setItems((rows) => [...rows, emptyRow()]);
+  }
+
+  function removeRow(index: number) {
+    setItems((rows) => (rows.length > 1 ? rows.filter((_, i) => i !== index) : rows));
+  }
+
+  return (
+    <form action={formAction} className="flex flex-col gap-10">
+      {state && !state.ok ? (
+        <p role="alert" className="font-sans text-sm text-red-600">
+          {state.message}
+        </p>
+      ) : null}
+
+      {serviceRequestId ? (
+        <input type="hidden" name="serviceRequestId" value={serviceRequestId} />
+      ) : null}
+
+      {source?.shoppingList ? (
+        <div className="rounded-sm border border-navy/10 bg-ivory p-4">
+          <p className="font-sans text-xs font-semibold uppercase tracking-[0.15em] text-charcoal/50">
+            Original request (reference only)
+          </p>
+          <p className="mt-2 whitespace-pre-wrap font-sans text-sm text-charcoal/80">
+            {source.shoppingList}
+          </p>
+        </div>
+      ) : null}
+
+      <fieldset className="flex flex-col gap-4">
+        <legend className="font-serif text-lg text-navy-deep">Customer</legend>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField
+            name="customerName"
+            label="Full name"
+            required
+            defaultValue={source?.name}
+            error={fieldErrors?.customerName}
+          />
+          <TextField
+            name="customerEmail"
+            type="email"
+            label="Email"
+            required
+            defaultValue={source?.email}
+            error={fieldErrors?.customerEmail}
+          />
+          <TextField
+            name="customerPhone"
+            type="tel"
+            label="Phone"
+            required
+            defaultValue={source?.phone}
+            error={fieldErrors?.customerPhone}
+          />
+        </div>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-4">
+        <legend className="font-serif text-lg text-navy-deep">Delivery Address</legend>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField
+            name="deliveryAddressLine1"
+            label="Address"
+            required
+            className="sm:col-span-2"
+            defaultValue={source?.addressLine1}
+            error={fieldErrors?.deliveryAddressLine1}
+          />
+          <TextField
+            name="deliveryAddressLine2"
+            label="Address line 2"
+            className="sm:col-span-2"
+            defaultValue={source?.addressLine2 ?? undefined}
+            error={fieldErrors?.deliveryAddressLine2}
+          />
+          <TextField
+            name="deliveryCity"
+            label="City"
+            required
+            defaultValue={source?.city}
+            error={fieldErrors?.deliveryCity}
+          />
+          <TextField
+            name="deliveryState"
+            label="State"
+            required
+            defaultValue={source?.state}
+            error={fieldErrors?.deliveryState}
+          />
+          <TextField
+            name="deliveryZip"
+            label="ZIP code"
+            required
+            defaultValue={source?.zip}
+            error={fieldErrors?.deliveryZip}
+          />
+        </div>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-4">
+        <legend className="font-serif text-lg text-navy-deep">Shopping List</legend>
+        <div className="flex flex-col gap-3">
+          {items.map((row, index) => (
+            <div key={index} className="grid gap-3 sm:grid-cols-[2fr_1fr_2fr_auto] sm:items-end">
+              <TextField
+                name={`item-name-${index}`}
+                label="Item"
+                required
+                value={row.itemName}
+                onChange={(e) => updateItem(index, { itemName: e.target.value })}
+              />
+              <TextField
+                name={`item-qty-${index}`}
+                label="Quantity"
+                required
+                value={row.quantity}
+                onChange={(e) => updateItem(index, { quantity: e.target.value })}
+              />
+              <TextField
+                name={`item-notes-${index}`}
+                label="Notes / brand preference"
+                value={row.notes}
+                onChange={(e) => updateItem(index, { notes: e.target.value })}
+              />
+              <Button
+                type="button"
+                variant="outline-dark"
+                onClick={() => removeRow(index)}
+                disabled={items.length === 1}
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
+        </div>
+        <Button type="button" variant="outline-dark" className="self-start" onClick={addRow}>
+          Add Item
+        </Button>
+        {fieldErrors?.itemsJson ? (
+          <p role="alert" className="font-sans text-xs text-red-600">
+            {fieldErrors.itemsJson}
+          </p>
+        ) : null}
+      </fieldset>
+
+      <input type="hidden" name="itemsJson" value={JSON.stringify(items)} />
+
+      <TextareaField name="customerNotes" label="Notes" hint="Gate code, delivery preferences, anything else." />
+
+      <Button type="submit" variant="navy" size="lg" disabled={pending} className="self-start">
+        {pending ? "Creating…" : "Create Order & Build Quote"}
+      </Button>
+    </form>
+  );
+}

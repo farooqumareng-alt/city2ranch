@@ -25,6 +25,7 @@ export default async function DispatchPage() {
         id: orders.id,
         status: orders.status,
         createdAt: orders.createdAt,
+        serviceType: orders.serviceType,
         customerName: orders.customerName,
         customerPhone: orders.customerPhone,
         retailerOrderNumber: orders.retailerOrderNumber,
@@ -36,7 +37,8 @@ export default async function DispatchPage() {
         driverName: drivers.name,
       })
       .from(orders)
-      .innerJoin(stores, eq(orders.storeId, stores.id))
+      // leftJoin: a concierge order may have no store at all.
+      .leftJoin(stores, eq(orders.storeId, stores.id))
       .leftJoin(drivers, eq(orders.driverId, drivers.id))
       .where(inArray(orders.status, ACTIVE_STATUSES))
       .orderBy(asc(orders.createdAt)),
@@ -73,11 +75,11 @@ export default async function DispatchPage() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="font-serif text-lg text-navy-deep">
-                      {order.customerName} — {order.storeName}
+                      {order.customerName} — {order.storeName ?? "Concierge"}
                     </p>
                     <p className="font-sans text-xs text-charcoal/60">
-                      Order #{order.retailerOrderNumber} · {order.deliveryCity},{" "}
-                      {order.deliveryState} {order.deliveryZip} ·{" "}
+                      {order.retailerOrderNumber ? `Order #${order.retailerOrderNumber} · ` : ""}
+                      {order.deliveryCity}, {order.deliveryState} {order.deliveryZip} ·{" "}
                       {order.customerPhone}
                     </p>
                     <p className="font-sans text-xs text-charcoal/60">

@@ -46,7 +46,12 @@ export async function approveAndPayOrder(orderId: string) {
       {
         price_data: {
           currency: order.currency,
-          product_data: { name: "City2Ranch pickup & delivery" },
+          product_data: {
+            name:
+              order.serviceType === "concierge"
+                ? "City2Ranch Concierge Shopping & Delivery"
+                : "City2Ranch pickup & delivery",
+          },
           unit_amount: order.totalCents,
         },
         quantity: 1,

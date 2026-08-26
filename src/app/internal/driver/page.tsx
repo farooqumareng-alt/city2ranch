@@ -9,6 +9,7 @@ import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import { markPickedUp } from "@/lib/actions/driver-mark-picked-up";
 import { markInTransit } from "@/lib/actions/driver-mark-in-transit";
 import { ConfirmDeliveryForm } from "@/components/driver/ConfirmDeliveryForm";
+import { getOrderItems } from "@/lib/orders/concierge";
 
 export const metadata: Metadata = { title: "My Deliveries" };
 
@@ -24,6 +25,7 @@ export default async function DriverPage() {
     .select({
       id: orders.id,
       status: orders.status,
+      serviceType: orders.serviceType,
       assignedAt: orders.assignedAt,
       retailerOrderNumber: orders.retailerOrderNumber,
       pickupNotes: orders.pickupNotes,
@@ -39,9 +41,17 @@ export default async function DriverPage() {
       storeState: stores.state,
     })
     .from(orders)
-    .innerJoin(stores, eq(orders.storeId, stores.id))
+    // leftJoin: a concierge order may have no store at all.
+    .leftJoin(stores, eq(orders.storeId, stores.id))
     .where(and(eq(orders.driverId, driver.id), inArray(orders.status, ASSIGNED_STATUSES)))
     .orderBy(asc(orders.assignedAt));
+
+  const itemsByOrder = new Map<string, Awaited<ReturnType<typeof getOrderItems>>>();
+  for (const order of assignedOrders) {
+    if (order.serviceType === "concierge") {
+      itemsByOrder.set(order.id, await getOrderItems(order.id));
+    }
+  }
 
   return (
     <div className="flex flex-col gap-10">
@@ -63,22 +73,45 @@ export default async function DriverPage() {
               className="flex flex-col gap-4 rounded-sm border border-navy/10 bg-white/60 p-6"
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="font-serif text-lg text-navy-deep">
-                    Pickup: {order.storeName}
-                  </p>
-                  <p className="font-sans text-sm text-charcoal/70">
-                    {order.storeAddress}, {order.storeCity}, {order.storeState}
-                  </p>
-                  <p className="font-sans text-xs text-charcoal/60">
-                    Order #{order.retailerOrderNumber}
-                    {order.pickupNotes ? ` — ${order.pickupNotes}` : ""}
-                  </p>
-                </div>
+                {order.serviceType === "concierge" ? (
+                  <div>
+                    <p className="font-serif text-lg text-navy-deep">Concierge Order</p>
+                    {order.pickupNotes ? (
+                      <p className="font-sans text-xs text-charcoal/60">{order.pickupNotes}</p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-serif text-lg text-navy-deep">
+                      Pickup: {order.storeName}
+                    </p>
+                    <p className="font-sans text-sm text-charcoal/70">
+                      {order.storeAddress}, {order.storeCity}, {order.storeState}
+                    </p>
+                    <p className="font-sans text-xs text-charcoal/60">
+                      Order #{order.retailerOrderNumber}
+                      {order.pickupNotes ? ` — ${order.pickupNotes}` : ""}
+                    </p>
+                  </div>
+                )}
                 <span className="font-sans text-sm font-medium text-navy-deep">
                   {ORDER_STATUS_LABELS[order.status]}
                 </span>
               </div>
+
+              {order.serviceType === "concierge" ? (
+                <div>
+                  <p className="font-serif text-lg text-navy-deep">Shopping List</p>
+                  <ul className="mt-1 flex flex-col gap-1">
+                    {(itemsByOrder.get(order.id) ?? []).map((item) => (
+                      <li key={item.id} className="font-sans text-sm text-charcoal/70">
+                        {item.itemName} <span className="text-charcoal/50">— {item.quantity}</span>
+                        {item.notes ? <span className="text-charcoal/50"> ({item.notes})</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               <div>
                 <p className="font-serif text-lg text-navy-deep">Deliver to</p>

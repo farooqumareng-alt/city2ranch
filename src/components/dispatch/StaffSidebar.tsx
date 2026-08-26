@@ -1,10 +1,11 @@
 import { PanelSidebar } from "@/components/layout/PanelSidebar";
 
-const STAFF_LINKS = [{ href: "/internal/dispatch", label: "Dispatch Queue" }];
+const STAFF_LINKS = [
+  { href: "/internal/dispatch", label: "Dispatch Queue" },
+  { href: "/internal/dispatch/concierge", label: "Concierge Quotes" },
+];
 
-/** Same pattern as AccountSidebar/DriverSidebar — one item today, but
- *  a real nav shell rather than a one-off, since staff tooling is the
- *  most likely of the three to grow more pages next. */
+/** Same pattern as AccountSidebar/DriverSidebar. */
 export function StaffSidebar({ pathname }: { pathname: string }) {
   return <PanelSidebar links={STAFF_LINKS} pathname={pathname} />;
 }

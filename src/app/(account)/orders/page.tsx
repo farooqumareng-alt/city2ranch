@@ -30,7 +30,9 @@ export default async function OrdersPage() {
       storeName: stores.name,
     })
     .from(orders)
-    .innerJoin(stores, eq(orders.storeId, stores.id))
+    // leftJoin, not innerJoin: a concierge order has no storeId until
+    // staff picks one while building the quote.
+    .leftJoin(stores, eq(orders.storeId, stores.id))
     .where(eq(orders.authUserId, user.id))
     .orderBy(desc(orders.createdAt));
 
@@ -56,7 +58,9 @@ export default async function OrdersPage() {
               className="flex flex-wrap items-center justify-between gap-2 py-4 hover:bg-white/50"
             >
               <div>
-                <p className="font-serif text-base text-navy-deep">{order.storeName}</p>
+                <p className="font-serif text-base text-navy-deep">
+                  {order.storeName ?? "Concierge Request"}
+                </p>
                 <p className="font-sans text-xs text-charcoal/60">
                   {new Date(order.createdAt).toLocaleDateString()}
                 </p>
