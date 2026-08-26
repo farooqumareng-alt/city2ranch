@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { pricingRules, zipMileage } from "@/lib/db/schema";
-import type { PricingRule } from "@/lib/pricing/compute-price";
+import { DEFAULT_SERVICE_LABEL, type PricingRule } from "@/lib/pricing/compute-price";
 
 /**
  * The currently-active pricing rule. Throws if none is configured or if
@@ -34,6 +34,7 @@ export async function getActivePricingRule(): Promise<
     baseFeeCents: rule.baseFeeCents,
     perMileCents: rule.perMileCents,
     minFeeCents: rule.minFeeCents,
+    serviceLabel: rule.serviceLabel ?? DEFAULT_SERVICE_LABEL,
   };
 }
 

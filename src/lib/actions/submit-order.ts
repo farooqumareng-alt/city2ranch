@@ -57,11 +57,14 @@ export async function submitOrder(
     // customer input, so a customer can never manipulate the price.
     const roundTripMiles = await getZipMileage(data.deliveryZip);
     if (roundTripMiles == null) {
+      // No route data for this ZIP — never invent a price. Point the
+      // customer at the waitlist (real lead-capture) rather than a dead
+      // end; a concierge follows up once this corridor is configured.
       return {
         ok: false,
         message:
-          "We don't currently deliver to this ZIP code yet. Join the waitlist from the Service Area page and we'll let you know when we do.",
-        fieldErrors: { deliveryZip: "Not currently in our service area." },
+          "Your location requires a custom City2Ranch service quote. Join the waitlist from the Service Area page and a concierge will follow up.",
+        fieldErrors: { deliveryZip: "Quote required for this ZIP code." },
       };
     }
 
@@ -87,6 +90,7 @@ export async function submitOrder(
         customerNotes: data.customerNotes,
         status: "priced",
         pricingRuleId: rule.id,
+        serviceLabel: rule.serviceLabel,
         roundTripMiles: String(roundTripMiles),
         baseFeeCents: price.baseFeeCents,
         mileageFeeCents: price.mileageFeeCents,

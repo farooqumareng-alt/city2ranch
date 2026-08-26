@@ -71,6 +71,13 @@
       "when": 1787690831213,
       "tag": "0009_rls_customer_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787703433363,
+      "tag": "0010_pricing_service_label",
+      "breakpoints": true
     }
   ]
 }

@@ -35,8 +35,7 @@ export default async function OrderDetailPage({
       deliveryCity: orders.deliveryCity,
       deliveryState: orders.deliveryState,
       deliveryZip: orders.deliveryZip,
-      baseFeeCents: orders.baseFeeCents,
-      mileageFeeCents: orders.mileageFeeCents,
+      serviceLabel: orders.serviceLabel,
       totalCents: orders.totalCents,
       deliveryPin: orders.deliveryPin,
       paidAt: orders.paidAt,
@@ -106,27 +105,24 @@ export default async function OrderDetailPage({
 
         <div className="flex flex-col gap-4 rounded-sm border border-navy/10 bg-white/60 p-6">
           <h3 className="font-serif text-lg text-navy-deep">Price</h3>
-          <dl className="flex flex-col gap-2 font-sans text-sm">
-            <div className="flex justify-between">
-              <dt className="text-charcoal/70">Base fee</dt>
-              <dd>${(order.baseFeeCents / 100).toFixed(2)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-charcoal/70">Mileage</dt>
-              <dd>${(order.mileageFeeCents / 100).toFixed(2)}</dd>
-            </div>
-            <div className="flex justify-between border-t border-navy/10 pt-2 font-medium text-navy-deep">
-              <dt>Total</dt>
-              <dd>${(order.totalCents / 100).toFixed(2)}</dd>
-            </div>
-          </dl>
+          <div className="flex flex-col gap-1">
+            <p className="font-sans text-sm text-charcoal/70">{order.serviceLabel}</p>
+            <p className="font-serif text-3xl text-navy-deep">
+              ${(order.totalCents / 100).toFixed(2)}
+            </p>
+          </div>
 
           {order.status === "priced" ? (
-            <form action={approveAndPayOrder.bind(null, order.id)}>
-              <Button type="submit" variant="gold" className="w-full">
-                Approve &amp; Pay
-              </Button>
-            </form>
+            <>
+              <p className="font-sans text-xs text-charcoal/60">
+                Final pricing confirmed before service begins.
+              </p>
+              <form action={approveAndPayOrder.bind(null, order.id)}>
+                <Button type="submit" variant="gold" className="w-full">
+                  Approve &amp; Pay
+                </Button>
+              </form>
+            </>
           ) : (
             <p className="font-sans text-sm text-charcoal/70">
               Status: {ORDER_STATUS_LABELS[order.status]}

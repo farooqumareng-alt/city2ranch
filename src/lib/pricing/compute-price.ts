@@ -2,7 +2,13 @@ export type PricingRule = {
   baseFeeCents: number;
   perMileCents: number;
   minFeeCents: number | null;
+  /** Customer-facing name, e.g. "Rural Route Service". Resolved to a
+   *  generic fallback in the repository if the rule row has none set. */
+  serviceLabel: string;
 };
+
+/** Shown to the customer when a rule has no explicit serviceLabel. */
+export const DEFAULT_SERVICE_LABEL = "City2Ranch Rural Route Service";
 
 export type PriceBreakdown = {
   baseFeeCents: number;

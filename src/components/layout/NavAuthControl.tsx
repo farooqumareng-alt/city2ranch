@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { signOut } from "@/lib/actions/sign-out";
@@ -38,15 +38,6 @@ export function NavAuthControl({
     return () => subscription.subscription.unsubscribe();
   }, []);
 
-  const linkClass =
-    variant === "desktop"
-      ? "font-sans text-sm text-charcoal/75 transition-colors hover:text-gold"
-      : "block py-1 font-sans text-base text-navy-deep hover:text-gold";
-  const signOutButtonClass =
-    variant === "desktop"
-      ? "font-sans text-sm text-charcoal/50 transition-colors hover:text-gold"
-      : "py-1 font-sans text-base text-charcoal/60 hover:text-gold";
-
   // Unknown yet (first client paint, before getUser() resolves): render
   // nothing rather than guessing, to avoid a visible flash from the
   // wrong guess in the common case (already signed in).
@@ -55,6 +46,10 @@ export function NavAuthControl({
   }
 
   if (!signedIn) {
+    const linkClass =
+      variant === "desktop"
+        ? "font-sans text-sm text-charcoal/75 transition-colors hover:text-gold"
+        : "block py-1 font-sans text-base text-navy-deep hover:text-gold";
     return (
       <Link href="/sign-in" className={linkClass}>
         Sign In
@@ -62,39 +57,105 @@ export function NavAuthControl({
     );
   }
 
-  const accountLink = (
-    <Link href="/orders" className={linkClass}>
-      My Orders
-    </Link>
-  );
-  const profileLink = (
-    <Link href="/profile" className={linkClass}>
-      Profile
-    </Link>
-  );
-  const signOutButton = (
-    <form action={signOut}>
-      <button type="submit" className={signOutButtonClass}>
-        Sign Out
-      </button>
-    </form>
-  );
-
-  if (variant === "mobile") {
-    return (
-      <>
-        {accountLink}
-        {profileLink}
-        {signOutButton}
-      </>
-    );
+  // Desktop: account management (Orders/Profile/Sign Out) collapses into
+  // one "My Account" menu — a single control competing with "Request a
+  // Pickup" for attention, not three. Mobile: the hamburger panel is
+  // already a full expanded menu, so a nested dropdown inside it would
+  // just add friction — list the items directly, as before.
+  if (variant === "desktop") {
+    return <DesktopAccountMenu />;
   }
 
+  const mobileLinkClass = "block py-1 font-sans text-base text-navy-deep hover:text-gold";
   return (
-    <div className="flex items-center gap-4">
-      {accountLink}
-      {profileLink}
-      {signOutButton}
+    <>
+      <Link href="/orders" className={mobileLinkClass}>
+        My Orders
+      </Link>
+      <Link href="/profile" className={mobileLinkClass}>
+        Profile
+      </Link>
+      <form action={signOut}>
+        <button
+          type="submit"
+          className="py-1 font-sans text-base text-charcoal/60 hover:text-gold"
+        >
+          Sign Out
+        </button>
+      </form>
+    </>
+  );
+}
+
+function DesktopAccountMenu() {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(event: PointerEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  const menuItemClass =
+    "block px-4 py-2 font-sans text-sm text-charcoal/75 transition-colors hover:bg-ivory hover:text-gold";
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex items-center gap-1.5 font-sans text-sm text-charcoal/75 transition-colors hover:text-gold"
+      >
+        My Account
+        <svg
+          width="10"
+          height="6"
+          viewBox="0 0 10 6"
+          fill="none"
+          aria-hidden="true"
+          className={`transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-50 mt-2 w-44 rounded-sm border border-navy/10 bg-white py-2 shadow-lg"
+        >
+          <Link href="/orders" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
+            My Orders
+          </Link>
+          <Link href="/profile" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
+            Profile
+          </Link>
+          <form action={signOut}>
+            <button
+              type="submit"
+              role="menuitem"
+              className={`w-full text-left ${menuItemClass}`}
+            >
+              Sign Out
+            </button>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }

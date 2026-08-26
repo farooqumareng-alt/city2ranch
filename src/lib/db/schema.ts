@@ -254,12 +254,21 @@ export const drivers = pgTable(
  * every order snapshots its computed price at request time, so a later
  * pricing change never alters a historical order. Only one row should
  * have `isActive = true` at a time (enforced by the app, not the DB).
+ *
+ * baseFeeCents/perMileCents/minFeeCents remain the internal formula used
+ * to derive a price from distance (useful for route economics, driver
+ * comp, and viability checks) — but that breakdown is never shown to the
+ * customer. serviceLabel is the customer-facing name for what they're
+ * actually being charged (e.g. "Rural Route Service"); a null value
+ * falls back to a generic label in app code rather than forcing every
+ * row to have one via a DB constraint.
  */
 export const pricingRules = pgTable("pricing_rules", {
   id: uuid("id").primaryKey().defaultRandom(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+  serviceLabel: text("service_label"),
   baseFeeCents: integer("base_fee_cents").notNull(),
   perMileCents: integer("per_mile_cents").notNull(),
   minFeeCents: integer("min_fee_cents"),
@@ -333,10 +342,19 @@ export const orders = pgTable("orders", {
   pricingRuleId: uuid("pricing_rule_id")
     .notNull()
     .references(() => pricingRules.id),
+  // Snapshotted from pricingRules.serviceLabel at request time — the
+  // customer-facing name, e.g. "Rural Route Service". Never null (the
+  // fallback used when the rule itself has no label is resolved and
+  // stored here), so a later rename of the rule doesn't retroactively
+  // change what a historical order displays.
+  serviceLabel: text("service_label").notNull(),
   roundTripMiles: numeric("round_trip_miles", {
     precision: 6,
     scale: 1,
   }).notNull(),
+  // Internal cost breakdown only (route economics, driver comp) — the
+  // customer never sees "base" or "mileage" as separate line items, only
+  // serviceLabel + totalCents.
   baseFeeCents: integer("base_fee_cents").notNull(),
   mileageFeeCents: integer("mileage_fee_cents").notNull(),
   totalCents: integer("total_cents").notNull(),

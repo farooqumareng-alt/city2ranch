@@ -4,7 +4,7 @@ import { computePrice } from "./compute-price";
 describe("computePrice", () => {
   it("computes base + mileage with no floor", () => {
     const result = computePrice(
-      { baseFeeCents: 1500, perMileCents: 150, minFeeCents: null },
+      { baseFeeCents: 1500, perMileCents: 150, minFeeCents: null, serviceLabel: "Rural Route Service" },
       25
     );
     expect(result).toEqual({
@@ -16,7 +16,7 @@ describe("computePrice", () => {
 
   it("rounds a fractional mileage fee to the nearest cent", () => {
     const result = computePrice(
-      { baseFeeCents: 1000, perMileCents: 133, minFeeCents: null },
+      { baseFeeCents: 1000, perMileCents: 133, minFeeCents: null, serviceLabel: "Rural Route Service" },
       10.4
     );
     // 133 * 10.4 = 1383.2 -> rounds to 1383
@@ -26,7 +26,7 @@ describe("computePrice", () => {
 
   it("applies the minimum-fee floor when base + mileage falls short", () => {
     const result = computePrice(
-      { baseFeeCents: 500, perMileCents: 50, minFeeCents: 2500 },
+      { baseFeeCents: 500, perMileCents: 50, minFeeCents: 2500, serviceLabel: "Rural Route Service" },
       2
     );
     // base 500 + mileage 100 = 600, below the 2500 floor
@@ -37,7 +37,7 @@ describe("computePrice", () => {
 
   it("does not apply the floor when it's already exceeded", () => {
     const result = computePrice(
-      { baseFeeCents: 1500, perMileCents: 150, minFeeCents: 2500 },
+      { baseFeeCents: 1500, perMileCents: 150, minFeeCents: 2500, serviceLabel: "Rural Route Service" },
       25
     );
     expect(result.totalCents).toBe(5250);
@@ -45,7 +45,7 @@ describe("computePrice", () => {
 
   it("treats zero miles as base fee only", () => {
     const result = computePrice(
-      { baseFeeCents: 1500, perMileCents: 150, minFeeCents: null },
+      { baseFeeCents: 1500, perMileCents: 150, minFeeCents: null, serviceLabel: "Rural Route Service" },
       0
     );
     expect(result).toEqual({
