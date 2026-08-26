@@ -11,6 +11,8 @@ import { sumFeeLines } from "@/lib/pricing/fee-lines";
 import { conciergeQuoteFinalizeSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
 import { logAuditEvent } from "@/lib/audit";
+import { getResend } from "@/lib/email/resend";
+import { quoteReadyEmail } from "@/lib/email/templates";
 
 /**
  * Replaces a concierge order's fee lines, recomputes totalCents as their
@@ -84,6 +86,29 @@ export async function finalizeConciergeQuote(
       newState: "priced",
       metadata: { totalCents, lineCount: feeLines.length },
     });
+
+    // Non-blocking: an unclaimed order (no authUserId yet — see
+    // claim-order.ts) needs to tell the customer their quote is ready,
+    // since nothing else would prompt them to sign in and look. Failure
+    // here never blocks the quote from being finalized.
+    if (!order.authUserId) {
+      try {
+        const resend = getResend();
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+        const { subject, html } = quoteReadyEmail({
+          totalCents,
+          signInUrl: `${siteUrl}/sign-in?next=/orders`,
+        });
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM ?? "notifications@city2ranch.com",
+          to: order.customerEmail,
+          subject,
+          html,
+        });
+      } catch (error) {
+        console.error("[finalizeConciergeQuote] quote-ready email failed", error);
+      }
+    }
   } catch (error) {
     console.error("[finalizeConciergeQuote] failed", error);
     return {

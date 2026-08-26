@@ -134,6 +134,18 @@ export function orderPaymentConfirmedEmail(fields: {
   );
 }
 
+export function quoteReadyEmail(fields: { totalCents: number; signInUrl: string }) {
+  const total = (fields.totalCents / 100).toFixed(2);
+  return customerWrap(
+    "Your Quote Is Ready",
+    `
+      <p>Your City2Ranch concierge has finished your quote — total: <strong>$${total}</strong>.</p>
+      <p>Sign in to review the details and approve it before anything is charged.</p>
+      <p><a href="${fields.signInUrl}" style="color:#0B2445;">Sign in to review your quote</a></p>
+    `
+  );
+}
+
 export function contactMessageEmail(fields: {
   name: string;
   email: string;
