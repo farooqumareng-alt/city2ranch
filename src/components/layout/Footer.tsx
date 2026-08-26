@@ -7,9 +7,10 @@ export function Footer() {
     <footer className="border-t border-ivory/10 bg-navy-deep pb-24 pt-16 text-ivory md:pb-16">
       <Container className="flex flex-col gap-10 sm:flex-row sm:justify-between">
         <div className="flex max-w-sm flex-col gap-3">
-          <span className="font-serif text-xl tracking-wide">
-            {SITE_NAME.toUpperCase()}
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a
+              plain <img> avoids next/image's SVG size-inference issues
+              with this file's viewBox-only sizing */}
+          <img src="/logo-white.svg" alt={SITE_NAME} className="h-9 w-auto" />
           <p className="font-sans text-sm text-gold">
             Private Rural Concierge &amp; Delivery
           </p>
