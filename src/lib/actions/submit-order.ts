@@ -5,11 +5,26 @@ import { getDb } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
 import { formServicesConfigured, SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/env";
 import { orderSubmitSchema } from "@/lib/validation/schemas";
-import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
+import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { computePrice } from "@/lib/pricing/compute-price";
 import { getActivePricingRule, getZipMileage } from "@/lib/pricing/repository";
 import { logAuditEvent } from "@/lib/audit";
+
+const FORM_FIELDS = [
+  "storeId",
+  "retailerOrderNumber",
+  "customerName",
+  "customerPhone",
+  "pickupNotes",
+  "deliveryAddressLine1",
+  "deliveryAddressLine2",
+  "deliveryCity",
+  "deliveryState",
+  "deliveryZip",
+  "customerNotes",
+  "requestedDeliveryDate",
+];
 
 export async function submitOrder(
   _prev: ActionResult | undefined,
@@ -35,6 +50,7 @@ export async function submitOrder(
     deliveryState: formData.get("deliveryState"),
     deliveryZip: formData.get("deliveryZip"),
     customerNotes: formData.get("customerNotes"),
+    requestedDeliveryDate: formData.get("requestedDeliveryDate"),
   });
 
   if (!parsed.success) {
@@ -42,11 +58,16 @@ export async function submitOrder(
       ok: false,
       message: "Please correct the highlighted fields.",
       fieldErrors: firstFieldErrors(parsed.error.flatten().fieldErrors),
+      values: valuesFromFormData(formData, FORM_FIELDS),
     };
   }
 
   if (!formServicesConfigured()) {
-    return { ok: false, message: SERVICE_UNAVAILABLE_MESSAGE };
+    return {
+      ok: false,
+      message: SERVICE_UNAVAILABLE_MESSAGE,
+      values: valuesFromFormData(formData, FORM_FIELDS),
+    };
   }
 
   const data = parsed.data;
@@ -65,6 +86,7 @@ export async function submitOrder(
         message:
           "Your location requires a custom City2Ranch service quote. Join the waitlist from the Service Area page and a concierge will follow up.",
         fieldErrors: { deliveryZip: "Quote required for this ZIP code." },
+        values: valuesFromFormData(formData, FORM_FIELDS),
       };
     }
 
@@ -88,6 +110,7 @@ export async function submitOrder(
         deliveryState: data.deliveryState,
         deliveryZip: data.deliveryZip,
         customerNotes: data.customerNotes,
+        requestedDeliveryDate: data.requestedDeliveryDate,
         serviceType: "pickup",
         status: "priced",
         pricingRuleId: rule.id,
@@ -111,7 +134,11 @@ export async function submitOrder(
     });
   } catch (error) {
     console.error("[submitOrder] failed", error);
-    return { ok: false, message: SERVICE_UNAVAILABLE_MESSAGE };
+    return {
+      ok: false,
+      message: SERVICE_UNAVAILABLE_MESSAGE,
+      values: valuesFromFormData(formData, FORM_FIELDS),
+    };
   }
 
   redirect(`/orders/${orderId}`);

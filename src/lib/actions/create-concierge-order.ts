@@ -8,8 +8,24 @@ import { requireStaff } from "@/lib/auth/roles";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getZipMileage } from "@/lib/pricing/repository";
 import { conciergeOrderCreateSchema } from "@/lib/validation/schemas";
-import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
+import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 import { logAuditEvent } from "@/lib/audit";
+
+// itemsJson deliberately excluded — it's re-serialized client-side from
+// NewConciergeOrderForm's own `items` state, which a failed submission
+// never clears (only the flat fields below need round-tripping here).
+const FORM_FIELDS = [
+  "customerName",
+  "customerEmail",
+  "customerPhone",
+  "deliveryAddressLine1",
+  "deliveryAddressLine2",
+  "deliveryCity",
+  "deliveryState",
+  "deliveryZip",
+  "customerNotes",
+  "requestedDeliveryDate",
+];
 
 /**
  * Staff-side concierge order creation. Unlike submitOrder (City Pickup),
@@ -38,6 +54,7 @@ export async function createConciergeOrder(
     deliveryState: formData.get("deliveryState"),
     deliveryZip: formData.get("deliveryZip"),
     customerNotes: formData.get("customerNotes"),
+    requestedDeliveryDate: formData.get("requestedDeliveryDate"),
     itemsJson: formData.get("itemsJson"),
   });
 
@@ -46,6 +63,7 @@ export async function createConciergeOrder(
       ok: false,
       message: "Please correct the highlighted fields.",
       fieldErrors: firstFieldErrors(parsed.error.flatten().fieldErrors),
+      values: valuesFromFormData(formData, FORM_FIELDS),
     };
   }
 
@@ -64,6 +82,7 @@ export async function createConciergeOrder(
         message:
           "This ZIP code has no route data yet. Add it to zip_mileage before creating an order for this address.",
         fieldErrors: { deliveryZip: "No route configured for this ZIP." },
+        values: valuesFromFormData(formData, FORM_FIELDS),
       };
     }
 
@@ -83,6 +102,7 @@ export async function createConciergeOrder(
           deliveryState: data.deliveryState,
           deliveryZip: data.deliveryZip,
           customerNotes: data.customerNotes,
+          requestedDeliveryDate: data.requestedDeliveryDate,
           status: "quote_pending",
           serviceLabel: "City2Ranch Concierge Shopping & Delivery",
           totalCents: 0,
@@ -122,6 +142,7 @@ export async function createConciergeOrder(
     return {
       ok: false,
       message: "We couldn't create the order right now. Please try again shortly.",
+      values: valuesFromFormData(formData, FORM_FIELDS),
     };
   }
 

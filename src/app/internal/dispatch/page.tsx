@@ -8,6 +8,7 @@ import { canTransition } from "@/lib/orders/status";
 import { cancelOrder, failOrder } from "@/lib/actions/staff-order-exceptions";
 import { AssignDriverForm } from "@/components/dispatch/AssignDriverForm";
 import { OrderExceptionForm } from "@/components/dispatch/OrderExceptionForm";
+import { formatPlainDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Dispatch" };
 
@@ -32,6 +33,7 @@ export default async function DispatchPage() {
         deliveryCity: orders.deliveryCity,
         deliveryState: orders.deliveryState,
         deliveryZip: orders.deliveryZip,
+        requestedDeliveryDate: orders.requestedDeliveryDate,
         totalCents: orders.totalCents,
         storeName: stores.name,
         driverName: drivers.name,
@@ -84,6 +86,9 @@ export default async function DispatchPage() {
                     </p>
                     <p className="font-sans text-xs text-charcoal/60">
                       Placed {new Date(order.createdAt).toLocaleString()}
+                      {order.requestedDeliveryDate
+                        ? ` · Requested for ${formatPlainDate(order.requestedDeliveryDate)}`
+                        : ""}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1">

@@ -7,6 +7,7 @@ import { getDb } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
 import { getOrderItems, getOrderFeeLines } from "@/lib/orders/concierge";
 import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
+import { formatPlainDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Concierge Quote" };
 
@@ -29,7 +30,11 @@ export default async function ConciergeQuoteEditPage({
       <SectionHeading
         eyebrow={ORDER_STATUS_LABELS[order.status]}
         title={`Concierge Order — ${order.customerName}`}
-        description={`${order.deliveryAddressLine1}, ${order.deliveryCity}, ${order.deliveryState} ${order.deliveryZip} · ${order.customerPhone} · ${order.customerEmail}`}
+        description={`${order.deliveryAddressLine1}, ${order.deliveryCity}, ${order.deliveryState} ${order.deliveryZip} · ${order.customerPhone} · ${order.customerEmail}${
+          order.requestedDeliveryDate
+            ? ` · Requested for ${formatPlainDate(order.requestedDeliveryDate)}`
+            : ""
+        }`}
       />
 
       <div className="grid gap-8 sm:grid-cols-2">

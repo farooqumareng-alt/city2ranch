@@ -6,7 +6,25 @@ import { getResend } from "@/lib/email/resend";
 import { serviceRequestEmail } from "@/lib/email/templates";
 import { formServicesConfigured, SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/env";
 import { serviceRequestSchema } from "@/lib/validation/schemas";
-import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
+import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
+
+const FORM_FIELDS = [
+  "name",
+  "email",
+  "phone",
+  "addressLine1",
+  "addressLine2",
+  "city",
+  "state",
+  "zip",
+  "serviceType",
+  "preferredStore",
+  "shoppingList",
+  "estimatedOrderValue",
+  "timingPreference",
+  "requestedDeliveryDate",
+  "notes",
+];
 
 export async function submitServiceRequest(
   _prev: ActionResult | undefined,
@@ -26,6 +44,7 @@ export async function submitServiceRequest(
     shoppingList: formData.get("shoppingList"),
     estimatedOrderValue: formData.get("estimatedOrderValue"),
     timingPreference: formData.get("timingPreference"),
+    requestedDeliveryDate: formData.get("requestedDeliveryDate"),
     notes: formData.get("notes"),
   });
 
@@ -34,11 +53,16 @@ export async function submitServiceRequest(
       ok: false,
       message: "Please correct the highlighted fields.",
       fieldErrors: firstFieldErrors(parsed.error.flatten().fieldErrors),
+      values: valuesFromFormData(formData, FORM_FIELDS),
     };
   }
 
   if (!formServicesConfigured()) {
-    return { ok: false, message: SERVICE_UNAVAILABLE_MESSAGE };
+    return {
+      ok: false,
+      message: SERVICE_UNAVAILABLE_MESSAGE,
+      values: valuesFromFormData(formData, FORM_FIELDS),
+    };
   }
 
   const data = parsed.data;
@@ -48,7 +72,11 @@ export async function submitServiceRequest(
     await db.insert(serviceRequests).values(data);
   } catch (error) {
     console.error("[submitServiceRequest] database write failed", error);
-    return { ok: false, message: SERVICE_UNAVAILABLE_MESSAGE };
+    return {
+      ok: false,
+      message: SERVICE_UNAVAILABLE_MESSAGE,
+      values: valuesFromFormData(formData, FORM_FIELDS),
+    };
   }
 
   try {

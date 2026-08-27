@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   integer,
   jsonb,
   numeric,
@@ -104,6 +105,10 @@ export const serviceRequests = pgTable("service_requests", {
   shoppingList: text("shopping_list"),
   estimatedOrderValue: text("estimated_order_value"),
   timingPreference: text("timing_preference").notNull(),
+  // A calendar target, not a promise — staff still confirms real timing
+  // by phone/email when they follow up. Nullable: most requests don't
+  // name a specific date, just a timingPreference.
+  requestedDeliveryDate: date("requested_delivery_date"),
   notes: text("notes"),
   status: leadStatusEnum("status").notNull().default("new"),
 });
@@ -393,6 +398,10 @@ export const orders = pgTable("orders", {
     .notNull()
     .references(() => zipMileage.zip),
   customerNotes: text("customer_notes"),
+  // When the customer would like it delivered by — a target for
+  // dispatch/driver scheduling, not a contractual guarantee. Applies to
+  // both service types; nullable since most orders don't name one.
+  requestedDeliveryDate: date("requested_delivery_date"),
 
   // Concierge orders start at "quote_pending" (see orderStatusEnum) and
   // have no default here that would silently mislabel them — every
@@ -441,6 +450,25 @@ export const orders = pgTable("orders", {
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   cancellationReason: text("cancellation_reason"),
   failureReason: text("failure_reason"),
+});
+
+/**
+ * Reference list of common grocery/shopping items, grouped by category —
+ * powers "quick add" suggestions on the customer request-service form and
+ * the staff concierge order builder, so neither has to be typed from
+ * scratch. Read-only from the app today (no admin UI yet); seeded via
+ * migration, editable directly in the DB until one exists. category is
+ * free text, not an enum, on purpose — the category list is expected to
+ * evolve without a schema migration.
+ */
+export const commonGroceryItems = pgTable("common_grocery_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  name: text("name").notNull().unique(),
+  category: text("category").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
 });
 
 /**

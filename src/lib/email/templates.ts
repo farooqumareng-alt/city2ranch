@@ -77,6 +77,7 @@ export function serviceRequestEmail(fields: {
   shoppingList?: string;
   estimatedOrderValue?: string;
   timingPreference: string;
+  requestedDeliveryDate?: string;
   notes?: string;
 }) {
   return wrap("New Private Service Request", {
@@ -91,6 +92,7 @@ export function serviceRequestEmail(fields: {
     "Shopping list": fields.shoppingList,
     "Estimated order value": fields.estimatedOrderValue,
     Timing: fields.timingPreference,
+    "Requested delivery date": fields.requestedDeliveryDate,
     Notes: fields.notes,
   });
 }

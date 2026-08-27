@@ -29,6 +29,7 @@ export function OrderPickupForm({
   const [state, formAction, pending] = useActionState(submitOrder, initialState);
 
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
+  const values = state && !state.ok ? state.values : undefined;
 
   return (
     <form action={formAction} className="flex flex-col gap-10">
@@ -45,6 +46,7 @@ export function OrderPickupForm({
             name="storeId"
             label="Store"
             required
+            defaultValue={values?.storeId}
             options={stores.map((s) => ({
               value: s.id,
               label: `${s.name} — ${s.city}, ${s.state}`,
@@ -55,6 +57,7 @@ export function OrderPickupForm({
             name="retailerOrderNumber"
             label="Order / confirmation number"
             required
+            defaultValue={values?.retailerOrderNumber}
             error={fieldErrors?.retailerOrderNumber}
           />
         </div>
@@ -62,6 +65,7 @@ export function OrderPickupForm({
           name="pickupNotes"
           label="Pickup notes"
           hint="Anything the driver should know when picking up (e.g. curbside pickup instructions)."
+          defaultValue={values?.pickupNotes}
           error={fieldErrors?.pickupNotes}
         />
       </fieldset>
@@ -73,7 +77,7 @@ export function OrderPickupForm({
             name="customerName"
             label="Full name"
             required
-            defaultValue={profile?.name ?? ""}
+            defaultValue={values?.customerName ?? profile?.name ?? ""}
             error={fieldErrors?.customerName}
           />
           <TextField
@@ -81,7 +85,7 @@ export function OrderPickupForm({
             type="tel"
             label="Phone"
             required
-            defaultValue={profile?.phone ?? ""}
+            defaultValue={values?.customerPhone ?? profile?.phone ?? ""}
             error={fieldErrors?.customerPhone}
           />
         </div>
@@ -95,44 +99,54 @@ export function OrderPickupForm({
             label="Address"
             required
             className="sm:col-span-2"
-            defaultValue={profile?.defaultDeliveryAddressLine1 ?? ""}
+            defaultValue={values?.deliveryAddressLine1 ?? profile?.defaultDeliveryAddressLine1 ?? ""}
             error={fieldErrors?.deliveryAddressLine1}
           />
           <TextField
             name="deliveryAddressLine2"
             label="Address line 2"
             className="sm:col-span-2"
-            defaultValue={profile?.defaultDeliveryAddressLine2 ?? ""}
+            defaultValue={values?.deliveryAddressLine2 ?? profile?.defaultDeliveryAddressLine2 ?? ""}
             error={fieldErrors?.deliveryAddressLine2}
           />
           <TextField
             name="deliveryCity"
             label="City"
             required
-            defaultValue={profile?.defaultDeliveryCity ?? ""}
+            defaultValue={values?.deliveryCity ?? profile?.defaultDeliveryCity ?? ""}
             error={fieldErrors?.deliveryCity}
           />
           <TextField
             name="deliveryState"
             label="State"
             required
-            defaultValue={profile?.defaultDeliveryState ?? ""}
+            defaultValue={values?.deliveryState ?? profile?.defaultDeliveryState ?? ""}
             error={fieldErrors?.deliveryState}
           />
           <TextField
             name="deliveryZip"
             label="ZIP code"
             required
-            defaultValue={profile?.defaultDeliveryZip ?? ""}
+            defaultValue={values?.deliveryZip ?? profile?.defaultDeliveryZip ?? ""}
             error={fieldErrors?.deliveryZip}
           />
         </div>
       </fieldset>
 
+      <TextField
+        name="requestedDeliveryDate"
+        type="date"
+        label="Preferred delivery date"
+        hint="Optional — let us know if you need it by a specific date."
+        defaultValue={values?.requestedDeliveryDate}
+        error={fieldErrors?.requestedDeliveryDate}
+      />
+
       <TextareaField
         name="customerNotes"
         label="Notes"
         hint="Gate code, delivery preferences, anything else."
+        defaultValue={values?.customerNotes}
         error={fieldErrors?.customerNotes}
       />
 

@@ -23,6 +23,16 @@ const optionalZip = z
   .transform((v) => (v === "" ? undefined : v))
   .refine((v) => v === undefined || /^\d{5}$/.test(v), "Enter a 5-digit ZIP code.");
 
+// A native <input type="date"> always submits "" or "YYYY-MM-DD" — never a
+// customer-typed price or ZIP, just a plain calendar date the concierge
+// team treats as a target, not a guarantee.
+const optionalDate = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v === "" ? undefined : v))
+  .refine((v) => v === undefined || /^\d{4}-\d{2}-\d{2}$/.test(v), "Enter a valid date.");
+
 const email = z.email("Enter a valid email address.");
 const phone = z
   .string()
@@ -82,6 +92,7 @@ export const serviceRequestSchema = z.object({
   shoppingList: optionalText,
   estimatedOrderValue: optionalText,
   timingPreference: requiredText("Timing preference"),
+  requestedDeliveryDate: optionalDate,
   notes: optionalText,
 });
 export type ServiceRequestInput = z.infer<typeof serviceRequestSchema>;
@@ -98,6 +109,7 @@ export const orderSubmitSchema = z.object({
   deliveryState: requiredText("State", 2),
   deliveryZip: zip,
   customerNotes: optionalText,
+  requestedDeliveryDate: optionalDate,
 });
 export type OrderSubmitInput = z.infer<typeof orderSubmitSchema>;
 
@@ -140,6 +152,7 @@ export const conciergeOrderCreateSchema = z.object({
   deliveryState: requiredText("State", 2),
   deliveryZip: zip,
   customerNotes: optionalText,
+  requestedDeliveryDate: optionalDate,
   itemsJson: z
     .string()
     .transform((raw, ctx) => {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { getDb } from "@/lib/db";
 import { orders, serviceRequests } from "@/lib/db/schema";
 import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
+import { formatPlainDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Concierge Quotes" };
 
@@ -54,6 +55,9 @@ export default async function ConciergeQueuePage() {
                   <p className="font-serif text-base text-navy-deep">{req.name}</p>
                   <p className="font-sans text-xs text-charcoal/60">
                     {req.email} · {req.phone} · {new Date(req.createdAt).toLocaleDateString()}
+                    {req.requestedDeliveryDate
+                      ? ` · Requested for ${formatPlainDate(req.requestedDeliveryDate)}`
+                      : ""}
                   </p>
                 </div>
                 <Button href={`/internal/dispatch/concierge/new?fromRequest=${req.id}`} variant="outline-dark">

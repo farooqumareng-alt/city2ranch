@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { createConciergeOrder } from "@/lib/actions/create-concierge-order";
 import { TextField, TextareaField } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
+import { GroceryItemPicker, type GroceryItem } from "@/components/forms/GroceryItemPicker";
 import type { ActionResult } from "@/lib/actions/types";
 
 const initialState: ActionResult | undefined = undefined;
@@ -22,17 +23,21 @@ type SourceRequest = {
   state: string;
   zip: string;
   shoppingList: string | null;
+  requestedDeliveryDate: string | null;
 };
 
 export function NewConciergeOrderForm({
   serviceRequestId,
   source,
+  groceryItems = [],
 }: {
   serviceRequestId?: string;
   source?: SourceRequest;
+  groceryItems?: GroceryItem[];
 }) {
   const [state, formAction, pending] = useActionState(createConciergeOrder, initialState);
   const [items, setItems] = useState<ItemRow[]>([emptyRow()]);
+  const values = state && !state.ok ? state.values : undefined;
 
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
 
@@ -46,6 +51,19 @@ export function NewConciergeOrderForm({
 
   function removeRow(index: number) {
     setItems((rows) => (rows.length > 1 ? rows.filter((_, i) => i !== index) : rows));
+  }
+
+  // Fills the last row if it's still blank, rather than always appending —
+  // clicking three quick-add chips in a row shouldn't leave two empty
+  // rows behind from the default single starting row.
+  function quickAddItem(name: string) {
+    setItems((rows) => {
+      const last = rows[rows.length - 1];
+      if (last && last.itemName.trim() === "") {
+        return rows.map((row, i) => (i === rows.length - 1 ? { ...row, itemName: name } : row));
+      }
+      return [...rows, { itemName: name, quantity: "1", notes: "" }];
+    });
   }
 
   return (
@@ -78,7 +96,7 @@ export function NewConciergeOrderForm({
             name="customerName"
             label="Full name"
             required
-            defaultValue={source?.name}
+            defaultValue={values?.customerName ?? source?.name}
             error={fieldErrors?.customerName}
           />
           <TextField
@@ -86,7 +104,7 @@ export function NewConciergeOrderForm({
             type="email"
             label="Email"
             required
-            defaultValue={source?.email}
+            defaultValue={values?.customerEmail ?? source?.email}
             error={fieldErrors?.customerEmail}
           />
           <TextField
@@ -94,7 +112,7 @@ export function NewConciergeOrderForm({
             type="tel"
             label="Phone"
             required
-            defaultValue={source?.phone}
+            defaultValue={values?.customerPhone ?? source?.phone}
             error={fieldErrors?.customerPhone}
           />
         </div>
@@ -108,39 +126,48 @@ export function NewConciergeOrderForm({
             label="Address"
             required
             className="sm:col-span-2"
-            defaultValue={source?.addressLine1}
+            defaultValue={values?.deliveryAddressLine1 ?? source?.addressLine1}
             error={fieldErrors?.deliveryAddressLine1}
           />
           <TextField
             name="deliveryAddressLine2"
             label="Address line 2"
             className="sm:col-span-2"
-            defaultValue={source?.addressLine2 ?? undefined}
+            defaultValue={values?.deliveryAddressLine2 ?? source?.addressLine2 ?? undefined}
             error={fieldErrors?.deliveryAddressLine2}
           />
           <TextField
             name="deliveryCity"
             label="City"
             required
-            defaultValue={source?.city}
+            defaultValue={values?.deliveryCity ?? source?.city}
             error={fieldErrors?.deliveryCity}
           />
           <TextField
             name="deliveryState"
             label="State"
             required
-            defaultValue={source?.state}
+            defaultValue={values?.deliveryState ?? source?.state}
             error={fieldErrors?.deliveryState}
           />
           <TextField
             name="deliveryZip"
             label="ZIP code"
             required
-            defaultValue={source?.zip}
+            defaultValue={values?.deliveryZip ?? source?.zip}
             error={fieldErrors?.deliveryZip}
           />
         </div>
       </fieldset>
+
+      <TextField
+        name="requestedDeliveryDate"
+        type="date"
+        label="Requested delivery date"
+        hint="Optional — carried over from the customer's request if they gave one."
+        defaultValue={values?.requestedDeliveryDate ?? source?.requestedDeliveryDate ?? undefined}
+        error={fieldErrors?.requestedDeliveryDate}
+      />
 
       <fieldset className="flex flex-col gap-4">
         <legend className="font-serif text-lg text-navy-deep">Shopping List</legend>
@@ -181,6 +208,7 @@ export function NewConciergeOrderForm({
         <Button type="button" variant="outline-dark" className="self-start" onClick={addRow}>
           Add Item
         </Button>
+        <GroceryItemPicker items={groceryItems} onAdd={quickAddItem} />
         {fieldErrors?.itemsJson ? (
           <p role="alert" className="font-sans text-xs text-red-600">
             {fieldErrors.itemsJson}
@@ -190,7 +218,12 @@ export function NewConciergeOrderForm({
 
       <input type="hidden" name="itemsJson" value={JSON.stringify(items)} />
 
-      <TextareaField name="customerNotes" label="Notes" hint="Gate code, delivery preferences, anything else." />
+      <TextareaField
+        name="customerNotes"
+        label="Notes"
+        hint="Gate code, delivery preferences, anything else."
+        defaultValue={values?.customerNotes}
+      />
 
       <Button type="submit" variant="navy" size="lg" disabled={pending} className="self-start">
         {pending ? "Creating…" : "Create Order & Build Quote"}

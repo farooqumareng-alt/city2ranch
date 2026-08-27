@@ -4,6 +4,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { NewConciergeOrderForm } from "@/components/dispatch/NewConciergeOrderForm";
 import { getDb } from "@/lib/db";
 import { serviceRequests } from "@/lib/db/schema";
+import { getCommonGroceryItems } from "@/lib/grocery-items";
 
 export const metadata: Metadata = { title: "New Concierge Order" };
 
@@ -15,14 +16,13 @@ export default async function NewConciergeOrderPage({
   const { fromRequest } = await searchParams;
 
   let source;
-  if (fromRequest) {
-    const db = getDb();
-    const rows = await db
-      .select()
-      .from(serviceRequests)
-      .where(eq(serviceRequests.id, fromRequest));
-    source = rows[0];
-  }
+  const [rows, groceryItems] = await Promise.all([
+    fromRequest
+      ? getDb().select().from(serviceRequests).where(eq(serviceRequests.id, fromRequest))
+      : Promise.resolve([]),
+    getCommonGroceryItems(),
+  ]);
+  if (fromRequest) source = rows[0];
 
   return (
     <div className="flex flex-col gap-10">
@@ -38,6 +38,7 @@ export default async function NewConciergeOrderPage({
       <div className="max-w-2xl">
         <NewConciergeOrderForm
           serviceRequestId={source?.id}
+          groceryItems={groceryItems}
           source={
             source
               ? {
@@ -50,6 +51,7 @@ export default async function NewConciergeOrderPage({
                   state: source.state,
                   zip: source.zip,
                   shoppingList: source.shoppingList,
+                  requestedDeliveryDate: source.requestedDeliveryDate,
                 }
               : undefined
           }

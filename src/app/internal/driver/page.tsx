@@ -10,6 +10,7 @@ import { markPickedUp } from "@/lib/actions/driver-mark-picked-up";
 import { markInTransit } from "@/lib/actions/driver-mark-in-transit";
 import { ConfirmDeliveryForm } from "@/components/driver/ConfirmDeliveryForm";
 import { getOrderItems } from "@/lib/orders/concierge";
+import { formatPlainDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "My Deliveries" };
 
@@ -35,6 +36,7 @@ export default async function DriverPage() {
       deliveryState: orders.deliveryState,
       deliveryZip: orders.deliveryZip,
       customerNotes: orders.customerNotes,
+      requestedDeliveryDate: orders.requestedDeliveryDate,
       storeName: stores.name,
       storeAddress: stores.addressLine1,
       storeCity: stores.city,
@@ -124,6 +126,11 @@ export default async function DriverPage() {
                 {order.customerNotes ? (
                   <p className="font-sans text-xs text-charcoal/60">
                     Note: {order.customerNotes}
+                  </p>
+                ) : null}
+                {order.requestedDeliveryDate ? (
+                  <p className="font-sans text-xs text-charcoal/60">
+                    Requested for: {formatPlainDate(order.requestedDeliveryDate)}
                   </p>
                 ) : null}
               </div>

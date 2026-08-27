@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import { approveAndPayOrder } from "@/lib/actions/approve-and-pay";
 import { getOrderItems, getOrderFeeLines } from "@/lib/orders/concierge";
+import { formatPlainDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Order Details" };
 
@@ -36,6 +37,7 @@ export default async function OrderDetailPage({
       deliveryCity: orders.deliveryCity,
       deliveryState: orders.deliveryState,
       deliveryZip: orders.deliveryZip,
+      requestedDeliveryDate: orders.requestedDeliveryDate,
       serviceLabel: orders.serviceLabel,
       totalCents: orders.totalCents,
       deliveryPin: orders.deliveryPin,
@@ -113,6 +115,11 @@ export default async function OrderDetailPage({
               <br />
               {order.deliveryCity}, {order.deliveryState} {order.deliveryZip}
             </p>
+            {order.requestedDeliveryDate ? (
+              <p className="mt-1 font-sans text-sm text-charcoal/70">
+                Requested for: {formatPlainDate(order.requestedDeliveryDate)}
+              </p>
+            ) : null}
           </div>
           {order.driverName ? (
             <div>
