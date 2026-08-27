@@ -12,6 +12,6 @@ const ACCOUNT_LINKS = [
  * these routes specifically so there's one account-nav surface, not
  * two competing ones.
  */
-export function AccountSidebar({ pathname }: { pathname: string }) {
-  return <PanelSidebar links={ACCOUNT_LINKS} pathname={pathname} />;
+export function AccountSidebar({ pathname, userEmail }: { pathname: string; userEmail?: string }) {
+  return <PanelSidebar links={ACCOUNT_LINKS} pathname={pathname} userEmail={userEmail} />;
 }

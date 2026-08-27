@@ -8,12 +8,12 @@ export default async function DispatchLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireStaff();
+  const staffMember = await requireStaff();
   const pathname = (await headers()).get("x-pathname") ?? "/internal/dispatch";
 
   return (
     <Container className="flex flex-col gap-8 py-12 sm:py-16 md:flex-row md:items-start md:gap-10">
-      <StaffSidebar pathname={pathname} />
+      <StaffSidebar pathname={pathname} userEmail={staffMember.email} />
       <div className="min-w-0 flex-1">{children}</div>
     </Container>
   );

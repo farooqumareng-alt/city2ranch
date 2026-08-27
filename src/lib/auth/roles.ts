@@ -24,7 +24,10 @@ export async function requireStaff() {
     .where(eq(staff.authUserId, user.id));
 
   if (rows.length === 0) notFound();
-  return rows[0];
+  // email is included (not just the staff row's own columns) so callers
+  // that need "who is this" — the panel sidebar's "Signed in as" line, in
+  // particular — don't have to make a second getCurrentUser() call.
+  return { ...rows[0], email: user.email };
 }
 
 /** Same shape as requireStaff(), for the driver-gated view. */
@@ -39,5 +42,5 @@ export async function requireDriver() {
     .where(eq(drivers.authUserId, user.id));
 
   if (rows.length === 0) notFound();
-  return rows[0];
+  return { ...rows[0], email: user.email };
 }

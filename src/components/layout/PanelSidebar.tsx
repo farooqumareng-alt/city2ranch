@@ -18,9 +18,14 @@ export type PanelLink = { href: string; label: string };
 export function PanelSidebar({
   links,
   pathname,
+  userEmail,
 }: {
   links: PanelLink[];
   pathname: string;
+  /** Shown above the links so it's never ambiguous which of several
+   *  accounts (e.g. a staff member who is also a driver) is currently
+   *  signed in — this is display-only, not a role indicator. */
+  userEmail?: string;
 }) {
   const linkBase =
     "whitespace-nowrap rounded-sm px-3 py-2 font-sans text-sm transition-colors hover:bg-white hover:text-gold";
@@ -32,6 +37,16 @@ export function PanelSidebar({
       aria-label="Panel"
       className="flex shrink-0 flex-row gap-1 overflow-x-auto border-b border-navy/10 pb-3 md:w-48 md:flex-col md:gap-1 md:border-b-0 md:border-r md:border-navy/10 md:pb-0 md:pr-6"
     >
+      {userEmail ? (
+        <div className="mb-1 hidden flex-col gap-0.5 border-b border-navy/10 pb-3 md:flex">
+          <span className="font-sans text-[11px] uppercase tracking-[0.1em] text-charcoal/50">
+            Signed in as
+          </span>
+          <span className="truncate font-sans text-sm font-medium text-navy-deep" title={userEmail}>
+            {userEmail}
+          </span>
+        </div>
+      ) : null}
       {links.map((link) => {
         const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
         return (
