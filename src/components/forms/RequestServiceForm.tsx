@@ -10,7 +10,13 @@ import type { ActionResult } from "@/lib/actions/types";
 
 const initialState: ActionResult | undefined = undefined;
 
-export function RequestServiceForm({ groceryItems = [] }: { groceryItems?: GroceryItem[] }) {
+export function RequestServiceForm({
+  groceryItems = [],
+  notesPrefill,
+}: {
+  groceryItems?: GroceryItem[];
+  notesPrefill?: string;
+}) {
   const [state, formAction, pending] = useActionState(
     submitServiceRequest,
     initialState
@@ -179,7 +185,7 @@ export function RequestServiceForm({ groceryItems = [] }: { groceryItems?: Groce
         name="notes"
         label="Notes"
         hint="Anything else your concierge should know."
-        defaultValue={values?.notes}
+        defaultValue={values?.notes ?? notesPrefill}
         error={fieldErrors?.notes}
       />
 

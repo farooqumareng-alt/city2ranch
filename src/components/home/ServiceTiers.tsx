@@ -41,7 +41,7 @@ export function ServiceTiers() {
                 ))}
               </ul>
               <Button
-                href="/request-service"
+                href={`/request-service?tier=${tier.key}`}
                 variant="outline-light"
                 className="mt-auto self-start"
               >
