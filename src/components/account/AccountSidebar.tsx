@@ -1,9 +1,11 @@
 import { PanelSidebar } from "@/components/layout/PanelSidebar";
 
 const ACCOUNT_LINKS = [
+  { href: "/requests", label: "My Requests" },
   { href: "/orders", label: "My Orders" },
   { href: "/places", label: "My Places" },
   { href: "/profile", label: "Profile" },
+  { href: "/support", label: "Support" },
 ];
 
 /**

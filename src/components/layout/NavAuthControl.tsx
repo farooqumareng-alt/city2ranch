@@ -11,9 +11,11 @@ import { signOut } from "@/lib/actions/sign-out";
  *  top nav's account control would just duplicate it there. */
 function isPanelRoute(pathname: string) {
   return (
+    pathname.startsWith("/requests") ||
     pathname.startsWith("/orders") ||
     pathname.startsWith("/places") ||
     pathname.startsWith("/profile") ||
+    pathname.startsWith("/support") ||
     pathname.startsWith("/internal")
   );
 }
@@ -91,6 +93,9 @@ export function NavAuthControl({
   const mobileLinkClass = "block py-1 font-sans text-base text-navy-deep hover:text-gold";
   return (
     <>
+      <Link href="/requests" className={mobileLinkClass}>
+        My Requests
+      </Link>
       <Link href="/orders" className={mobileLinkClass}>
         My Orders
       </Link>
@@ -99,6 +104,9 @@ export function NavAuthControl({
       </Link>
       <Link href="/profile" className={mobileLinkClass}>
         Profile
+      </Link>
+      <Link href="/support" className={mobileLinkClass}>
+        Support
       </Link>
       <form action={signOut}>
         <button
@@ -164,6 +172,9 @@ function DesktopAccountMenu() {
           role="menu"
           className="absolute right-0 top-full z-50 mt-2 w-44 rounded-sm border border-navy/10 bg-white py-2 shadow-lg"
         >
+          <Link href="/requests" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
+            My Requests
+          </Link>
           <Link href="/orders" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
             My Orders
           </Link>
@@ -172,6 +183,9 @@ function DesktopAccountMenu() {
           </Link>
           <Link href="/profile" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
             Profile
+          </Link>
+          <Link href="/support" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
+            Support
           </Link>
           <form action={signOut}>
             <button
