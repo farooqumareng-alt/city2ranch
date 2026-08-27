@@ -10,6 +10,13 @@ export const metadata: Metadata = {
     "Submit a private service request to City2Ranch — groceries, shopping, essentials and errands delivered to your ranch or rural property.",
 };
 
+// The grocery-items quick-add list is live, editable DB data (see
+// src/lib/grocery-items.ts) — force this page to render per-request
+// rather than let Next.js try to prerender it as static at build time,
+// which would both freeze that list into the build and require a
+// database connection to be reachable during the build step itself.
+export const dynamic = "force-dynamic";
+
 export default async function RequestServicePage() {
   const groceryItems = await getCommonGroceryItems();
 
