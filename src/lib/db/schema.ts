@@ -182,6 +182,43 @@ export const customerProfiles = pgTable(
   (table) => [unique().on(table.authUserId)]
 );
 
+/**
+ * A customer's saved address book — "My Places" (ranch, lake house, guest
+ * house...), not just a single default address. First foundational piece
+ * of the long-term customer-account principle: the account is a
+ * permanent relationship, not tied to today's one-address, one-service
+ * shape. Deliberately decoupled from `orders`/`service_requests` — a
+ * place only pre-fills a form's delivery fields client-side; it isn't a
+ * foreign key anywhere, so this table can exist without touching any
+ * existing order/request logic.
+ */
+export const customerPlaces = pgTable("customer_places", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  authUserId: uuid("auth_user_id")
+    .notNull()
+    .references(() => authUsers.id),
+  // Customer-chosen name — "Ranch", "Lake House", "Guest House" — not a
+  // fixed enum, since there's no fixed list of property types.
+  label: text("label").notNull(),
+  addressLine1: text("address_line1").notNull(),
+  addressLine2: text("address_line2"),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zip: text("zip").notNull(),
+  // Gate codes, access notes — freeform, shown to whoever fulfills a
+  // request placed against this place (copied into the order/request's
+  // own notes field at submit time, not read live from here).
+  deliveryInstructions: text("delivery_instructions"),
+  isDefault: boolean("is_default").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
 // ---------------------------------------------------------------------
 // City Pickup order fulfillment (Phase 1 real product)
 // ---------------------------------------------------------------------

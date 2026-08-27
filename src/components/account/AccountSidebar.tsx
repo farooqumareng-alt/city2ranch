@@ -2,6 +2,7 @@ import { PanelSidebar } from "@/components/layout/PanelSidebar";
 
 const ACCOUNT_LINKS = [
   { href: "/orders", label: "My Orders" },
+  { href: "/places", label: "My Places" },
   { href: "/profile", label: "Profile" },
 ];
 

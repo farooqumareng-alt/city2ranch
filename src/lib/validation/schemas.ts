@@ -202,6 +202,19 @@ export const conciergeQuoteFinalizeSchema = z.object({
     .pipe(z.array(feeLineSchema).min(1, "Add at least one fee line.")),
 });
 
+// "My Places" — a customer's saved address book. label is freeform
+// ("Ranch", "Lake House") rather than a fixed list of property types.
+export const placeSchema = z.object({
+  label: requiredText("Place name"),
+  addressLine1: requiredText("Address"),
+  addressLine2: optionalText,
+  city: requiredText("City"),
+  state: requiredText("State", 2),
+  zip,
+  deliveryInstructions: optionalText,
+});
+export type PlaceInput = z.infer<typeof placeSchema>;
+
 export const contactSchema = z.object({
   name: requiredText("Name"),
   email,

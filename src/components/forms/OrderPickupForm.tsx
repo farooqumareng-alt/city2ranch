@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { submitOrder } from "@/lib/actions/submit-order";
 import { TextField, TextareaField, SelectField } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
@@ -18,18 +18,51 @@ type ProfileDefaults = {
   defaultDeliveryState: string | null;
   defaultDeliveryZip: string | null;
 } | null;
+type Place = {
+  id: string;
+  label: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  zip: string;
+  isDefault: boolean;
+};
 
 export function OrderPickupForm({
   stores,
   profile,
+  places = [],
 }: {
   stores: Store[];
   profile?: ProfileDefaults;
+  places?: Place[];
 }) {
   const [state, formAction, pending] = useActionState(submitOrder, initialState);
 
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
   const values = state && !state.ok ? state.values : undefined;
+
+  const defaultPlace = places.find((p) => p.isDefault) ?? places[0];
+  const [address, setAddress] = useState({
+    line1: values?.deliveryAddressLine1 ?? defaultPlace?.addressLine1 ?? profile?.defaultDeliveryAddressLine1 ?? "",
+    line2: values?.deliveryAddressLine2 ?? defaultPlace?.addressLine2 ?? profile?.defaultDeliveryAddressLine2 ?? "",
+    city: values?.deliveryCity ?? defaultPlace?.city ?? profile?.defaultDeliveryCity ?? "",
+    state: values?.deliveryState ?? defaultPlace?.state ?? profile?.defaultDeliveryState ?? "",
+    zip: values?.deliveryZip ?? defaultPlace?.zip ?? profile?.defaultDeliveryZip ?? "",
+  });
+
+  function applyPlace(placeId: string) {
+    const place = places.find((p) => p.id === placeId);
+    if (!place) return;
+    setAddress({
+      line1: place.addressLine1,
+      line2: place.addressLine2 ?? "",
+      city: place.city,
+      state: place.state,
+      zip: place.zip,
+    });
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-10">
@@ -93,41 +126,66 @@ export function OrderPickupForm({
 
       <fieldset className="flex flex-col gap-4">
         <legend className="font-serif text-lg text-navy-deep">Delivery Address</legend>
+        {places.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="place-picker" className="font-sans text-sm font-medium text-navy-deep">
+              Use a saved place
+            </label>
+            <select
+              id="place-picker"
+              onChange={(e) => applyPlace(e.target.value)}
+              defaultValue=""
+              className="w-full rounded-sm border border-navy/20 bg-white px-4 py-2.5 font-sans text-sm text-charcoal focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-1"
+            >
+              <option value="">— Enter manually —</option>
+              {places.map((place) => (
+                <option key={place.id} value={place.id}>
+                  {place.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
             name="deliveryAddressLine1"
             label="Address"
             required
             className="sm:col-span-2"
-            defaultValue={values?.deliveryAddressLine1 ?? profile?.defaultDeliveryAddressLine1 ?? ""}
+            value={address.line1}
+            onChange={(e) => setAddress((a) => ({ ...a, line1: e.target.value }))}
             error={fieldErrors?.deliveryAddressLine1}
           />
           <TextField
             name="deliveryAddressLine2"
             label="Address line 2"
             className="sm:col-span-2"
-            defaultValue={values?.deliveryAddressLine2 ?? profile?.defaultDeliveryAddressLine2 ?? ""}
+            value={address.line2}
+            onChange={(e) => setAddress((a) => ({ ...a, line2: e.target.value }))}
             error={fieldErrors?.deliveryAddressLine2}
           />
           <TextField
             name="deliveryCity"
             label="City"
             required
-            defaultValue={values?.deliveryCity ?? profile?.defaultDeliveryCity ?? ""}
+            value={address.city}
+            onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))}
             error={fieldErrors?.deliveryCity}
           />
           <TextField
             name="deliveryState"
             label="State"
             required
-            defaultValue={values?.deliveryState ?? profile?.defaultDeliveryState ?? ""}
+            value={address.state}
+            onChange={(e) => setAddress((a) => ({ ...a, state: e.target.value }))}
             error={fieldErrors?.deliveryState}
           />
           <TextField
             name="deliveryZip"
             label="ZIP code"
             required
-            defaultValue={values?.deliveryZip ?? profile?.defaultDeliveryZip ?? ""}
+            value={address.zip}
+            onChange={(e) => setAddress((a) => ({ ...a, zip: e.target.value }))}
             error={fieldErrors?.deliveryZip}
           />
         </div>

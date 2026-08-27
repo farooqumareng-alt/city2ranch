@@ -113,6 +113,20 @@
       "when": 1787802611717,
       "tag": "0015_rls_common_grocery_items",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1787808783793,
+      "tag": "0016_customer_places",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1787808789551,
+      "tag": "0017_rls_customer_places",
+      "breakpoints": true
     }
   ]
 }

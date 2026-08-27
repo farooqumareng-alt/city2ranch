@@ -12,6 +12,7 @@ import { signOut } from "@/lib/actions/sign-out";
 function isPanelRoute(pathname: string) {
   return (
     pathname.startsWith("/orders") ||
+    pathname.startsWith("/places") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/internal")
   );
@@ -93,6 +94,9 @@ export function NavAuthControl({
       <Link href="/orders" className={mobileLinkClass}>
         My Orders
       </Link>
+      <Link href="/places" className={mobileLinkClass}>
+        My Places
+      </Link>
       <Link href="/profile" className={mobileLinkClass}>
         Profile
       </Link>
@@ -162,6 +166,9 @@ function DesktopAccountMenu() {
         >
           <Link href="/orders" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
             My Orders
+          </Link>
+          <Link href="/places" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
+            My Places
           </Link>
           <Link href="/profile" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
             Profile

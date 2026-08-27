@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db";
 import { stores } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnProfile } from "@/lib/actions/update-profile";
+import { getOwnPlaces } from "@/lib/actions/places";
 
 export const metadata: Metadata = {
   title: "Request a City Pickup",
@@ -16,12 +17,13 @@ export const metadata: Metadata = {
 export default async function NewOrderPage() {
   const user = await getCurrentUser();
   const db = getDb();
-  const [activeStores, profile] = await Promise.all([
+  const [activeStores, profile, places] = await Promise.all([
     db
       .select({ id: stores.id, name: stores.name, city: stores.city, state: stores.state })
       .from(stores)
       .where(eq(stores.isActive, true)),
     user ? getOwnProfile(user.id) : Promise.resolve(null),
+    user ? getOwnPlaces(user.id) : Promise.resolve([]),
   ]);
 
   return (
@@ -38,7 +40,7 @@ export default async function NewOrderPage() {
             store. Please check back soon.
           </p>
         ) : (
-          <OrderPickupForm stores={activeStores} profile={profile} />
+          <OrderPickupForm stores={activeStores} profile={profile} places={places} />
         )}
       </div>
     </div>
