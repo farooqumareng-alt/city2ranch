@@ -4,6 +4,11 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { RequestServiceForm } from "@/components/forms/RequestServiceForm";
 import { getCommonGroceryItems } from "@/lib/grocery-items";
 import { SERVICE_TIERS } from "@/lib/constants";
+import { getCurrentUser } from "@/lib/supabase/server";
+import { getEffectiveOwnerId } from "@/lib/household";
+import { getOwnShoppingListsWithItems } from "@/lib/shopping-lists";
+import { getOwnProfile } from "@/lib/actions/update-profile";
+import { getOwnPlaces } from "@/lib/actions/places";
 
 export const metadata: Metadata = {
   title: "Request Private Service",
@@ -24,7 +29,14 @@ export default async function RequestServicePage({
   searchParams: Promise<{ tier?: string }>;
 }) {
   const { tier } = await searchParams;
-  const groceryItems = await getCommonGroceryItems();
+  const user = await getCurrentUser();
+  const ownerId = user ? await getEffectiveOwnerId(user.id) : null;
+  const [groceryItems, savedLists, profile, places] = await Promise.all([
+    getCommonGroceryItems(),
+    ownerId ? getOwnShoppingListsWithItems(ownerId) : Promise.resolve([]),
+    ownerId ? getOwnProfile(ownerId) : Promise.resolve(null),
+    ownerId ? getOwnPlaces(ownerId) : Promise.resolve([]),
+  ]);
   // Membership tiers (see the account /membership page and the homepage
   // ServiceTiers section) aren't a real billed product yet — "requesting"
   // one is just this form with a note tagging which tier the customer is
@@ -43,7 +55,14 @@ export default async function RequestServicePage({
         description="Tell us about your household and what you need. A City2Ranch concierge will follow up with availability and pricing."
       />
       <div className="max-w-2xl">
-        <RequestServiceForm groceryItems={groceryItems} notesPrefill={notesPrefill} />
+        <RequestServiceForm
+          groceryItems={groceryItems}
+          notesPrefill={notesPrefill}
+          savedLists={savedLists}
+          profile={profile}
+          places={places}
+          userEmail={user?.email}
+        />
       </div>
     </Container>
   );

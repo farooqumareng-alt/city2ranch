@@ -219,6 +219,31 @@ export const householdInviteSchema = z.object({
   email,
 });
 
+// A saved shopping list — same item shape as conciergeOrderItemSchema
+// (free-text quantity, same reason: "2 gallons"/"1 dozen"/"3" all need
+// to fit without a unit enum), submitted the same hidden-JSON-input way
+// as every other dynamic-row form in this app.
+export const shoppingListItemSchema = z.object({
+  itemName: requiredText("Item name"),
+  quantity: requiredText("Quantity"),
+  notes: optionalText,
+});
+
+export const shoppingListSaveSchema = z.object({
+  name: requiredText("List name"),
+  itemsJson: z
+    .string()
+    .transform((raw, ctx) => {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        ctx.addIssue({ code: "custom", message: "Invalid item list." });
+        return z.NEVER;
+      }
+    })
+    .pipe(z.array(shoppingListItemSchema).min(1, "Add at least one item.")),
+});
+
 export const contactSchema = z.object({
   name: requiredText("Name"),
   email,

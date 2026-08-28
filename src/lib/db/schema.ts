@@ -15,14 +15,15 @@ import {
 
 // Shadow reference to Supabase's auth.users table — lets us express real
 // foreign keys from our tables to auth identities without owning that
-// table (Supabase Auth manages its schema itself). `email` is included
-// (read-only, never written through this reference) so a query can join
-// an owner_auth_user_id straight to their email — see
-// src/lib/household.ts — without a second round trip through
-// getCurrentUser()/the Supabase admin API.
-export const authUsers = pgSchema("auth").table("users", {
+// table (Supabase Auth manages its schema itself). Deliberately NOT
+// exported and deliberately just the one column: `drizzle-kit generate`
+// only tracks tables it can see via this file's exports, and a second
+// column here would make it think it owns (and must CREATE/ALTER)
+// Supabase's real auth.users table — it doesn't; Supabase does. Code
+// outside this file that needs an owner's email (src/lib/household.ts)
+// reaches it with a raw SQL subquery instead of importing this table.
+const authUsers = pgSchema("auth").table("users", {
   id: uuid("id").primaryKey(),
-  email: text("email"),
 });
 
 // Shared status lifecycle for the marketing-site lead-capture tables
@@ -267,6 +268,44 @@ export const householdMembers = pgTable(
   },
   (table) => [unique().on(table.ownerAuthUserId, table.memberEmail)]
 );
+
+/**
+ * A customer's saved, reusable shopping list ("Weekly Groceries",
+ * "Guest House") — one request no longer means retyping the same items
+ * every time. Owned by auth_user_id (resolved through household
+ * delegation like everything else account-scoped), never referenced by
+ * orders/service_requests directly — loading a list just pre-fills a
+ * form's shopping-list text client-side, same decoupled relationship
+ * customerPlaces has to the delivery-address fields.
+ */
+export const shoppingLists = pgTable("shopping_lists", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  authUserId: uuid("auth_user_id")
+    .notNull()
+    .references(() => authUsers.id),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const shoppingListItems = pgTable("shopping_list_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  listId: uuid("list_id")
+    .notNull()
+    .references(() => shoppingLists.id, { onDelete: "cascade" }),
+  itemName: text("item_name").notNull(),
+  quantity: text("quantity").notNull().default("1"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
 
 // ---------------------------------------------------------------------
 // City Pickup order fulfillment (Phase 1 real product)

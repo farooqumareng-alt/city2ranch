@@ -4,6 +4,7 @@ const ACCOUNT_LINKS = [
   { href: "/requests", label: "My Requests" },
   { href: "/orders", label: "My Orders" },
   { href: "/places", label: "My Places" },
+  { href: "/lists", label: "My Lists" },
   { href: "/household", label: "Household" },
   { href: "/membership", label: "Membership" },
   { href: "/profile", label: "Profile" },

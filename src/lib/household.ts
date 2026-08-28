@@ -1,6 +1,15 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { authUsers, householdMembers } from "@/lib/db/schema";
+import { householdMembers } from "@/lib/db/schema";
+
+// Reaches auth.users.email via a raw correlated subquery rather than a
+// Drizzle-managed join — schema.ts's authUsers shadow table intentionally
+// only declares `id` (see its comment: exporting more columns there
+// would make `drizzle-kit generate` think it owns Supabase's real
+// auth.users table). This is read-only, never used to write.
+function ownerEmailSubquery(ownerIdColumn: typeof householdMembers.ownerAuthUserId) {
+  return sql<string | null>`(SELECT email FROM auth.users WHERE id = ${ownerIdColumn})`;
+}
 
 /**
  * Resolves which auth_user_id a signed-in user's orders/places/profile
@@ -35,9 +44,11 @@ export async function getEffectiveOwner(
 ): Promise<{ id: string; email: string }> {
   const db = getDb();
   const rows = await db
-    .select({ ownerAuthUserId: householdMembers.ownerAuthUserId, ownerEmail: authUsers.email })
+    .select({
+      ownerAuthUserId: householdMembers.ownerAuthUserId,
+      ownerEmail: ownerEmailSubquery(householdMembers.ownerAuthUserId),
+    })
     .from(householdMembers)
-    .leftJoin(authUsers, eq(authUsers.id, householdMembers.ownerAuthUserId))
     .where(and(eq(householdMembers.memberAuthUserId, userId), eq(householdMembers.status, "active")));
 
   const owner = rows[0];
@@ -61,20 +72,18 @@ export async function getHouseholdData(userId: string, email: string) {
       .select({
         id: householdMembers.id,
         invitedAt: householdMembers.invitedAt,
-        ownerEmail: authUsers.email,
+        ownerEmail: ownerEmailSubquery(householdMembers.ownerAuthUserId),
       })
       .from(householdMembers)
-      .leftJoin(authUsers, eq(authUsers.id, householdMembers.ownerAuthUserId))
       .where(and(eq(householdMembers.status, "invited"), sql`lower(${householdMembers.memberEmail}) = lower(${email})`)),
     db
       .select({
         id: householdMembers.id,
         ownerAuthUserId: householdMembers.ownerAuthUserId,
         acceptedAt: householdMembers.acceptedAt,
-        ownerEmail: authUsers.email,
+        ownerEmail: ownerEmailSubquery(householdMembers.ownerAuthUserId),
       })
       .from(householdMembers)
-      .leftJoin(authUsers, eq(authUsers.id, householdMembers.ownerAuthUserId))
       .where(and(eq(householdMembers.memberAuthUserId, userId), eq(householdMembers.status, "active"))),
   ]);
 
