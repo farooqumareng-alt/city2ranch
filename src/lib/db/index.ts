@@ -21,9 +21,15 @@ export function getDb() {
   }
 
   // `prepare: false` is required for connection poolers run in transaction
-  // mode (e.g. Supabase's pgbouncer pooler on port 6543); harmless against
-  // a direct connection too.
-  const client = postgres(connectionString, { prepare: false });
+  // mode (e.g. Supabase's Supavisor pooler on port 6543); harmless against
+  // a direct connection too. `max: 1` matters just as much: each
+  // serverless function instance should hold at most one connection —
+  // postgres-js's default (10) multiplied across however many concurrent
+  // instances Vercel spins up is exactly what exhausted Supabase's
+  // pooler connection cap in production (EMAXCONNSESSION). The pooler
+  // itself is what multiplexes many of these single connections
+  // together; the app doesn't need its own pool on top of that.
+  const client = postgres(connectionString, { prepare: false, max: 1 });
   cached = drizzle(client, { schema });
   return cached;
 }
