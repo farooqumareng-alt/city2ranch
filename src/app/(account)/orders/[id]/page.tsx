@@ -10,7 +10,7 @@ import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import { approveAndPayOrder } from "@/lib/actions/approve-and-pay";
 import { getOrderItems, getOrderFeeLines } from "@/lib/orders/concierge";
 import { formatPlainDate } from "@/lib/format";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 import { getOrderMessages } from "@/lib/order-messages";
 import { OrderMessageThread } from "@/components/orders/OrderMessageThread";
 
@@ -61,7 +61,7 @@ export default async function OrderDetailPage({
 
   // A household member (see src/lib/household.ts) can view the owner's
   // order exactly as the owner would.
-  const effectiveOwnerId = await getEffectiveOwnerId(user.id);
+  const { ownerId: effectiveOwnerId, role } = await getEffectiveOwnerWithRole(user.id);
 
   // Not found (wrong id) and not-yours (wrong owner) both 404 — an order
   // id belonging to someone else must never distinguish "doesn't exist"
@@ -181,7 +181,7 @@ export default async function OrderDetailPage({
             </div>
           )}
 
-          {order.status === "priced" ? (
+          {order.status === "priced" && canPerform(role, "pay") ? (
             <>
               <p className="font-sans text-xs text-charcoal/60">
                 Final pricing confirmed before service begins.
@@ -192,6 +192,10 @@ export default async function OrderDetailPage({
                 </Button>
               </form>
             </>
+          ) : order.status === "priced" ? (
+            <p className="font-sans text-sm text-charcoal/70">
+              Final pricing confirmed — ask the account owner to approve and pay.
+            </p>
           ) : (
             <p className="font-sans text-sm text-charcoal/70">
               Status: {ORDER_STATUS_LABELS[order.status]}

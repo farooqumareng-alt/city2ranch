@@ -26,9 +26,12 @@ export default async function AccountLayout({
   }
 
   // A household member (see src/lib/household.ts) sees whose account
-  // they're actually managing, since it isn't their own.
+  // they're actually managing, since it isn't their own — and their own
+  // role there, since "managing" doesn't imply full access anymore.
   const owner = await getEffectiveOwner(user.id, user.email);
-  const managingEmail = owner.id !== user.id ? owner.email : undefined;
+  const isDelegated = owner.id !== user.id;
+  const managingEmail = isDelegated ? owner.email : undefined;
+  const managingRole = isDelegated && owner.role !== "full" ? owner.role : undefined;
   const profile = await getOwnProfile(owner.id);
 
   return (
@@ -38,6 +41,7 @@ export default async function AccountLayout({
         userEmail={user.email}
         userName={profile?.name ?? undefined}
         managingEmail={managingEmail}
+        managingRole={managingRole}
       />
       <div className="min-w-0 flex-1">{children}</div>
     </Container>

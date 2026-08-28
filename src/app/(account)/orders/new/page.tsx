@@ -7,7 +7,7 @@ import { stores } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnProfile } from "@/lib/actions/update-profile";
 import { getOwnPlaces } from "@/lib/actions/places";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 
 export const metadata: Metadata = {
   title: "Request a City Pickup",
@@ -19,7 +19,9 @@ export default async function NewOrderPage() {
   const user = await getCurrentUser();
   // A household member (see src/lib/household.ts) sees and adds to the
   // owner's saved profile/places, not a separate set of their own.
-  const ownerId = user ? await getEffectiveOwnerId(user.id) : null;
+  const effective = user ? await getEffectiveOwnerWithRole(user.id) : null;
+  const ownerId = effective?.ownerId ?? null;
+  const canOrder = effective ? canPerform(effective.role, "place_order") : false;
   const db = getDb();
   const [activeStores, profile, places] = await Promise.all([
     db
@@ -38,7 +40,12 @@ export default async function NewOrderPage() {
         description="Already placed your own order with a supported retailer? Tell us where to pick it up and where to bring it, and we'll show you the price before anything is charged."
       />
       <div className="max-w-2xl">
-        {activeStores.length === 0 ? (
+        {!canOrder ? (
+          <p className="font-sans text-sm text-charcoal/70">
+            You have view-only access to this account and can&apos;t place
+            orders. Ask the account owner to place this request.
+          </p>
+        ) : activeStores.length === 0 ? (
           <p className="font-sans text-sm text-charcoal/70">
             We&apos;re not currently accepting City Pickup requests for any
             store. Please check back soon.

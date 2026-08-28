@@ -22,6 +22,7 @@ export function PanelSidebar({
   userName,
   accountType,
   managingEmail,
+  managingRole,
 }: {
   links: PanelLink[];
   pathname: string;
@@ -40,11 +41,15 @@ export function PanelSidebar({
    *  wearing right now. */
   accountType?: string;
   /** Set when the signed-in user is a household member (see
-   *  src/lib/household.ts) operating another account by full
-   *  delegation — makes it unmistakable whose orders/places/payments
-   *  are actually being shown, since they aren't the signed-in
-   *  person's own. */
+   *  src/lib/household.ts) operating another account by delegation —
+   *  makes it unmistakable whose orders/places/payments are actually
+   *  being shown, since they aren't the signed-in person's own. */
   managingEmail?: string;
+  /** Set alongside managingEmail when the delegated member's role is
+   *  something less than full access (e.g. "ordering", "view_only") —
+   *  omitted for full access, since that was the only option before
+   *  roles existed and stays the unlabeled default. */
+  managingRole?: string;
 }) {
   const linkBase =
     "whitespace-nowrap rounded-sm px-3 py-2 font-sans text-sm transition-colors hover:bg-white hover:text-gold";
@@ -79,6 +84,7 @@ export function PanelSidebar({
           {managingEmail ? (
             <span className="mt-1 truncate font-sans text-xs text-gold" title={managingEmail}>
               Managing {managingEmail}&apos;s account
+              {managingRole ? ` (${managingRole.replace("_", " ")})` : ""}
             </span>
           ) : null}
         </div>

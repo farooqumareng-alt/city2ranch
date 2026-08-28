@@ -9,7 +9,7 @@ import { getStripe } from "@/lib/stripe/server";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { paymentServicesConfigured } from "@/lib/env";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 
 /**
  * Bound to the "Approve & Pay" form as
@@ -37,8 +37,13 @@ export async function approveAndPayOrder(orderId: string) {
   // the one check in the whole app where that distinction is real money,
   // so it goes through the same resolver every other ownership check
   // uses, not a one-off.
-  const effectiveOwnerId = await getEffectiveOwnerId(user.id);
+  const { ownerId: effectiveOwnerId, role } = await getEffectiveOwnerWithRole(user.id);
   if (!order || order.authUserId !== effectiveOwnerId) redirect("/orders");
+
+  // The order page already hides this form for a role that can't pay
+  // (see orders/[id]/page.tsx) — re-checked here regardless, since a
+  // form action must never trust that the UI alone kept someone out.
+  if (!canPerform(role, "pay")) redirect(`/orders/${orderId}`);
 
   // Already progressed (e.g. a double-click) — idempotent no-op back to
   // the same page rather than erroring.

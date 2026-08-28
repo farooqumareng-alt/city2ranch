@@ -183,6 +183,13 @@
       "when": 1787880398612,
       "tag": "0025_rls_order_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787938510119,
+      "tag": "0026_household_member_role",
+      "breakpoints": true
     }
   ]
 }
