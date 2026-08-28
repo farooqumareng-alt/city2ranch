@@ -2,16 +2,68 @@ import { eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { getDb } from "@/lib/db";
-import { orders, stores } from "@/lib/db/schema";
+import { orders, stores, memberships } from "@/lib/db/schema";
 import { getStripe } from "@/lib/stripe/server";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { getResend } from "@/lib/email/resend";
 import { orderPaymentConfirmedEmail } from "@/lib/email/templates";
 import { shouldNotify } from "@/lib/notifications/should-send";
+import { getMembershipTierForPriceId, type MembershipTier } from "@/lib/stripe/tiers";
+import { toMembershipStatus } from "@/lib/stripe/membership-status";
 
 function generatePin(): string {
   return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+/** Shared by customer.subscription.created/updated/deleted — a
+ *  cancellation is just another status on the same object (Stripe
+ *  reports status "canceled" on the same Subscription, it doesn't send
+ *  a fundamentally different payload), so one upsert handles all three
+ *  event types identically. */
+async function upsertMembershipFromSubscription(subscription: Stripe.Subscription) {
+  const authUserId = subscription.metadata?.authUserId;
+  if (!authUserId) {
+    console.error(`[stripe webhook] subscription ${subscription.id} missing authUserId metadata`);
+    return;
+  }
+
+  const item = subscription.items.data[0];
+  const priceId = item?.price.id;
+  if (!priceId) {
+    console.error(`[stripe webhook] subscription ${subscription.id} has no price`);
+    return;
+  }
+
+  // Set at checkout (subscription_data.metadata — see subscribeMembership
+  // in src/lib/actions/membership.ts) and persisted on the Subscription
+  // for its whole lifetime, so this is available on every later event
+  // too, not just the first. Falls back to a reverse price-id lookup
+  // for a subscription created outside that flow (e.g. directly in the
+  // Stripe dashboard while testing).
+  const tier = (subscription.metadata?.tier as MembershipTier | undefined) ?? getMembershipTierForPriceId(priceId);
+  if (!tier) {
+    console.error(`[stripe webhook] subscription ${subscription.id} has no resolvable membership tier`);
+    return;
+  }
+
+  const db = getDb();
+  const values = {
+    authUserId,
+    tier,
+    status: toMembershipStatus(subscription.status),
+    stripeSubscriptionId: subscription.id,
+    stripePriceId: priceId,
+    currentPeriodEnd: item.current_period_end ? new Date(item.current_period_end * 1000) : null,
+  };
+
+  await db
+    .insert(memberships)
+    .values(values)
+    .onConflictDoUpdate({
+      target: memberships.authUserId,
+      set: { ...values, updatedAt: new Date() },
+    });
 }
 
 export async function POST(request: NextRequest) {
@@ -37,7 +89,11 @@ export async function POST(request: NextRequest) {
 
   const db = getDb();
 
-  if (event.type === "checkout.session.completed") {
+  // mode: "subscription" checkouts (Membership) also fire this event,
+  // but they carry no orderId — customer.subscription.created below is
+  // what actually records a new membership, so skip silently here
+  // rather than logging a false-positive "missing orderId" error.
+  if (event.type === "checkout.session.completed" && (event.data.object as Stripe.Checkout.Session).mode === "payment") {
     const session = event.data.object as Stripe.Checkout.Session;
     const orderId = session.metadata?.orderId;
     if (!orderId) {
@@ -140,6 +196,14 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+  }
+
+  if (
+    event.type === "customer.subscription.created" ||
+    event.type === "customer.subscription.updated" ||
+    event.type === "customer.subscription.deleted"
+  ) {
+    await upsertMembershipFromSubscription(event.data.object as Stripe.Subscription);
   }
 
   return NextResponse.json({ received: true });

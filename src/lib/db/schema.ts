@@ -203,6 +203,15 @@ export const customerProfiles = pgTable(
     defaultDeliveryCity: text("default_delivery_city"),
     defaultDeliveryState: text("default_delivery_state"),
     defaultDeliveryZip: text("default_delivery_zip"),
+    // Set the first time this account subscribes to a Membership (see
+    // memberships below) — created once via Stripe's Customer API and
+    // reused for every later checkout/portal session, unlike a one-off
+    // order's Checkout Session, which never creates or stores a Stripe
+    // Customer at all (see approve-and-pay.ts). Not "saved payment
+    // info" itself — just an identifier — so this doesn't contradict
+    // customer_profiles' original no-saved-payment-info design; it's
+    // what a real Customer relationship requires once one exists.
+    stripeCustomerId: text("stripe_customer_id"),
   },
   (table) => [unique().on(table.authUserId)]
 );
@@ -244,6 +253,70 @@ export const notificationPreferences = pgTable(
   },
   (table) => [unique().on(table.authUserId)]
 );
+
+// Matches src/lib/stripe/tiers.ts's MembershipTier keys, which are
+// deliberately the same strings as SERVICE_TIERS' `key` in
+// src/lib/constants.ts (the unpriced marketing-page tiers) even though
+// this is a separate enum — a real Stripe Price object is what actually
+// prices a membership, not this string.
+export const membershipTierEnum = pgEnum("membership_tier", ["route", "private", "estate"]);
+
+// Narrower than Stripe's own subscription.status (trialing, active,
+// past_due, canceled, unpaid, incomplete, incomplete_expired, paused) —
+// the webhook maps Stripe's states down to these three, since nothing
+// in this app's UI needs to distinguish e.g. "incomplete" from
+// "past_due" yet.
+export const membershipStatusEnum = pgEnum("membership_status", ["active", "past_due", "canceled"]);
+
+/**
+ * One row per account (owner-resolved) once it has ever subscribed —
+ * mirrors orders' relationship to Stripe (stripeCheckoutSessionId,
+ * stripePaymentIntentId) but for a recurring subscription instead of a
+ * one-off payment. Real enforcement of "does this account currently
+ * have an active membership" always means reading `status`, not just
+ * "does a row exist" — a canceled membership's row stays for history.
+ */
+export const memberships = pgTable(
+  "memberships",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    authUserId: uuid("auth_user_id")
+      .notNull()
+      .references(() => authUsers.id),
+    tier: membershipTierEnum("tier").notNull(),
+    status: membershipStatusEnum("status").notNull(),
+    stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
+    stripePriceId: text("stripe_price_id").notNull(),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  },
+  (table) => [unique().on(table.authUserId)]
+);
+
+/**
+ * A single settings row, seeded by its own migration (see
+ * drizzle/0030_membership_settings.sql) so the app never has to handle
+ * "no row exists yet." Per the business's 2026-08-28 launch strategy:
+ * membership billing must ship OFF by default and only go live once
+ * staff flips it on from /internal/dispatch/settings — there is no
+ * customer-facing path to subscribe while this is false, regardless of
+ * whether Stripe itself is configured. Deliberately its own narrow
+ * table (not a generic key-value settings table) — this app builds one
+ * real thing at a time, not speculative config infrastructure; add a
+ * zone-scoped variant later if/when membership-by-zone actually ships.
+ */
+export const membershipSettings = pgTable("membership_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  salesEnabled: boolean("sales_enabled").notNull().default(false),
+});
 
 /**
  * A customer's saved address book — "My Places" (ranch, lake house, guest
