@@ -17,7 +17,7 @@ export async function getOwnNotificationPreferences(authUserId: string) {
     .select()
     .from(notificationPreferences)
     .where(eq(notificationPreferences.authUserId, authUserId));
-  return rows[0] ?? { paymentReceipts: true };
+  return rows[0] ?? { paymentReceipts: true, recurringOrderCreated: true };
 }
 
 export async function updateNotificationPreferences(
@@ -37,15 +37,16 @@ export async function updateNotificationPreferences(
   // A checkbox's absence from FormData means "unchecked", not "field
   // missing" — there's no validation to fail here.
   const paymentReceipts = formData.get("paymentReceipts") === "on";
+  const recurringOrderCreated = formData.get("recurringOrderCreated") === "on";
 
   try {
     const db = getDb();
     await db
       .insert(notificationPreferences)
-      .values({ authUserId: ownerId, paymentReceipts })
+      .values({ authUserId: ownerId, paymentReceipts, recurringOrderCreated })
       .onConflictDoUpdate({
         target: notificationPreferences.authUserId,
-        set: { paymentReceipts, updatedAt: new Date() },
+        set: { paymentReceipts, recurringOrderCreated, updatedAt: new Date() },
       });
   } catch (error) {
     console.error("[updateNotificationPreferences] failed", error);

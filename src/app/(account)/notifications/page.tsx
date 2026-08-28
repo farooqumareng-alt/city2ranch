@@ -27,7 +27,10 @@ export default async function NotificationsPage() {
         description="Choose which emails City2Ranch sends you. More categories will show up here as more of the account can actually notify you about them."
       />
       <div className="max-w-md">
-        <NotificationPreferencesForm paymentReceipts={prefs.paymentReceipts} />
+        <NotificationPreferencesForm
+          paymentReceipts={prefs.paymentReceipts}
+          recurringOrderCreated={prefs.recurringOrderCreated}
+        />
       </div>
     </div>
   );

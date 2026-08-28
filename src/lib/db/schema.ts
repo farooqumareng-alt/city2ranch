@@ -250,6 +250,11 @@ export const notificationPreferences = pgTable(
       .notNull()
       .references(() => authUsers.id),
     paymentReceipts: boolean("payment_receipts").notNull().default(true),
+    // Added alongside Recurring Services (see recurringServicePlans) —
+    // the "your recurring order was created, come review and pay"
+    // email fired from the cron route. Same all-true-default,
+    // missing-row-means-send rule as paymentReceipts.
+    recurringOrderCreated: boolean("recurring_order_created").notNull().default(true),
   },
   (table) => [unique().on(table.authUserId)]
 );
@@ -425,6 +430,85 @@ export const shoppingListItems = pgTable("shopping_list_items", {
   listId: uuid("list_id")
     .notNull()
     .references(() => shoppingLists.id, { onDelete: "cascade" }),
+  itemName: text("item_name").notNull(),
+  quantity: text("quantity").notNull().default("1"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const recurringPlanFrequencyEnum = pgEnum("recurring_plan_frequency", [
+  "weekly",
+  "biweekly",
+  "monthly",
+]);
+
+export const recurringPlanStatusEnum = pgEnum("recurring_plan_status", [
+  "active",
+  "paused",
+  "canceled",
+]);
+
+/**
+ * A customer's standing "shop for me on this schedule" request. The
+ * cron route (src/app/api/cron/recurring-services/route.ts) spawns a
+ * new concierge order from it each cycle. Deliberately a point-in-time
+ * snapshot at creation — a plain copy of address/contact fields, not a
+ * live FK to customer_places — matching how customer_places itself is
+ * already documented as decoupled from orders ("loading a place just
+ * pre-fills a form... client-side"). A recurring plan is no different
+ * in spirit, it just has no human available to re-fill a form from a
+ * changed place each cycle, so the "fill once, then it's independent"
+ * step has to happen at plan-creation time instead of at submit time.
+ * Editing or deleting a saved place/list later never retroactively
+ * changes an active plan, same as it never changes a past order.
+ *
+ * Only concierge plans are supported — City Pickup needs a fresh
+ * retailer order number every occurrence (see orders.retailerOrderNumber's
+ * doc comment), which can't be templated, so there's nothing to spawn
+ * automatically for that service type.
+ */
+export const recurringServicePlans = pgTable("recurring_service_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  authUserId: uuid("auth_user_id")
+    .notNull()
+    .references(() => authUsers.id),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  deliveryAddressLine1: text("delivery_address_line1").notNull(),
+  deliveryAddressLine2: text("delivery_address_line2"),
+  deliveryCity: text("delivery_city").notNull(),
+  deliveryState: text("delivery_state").notNull(),
+  // NOT NULL + FK'd to zip_mileage, unlike customer_places' permissive
+  // zip column — a plan feeds unattended order creation, so "does this
+  // ZIP have route data" must be true up front, not discovered as a
+  // failure during a 3am cron run.
+  deliveryZip: text("delivery_zip")
+    .notNull()
+    .references(() => zipMileage.zip),
+  customerNotes: text("customer_notes"),
+  frequency: recurringPlanFrequencyEnum("frequency").notNull(),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+  status: recurringPlanStatusEnum("status").notNull().default("active"),
+});
+
+/** The plan's own shopping list — a snapshot copy at creation time
+ *  (possibly seeded from an existing shopping_lists row, but not a
+ *  live reference to one — see recurringServicePlans' doc comment).
+ *  Same shape as order_items/shopping_list_items by design: this is
+ *  exactly what gets copied into order_items each time the plan spawns
+ *  an order. */
+export const recurringServicePlanItems = pgTable("recurring_service_plan_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  planId: uuid("plan_id")
+    .notNull()
+    .references(() => recurringServicePlans.id, { onDelete: "cascade" }),
   itemName: text("item_name").notNull(),
   quantity: text("quantity").notNull().default("1"),
   notes: text("notes"),

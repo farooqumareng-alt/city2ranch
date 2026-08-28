@@ -150,6 +150,18 @@ export function quoteReadyEmail(fields: { totalCents: number; signInUrl: string 
   );
 }
 
+export function recurringOrderCreatedEmail(fields: { orderUrl: string }) {
+  return customerWrap(
+    "Your Recurring Order Is Ready",
+    `
+      <p>A new order was just created from your recurring City2Ranch request.</p>
+      <p>Sign in to review your shopping list and approve it before anything is charged — recurring
+      requests never charge you automatically.</p>
+      <p><a href="${fields.orderUrl}" style="color:#0B2445;">Review your order</a></p>
+    `
+  );
+}
+
 export function householdInviteEmail(fields: { ownerEmail: string; signInUrl: string }) {
   return customerWrap(
     "You've Been Invited",

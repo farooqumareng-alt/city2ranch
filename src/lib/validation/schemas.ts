@@ -173,6 +173,37 @@ export const conciergeOrderCreateSchema = z.object({
 });
 export type ConciergeOrderCreateInput = z.infer<typeof conciergeOrderCreateSchema>;
 
+export const recurringPlanFrequency = z.enum(["weekly", "biweekly", "monthly"]);
+
+/** Customer-facing Recurring Services intake — same itemsJson shape and
+ *  reasoning as conciergeOrderCreateSchema above (a dynamic-row shopping
+ *  list doesn't fit this app's flat-field form convention). No
+ *  requestedDeliveryDate — a plan's "when" is its frequency/nextRunAt,
+ *  not a one-off date. */
+export const recurringServicePlanCreateSchema = z.object({
+  customerName: requiredText("Full name"),
+  customerPhone: phone,
+  deliveryAddressLine1: requiredText("Address"),
+  deliveryAddressLine2: optionalText,
+  deliveryCity: requiredText("City"),
+  deliveryState: requiredText("State", 2),
+  deliveryZip: zip,
+  customerNotes: optionalText,
+  frequency: recurringPlanFrequency,
+  itemsJson: z
+    .string()
+    .transform((raw, ctx) => {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        ctx.addIssue({ code: "custom", message: "Invalid item list." });
+        return z.NEVER;
+      }
+    })
+    .pipe(z.array(conciergeOrderItemSchema).min(1, "Add at least one item.")),
+});
+export type RecurringServicePlanCreateInput = z.infer<typeof recurringServicePlanCreateSchema>;
+
 // A quote line as staff types it — a dollar-and-cents string ("75.00"),
 // converted to the integer cents every other price field in this app
 // already uses.

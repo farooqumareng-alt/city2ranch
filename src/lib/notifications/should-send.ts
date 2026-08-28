@@ -19,7 +19,10 @@ export async function shouldNotify(
   try {
     const db = getDb();
     const rows = await db
-      .select({ paymentReceipts: notificationPreferences.paymentReceipts })
+      .select({
+        paymentReceipts: notificationPreferences.paymentReceipts,
+        recurringOrderCreated: notificationPreferences.recurringOrderCreated,
+      })
       .from(notificationPreferences)
       .where(eq(notificationPreferences.authUserId, authUserId));
 

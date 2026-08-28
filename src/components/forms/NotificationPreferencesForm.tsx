@@ -7,7 +7,13 @@ import type { ActionResult } from "@/lib/actions/types";
 
 const initialState: ActionResult | undefined = undefined;
 
-export function NotificationPreferencesForm({ paymentReceipts }: { paymentReceipts: boolean }) {
+export function NotificationPreferencesForm({
+  paymentReceipts,
+  recurringOrderCreated,
+}: {
+  paymentReceipts: boolean;
+  recurringOrderCreated: boolean;
+}) {
   const [state, formAction, pending] = useActionState(updateNotificationPreferences, initialState);
 
   return (
@@ -32,6 +38,22 @@ export function NotificationPreferencesForm({ paymentReceipts }: { paymentReceip
           <span className="block font-sans text-sm font-medium text-navy-deep">Payment receipts</span>
           <span className="block font-sans text-xs text-charcoal/60">
             Email me a receipt and delivery PIN when a payment succeeds.
+          </span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          name="recurringOrderCreated"
+          defaultChecked={recurringOrderCreated}
+          className="mt-1 h-4 w-4 rounded-sm border-navy/30 text-gold focus-visible:outline-2 focus-visible:outline-gold"
+        />
+        <span>
+          <span className="block font-sans text-sm font-medium text-navy-deep">Recurring order created</span>
+          <span className="block font-sans text-xs text-charcoal/60">
+            Email me when a new order is created from one of my recurring requests, so I know to
+            review and pay.
           </span>
         </span>
       </label>

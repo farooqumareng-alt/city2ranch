@@ -1,13 +1,15 @@
 /**
- * Every send site this app has today that's both recurring and has a
- * known owner at send time — see the doc comment on
- * notificationPreferences in src/lib/db/schema.ts for why this is the
- * only category (the other transactional emails in this codebase fire
- * before there's a resolvable owner to key a preference off of).
+ * Every send site this app has that's both recurring and has a known
+ * owner at send time — see the doc comment on notificationPreferences
+ * in src/lib/db/schema.ts for why the set stays this narrow (the other
+ * transactional emails in this codebase fire before there's a
+ * resolvable owner to key a preference off of).
  */
-export type NotificationCategory = "paymentReceipts";
+export type NotificationCategory = "paymentReceipts" | "recurringOrderCreated";
 
-export type NotificationPreferencesRow = { paymentReceipts: boolean } | undefined;
+export type NotificationPreferencesRow =
+  | { paymentReceipts: boolean; recurringOrderCreated: boolean }
+  | undefined;
 
 /**
  * The actual decision, pulled out as its own DB-free module (like
@@ -26,5 +28,7 @@ export function resolveNotifyDecision(
   switch (category) {
     case "paymentReceipts":
       return row.paymentReceipts;
+    case "recurringOrderCreated":
+      return row.recurringOrderCreated;
   }
 }

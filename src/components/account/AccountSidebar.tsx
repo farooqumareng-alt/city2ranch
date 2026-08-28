@@ -15,6 +15,7 @@ const ACCOUNT_LINKS = [
   { href: "/orders", label: "My Orders" },
   { href: "/lists", label: "My Lists" },
   { href: "/places", label: "My Places" },
+  { href: "/recurring-services", label: "Recurring Services" },
   { href: "/household", label: "Household" },
   { href: "/membership", label: "Membership" },
   { href: "/payments", label: "Payments" },
