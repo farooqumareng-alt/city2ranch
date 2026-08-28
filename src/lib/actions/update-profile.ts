@@ -1,6 +1,5 @@
 "use server";
 
-import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { customerProfiles } from "@/lib/db/schema";
@@ -63,15 +62,4 @@ export async function updateProfile(
   revalidatePath("/profile");
   revalidatePath("/orders/new");
   return { ok: true };
-}
-
-/** Used by /orders/new to pre-fill the order form. Returns null for a
- *  signed-in customer with no saved profile yet — a normal state. */
-export async function getOwnProfile(authUserId: string) {
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(customerProfiles)
-    .where(eq(customerProfiles.authUserId, authUserId));
-  return rows[0] ?? null;
 }

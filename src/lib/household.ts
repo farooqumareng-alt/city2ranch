@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { householdMembers } from "@/lib/db/schema";
@@ -23,25 +24,34 @@ function ownerEmailSubquery(ownerIdColumn: typeof householdMembers.ownerAuthUser
  * call instead of using the signed-in user's id directly — see
  * submit-order.ts, approve-and-pay.ts, places.ts, update-profile.ts,
  * and the (account) pages for orders/places/profile.
+ *
+ * Wrapped in React's cache() — (account)/layout.tsx resolves this once
+ * for the sidebar/profile, then the page underneath resolves it again
+ * for its own data. Both calls are real, deliberate (never trust the
+ * layout alone), but without cache() they were also two separate round
+ * trips to the DB pool for the exact same query on every page view.
+ * cache() scopes the memoization to this one request, so the repeat
+ * call becomes free instead of a second hop through the pooler.
  */
-export async function getEffectiveOwnerId(userId: string): Promise<string> {
+export const getEffectiveOwnerId = cache(async (userId: string): Promise<string> => {
   const db = getDb();
   const rows = await db
     .select({ ownerAuthUserId: householdMembers.ownerAuthUserId })
     .from(householdMembers)
     .where(and(eq(householdMembers.memberAuthUserId, userId), eq(householdMembers.status, "active")));
   return rows[0]?.ownerAuthUserId ?? userId;
-}
+});
 
 /** Same resolution as getEffectiveOwnerId, but also returns the owner's
  *  email — for the one call site (submitOrder) that needs to stamp a
  *  new order's customer_email with whoever the order actually belongs
  *  to, not whichever household member happened to submit it. Avoids a
- *  second round trip for the common (non-delegated) case. */
-export async function getEffectiveOwner(
+ *  second round trip for the common (non-delegated) case. Also
+ *  cache()'d, same reasoning as getEffectiveOwnerId above. */
+export const getEffectiveOwner = cache(async (
   userId: string,
   userEmail: string
-): Promise<{ id: string; email: string }> {
+): Promise<{ id: string; email: string }> => {
   const db = getDb();
   const rows = await db
     .select({
@@ -54,7 +64,7 @@ export async function getEffectiveOwner(
   const owner = rows[0];
   if (!owner) return { id: userId, email: userEmail };
   return { id: owner.ownerAuthUserId, email: owner.ownerEmail ?? userEmail };
-}
+});
 
 /** Everything the /household page needs to render whichever of the
  *  three states (independent owner, active member elsewhere, pending

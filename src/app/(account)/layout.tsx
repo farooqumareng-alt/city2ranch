@@ -4,7 +4,7 @@ import { Container } from "@/components/ui/Container";
 import { AccountSidebar } from "@/components/account/AccountSidebar";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getEffectiveOwner } from "@/lib/household";
-import { getOwnProfile } from "@/lib/actions/update-profile";
+import { getOwnProfile } from "@/lib/customer-profile";
 
 /**
  * Shared sign-in gate + sidebar shell for every account page (/orders,
