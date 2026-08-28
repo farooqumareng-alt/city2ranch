@@ -10,7 +10,17 @@ import { placeSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 import { getEffectiveOwnerId } from "@/lib/household";
 
-const FORM_FIELDS = ["label", "addressLine1", "addressLine2", "city", "state", "zip", "deliveryInstructions"];
+const FORM_FIELDS = [
+  "label",
+  "addressLine1",
+  "addressLine2",
+  "city",
+  "state",
+  "zip",
+  "gateCode",
+  "dropoffLocation",
+  "accessNotes",
+];
 
 /** Used by /places and the order form's "use a saved place" picker. */
 export async function getOwnPlaces(authUserId: string) {
@@ -30,7 +40,9 @@ function parsePlace(formData: FormData) {
     city: formData.get("city"),
     state: formData.get("state"),
     zip: formData.get("zip"),
-    deliveryInstructions: formData.get("deliveryInstructions"),
+    gateCode: formData.get("gateCode"),
+    dropoffLocation: formData.get("dropoffLocation"),
+    accessNotes: formData.get("accessNotes"),
   });
 }
 

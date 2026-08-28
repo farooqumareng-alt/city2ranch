@@ -177,6 +177,16 @@ export const TIMING_OPTIONS = [
   { value: "on_demand", label: "Private / on-demand request" },
 ] as const;
 
+export const DROPOFF_LOCATION_OPTIONS = [
+  { value: "front_door", label: "Front door" },
+  { value: "back_door", label: "Back door" },
+  { value: "garage", label: "Garage" },
+  { value: "gate", label: "Gate / front entrance" },
+  { value: "barn", label: "Barn" },
+  { value: "hand_to_someone", label: "Hand to someone at the property" },
+  { value: "other", label: "Other — see notes" },
+] as const;
+
 export const FREQUENCY_OPTIONS = [
   { value: "weekly", label: "Weekly" },
   { value: "biweekly", label: "Biweekly" },

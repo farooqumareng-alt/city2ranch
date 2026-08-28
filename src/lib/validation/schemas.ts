@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DROPOFF_LOCATION_OPTIONS } from "@/lib/constants";
 
 // Shared primitives so every form validates ZIP/phone/email consistently,
 // both client-side (for inline feedback) and server-side (source of truth).
@@ -204,6 +205,14 @@ export const conciergeQuoteFinalizeSchema = z.object({
 
 // "My Places" — a customer's saved address book. label is freeform
 // ("Ranch", "Lake House") rather than a fixed list of property types.
+const dropoffLocationValues: string[] = DROPOFF_LOCATION_OPTIONS.map((o) => o.value);
+const optionalDropoffLocation = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v === "" ? undefined : v))
+  .refine((v) => v === undefined || dropoffLocationValues.includes(v), "Choose a valid option.");
+
 export const placeSchema = z.object({
   label: requiredText("Place name"),
   addressLine1: requiredText("Address"),
@@ -211,7 +220,9 @@ export const placeSchema = z.object({
   city: requiredText("City"),
   state: requiredText("State", 2),
   zip,
-  deliveryInstructions: optionalText,
+  gateCode: optionalText,
+  dropoffLocation: optionalDropoffLocation,
+  accessNotes: optionalText,
 });
 export type PlaceInput = z.infer<typeof placeSchema>;
 

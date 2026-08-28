@@ -184,6 +184,7 @@ export function NewConciergeOrderForm({
               <TextField
                 name={`item-qty-${index}`}
                 label="Quantity"
+                placeholder="3, 2 lbs, 1 dozen…"
                 required
                 value={row.quantity}
                 onChange={(e) => updateItem(index, { quantity: e.target.value })}

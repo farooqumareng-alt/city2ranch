@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import { TextField, TextareaField } from "@/components/ui/FormField";
+import { TextField, TextareaField, SelectField } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
+import { DROPOFF_LOCATION_OPTIONS } from "@/lib/constants";
 import type { ActionResult } from "@/lib/actions/types";
 
 const initialState: ActionResult | undefined = undefined;
@@ -14,7 +15,9 @@ export type PlaceDefaults = {
   city: string;
   state: string;
   zip: string;
-  deliveryInstructions: string | null;
+  gateCode: string | null;
+  dropoffLocation: string | null;
+  accessNotes: string | null;
 };
 
 /**
@@ -93,12 +96,30 @@ export function PlaceForm({
         />
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField
+          name="gateCode"
+          label="Gate code"
+          placeholder="e.g. 1234#"
+          defaultValue={values?.gateCode ?? place?.gateCode ?? ""}
+          error={fieldErrors?.gateCode}
+        />
+        <SelectField
+          name="dropoffLocation"
+          label="Preferred drop-off"
+          placeholder="— Not specified —"
+          options={DROPOFF_LOCATION_OPTIONS}
+          defaultValue={values?.dropoffLocation ?? place?.dropoffLocation ?? ""}
+          error={fieldErrors?.dropoffLocation}
+        />
+      </div>
+
       <TextareaField
-        name="deliveryInstructions"
-        label="Delivery instructions"
-        hint="Gate code, access notes, where to leave deliveries — anything a driver should know at this place."
-        defaultValue={values?.deliveryInstructions ?? place?.deliveryInstructions ?? ""}
-        error={fieldErrors?.deliveryInstructions}
+        name="accessNotes"
+        label="Access notes"
+        hint="Driveway directions, dogs on the property, anything else a driver should know that doesn't fit above."
+        defaultValue={values?.accessNotes ?? place?.accessNotes ?? ""}
+        error={fieldErrors?.accessNotes}
       />
 
       <Button type="submit" variant="navy" size="lg" disabled={pending} className="self-start">

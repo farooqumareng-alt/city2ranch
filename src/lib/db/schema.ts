@@ -227,10 +227,14 @@ export const customerPlaces = pgTable("customer_places", {
   city: text("city").notNull(),
   state: text("state").notNull(),
   zip: text("zip").notNull(),
-  // Gate codes, access notes — freeform, shown to whoever fulfills a
-  // request placed against this place (copied into the order/request's
-  // own notes field at submit time, not read live from here).
-  deliveryInstructions: text("delivery_instructions"),
+  // Split into a short structured field (gateCode) plus one dropdown
+  // from a fixed, common set (dropoffLocation) plus one true-freeform
+  // catch-all (accessNotes) — a single big textarea mixed all of these
+  // together, which is exactly the kind of ambiguity that causes a
+  // driver to miss the one line that mattered.
+  gateCode: text("gate_code"),
+  dropoffLocation: text("dropoff_location"),
+  accessNotes: text("access_notes"),
   isDefault: boolean("is_default").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
 });

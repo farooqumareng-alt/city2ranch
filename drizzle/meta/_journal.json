@@ -155,6 +155,13 @@
       "when": 1787876919622,
       "tag": "0021_rls_shopping_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787877444368,
+      "tag": "0022_places_structured_access_fields",
+      "breakpoints": true
     }
   ]
 }

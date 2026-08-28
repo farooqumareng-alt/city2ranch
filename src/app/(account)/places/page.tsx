@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnPlaces, deletePlace, setDefaultPlace } from "@/lib/actions/places";
 import { getEffectiveOwnerId } from "@/lib/household";
+import { DROPOFF_LOCATION_OPTIONS } from "@/lib/constants";
+
+const DROPOFF_LABELS = Object.fromEntries(DROPOFF_LOCATION_OPTIONS.map((o) => [o.value, o.label]));
 
 export const metadata: Metadata = {
   title: "My Places",
@@ -57,8 +60,14 @@ export default async function PlacesPage() {
                 <br />
                 {place.city}, {place.state} {place.zip}
               </p>
-              {place.deliveryInstructions ? (
-                <p className="font-sans text-xs text-charcoal/60">{place.deliveryInstructions}</p>
+              {place.gateCode || place.dropoffLocation || place.accessNotes ? (
+                <div className="flex flex-col gap-0.5 font-sans text-xs text-charcoal/60">
+                  {place.gateCode ? <p>Gate code: {place.gateCode}</p> : null}
+                  {place.dropoffLocation ? (
+                    <p>Drop-off: {DROPOFF_LABELS[place.dropoffLocation] ?? place.dropoffLocation}</p>
+                  ) : null}
+                  {place.accessNotes ? <p>{place.accessNotes}</p> : null}
+                </div>
               ) : null}
               <div className="flex flex-wrap gap-3 border-t border-navy/10 pt-3">
                 <Button href={`/places/${place.id}`} variant="outline-dark" size="md">
