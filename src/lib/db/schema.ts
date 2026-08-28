@@ -682,3 +682,26 @@ export const auditEvents = pgTable("audit_events", {
   newState: text("new_state"),
   metadata: jsonb("metadata"),
 });
+
+/**
+ * A real per-order message thread between the customer and the
+ * concierge team — e.g. "your requested brand is unavailable, here are
+ * two alternatives." Deliberately scoped to one order at a time, not a
+ * unified cross-order inbox yet (no real usage pattern to design that
+ * against). Reuses auditActorTypeEnum for authorType (only 'customer'
+ * and 'staff' apply here, but no reason to define a near-duplicate
+ * enum) — same actorId-is-always-a-real-auth-users-id shape auditEvents
+ * already uses.
+ */
+export const orderMessages = pgTable("order_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  orderId: uuid("order_id")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  authorType: auditActorTypeEnum("author_type").notNull(),
+  authorId: uuid("author_id"),
+  body: text("body").notNull(),
+});

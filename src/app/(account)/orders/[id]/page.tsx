@@ -11,6 +11,8 @@ import { approveAndPayOrder } from "@/lib/actions/approve-and-pay";
 import { getOrderItems, getOrderFeeLines } from "@/lib/orders/concierge";
 import { formatPlainDate } from "@/lib/format";
 import { getEffectiveOwnerId } from "@/lib/household";
+import { getOrderMessages } from "@/lib/order-messages";
+import { OrderMessageThread } from "@/components/orders/OrderMessageThread";
 
 export const metadata: Metadata = { title: "Order Details" };
 
@@ -67,9 +69,11 @@ export default async function OrderDetailPage({
   if (!order || order.authUserId !== effectiveOwnerId) notFound();
 
   const isConcierge = order.serviceType === "concierge";
-  const [items, feeLines] = isConcierge
-    ? await Promise.all([getOrderItems(order.id), getOrderFeeLines(order.id)])
-    : [[], []];
+  const [items, feeLines, messages] = await Promise.all([
+    isConcierge ? getOrderItems(order.id) : Promise.resolve([]),
+    isConcierge ? getOrderFeeLines(order.id) : Promise.resolve([]),
+    getOrderMessages(order.id),
+  ]);
 
   return (
     <div className="flex flex-col gap-10">
@@ -195,6 +199,8 @@ export default async function OrderDetailPage({
           )}
         </div>
       </div>
+
+      <OrderMessageThread orderId={order.id} messages={messages} viewerRole="customer" />
     </div>
   );
 }

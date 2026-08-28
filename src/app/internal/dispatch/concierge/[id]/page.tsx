@@ -8,6 +8,8 @@ import { orders } from "@/lib/db/schema";
 import { getOrderItems, getOrderFeeLines } from "@/lib/orders/concierge";
 import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import { formatPlainDate } from "@/lib/format";
+import { getOrderMessages } from "@/lib/order-messages";
+import { OrderMessageThread } from "@/components/orders/OrderMessageThread";
 
 export const metadata: Metadata = { title: "Concierge Quote" };
 
@@ -23,7 +25,11 @@ export default async function ConciergeQuoteEditPage({
   const order = rows[0];
   if (!order || order.serviceType !== "concierge") notFound();
 
-  const [items, feeLines] = await Promise.all([getOrderItems(id), getOrderFeeLines(id)]);
+  const [items, feeLines, messages] = await Promise.all([
+    getOrderItems(id),
+    getOrderFeeLines(id),
+    getOrderMessages(id),
+  ]);
 
   return (
     <div className="flex flex-col gap-10">
@@ -75,6 +81,8 @@ export default async function ConciergeQuoteEditPage({
           existingFeeLines={feeLines.map((l) => ({ label: l.label, amountCents: l.amountCents }))}
         />
       </div>
+
+      <OrderMessageThread orderId={order.id} messages={messages} viewerRole="staff" />
     </div>
   );
 }

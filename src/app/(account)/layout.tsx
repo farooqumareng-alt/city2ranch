@@ -18,7 +18,7 @@ export default async function AccountLayout({
   children: React.ReactNode;
 }) {
   const user = await getCurrentUser();
-  const pathname = (await headers()).get("x-pathname") ?? "/orders";
+  const pathname = (await headers()).get("x-pathname") ?? "/home";
 
   if (!user?.email) {
     redirect(`/sign-in?next=${encodeURIComponent(pathname)}`);

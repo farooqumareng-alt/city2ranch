@@ -11,12 +11,15 @@ import { signOut } from "@/lib/actions/sign-out";
  *  top nav's account control would just duplicate it there. */
 function isPanelRoute(pathname: string) {
   return (
+    pathname.startsWith("/home") ||
     pathname.startsWith("/requests") ||
+    pathname.startsWith("/deliveries") ||
     pathname.startsWith("/orders") ||
     pathname.startsWith("/places") ||
     pathname.startsWith("/lists") ||
     pathname.startsWith("/household") ||
     pathname.startsWith("/membership") ||
+    pathname.startsWith("/payments") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/support") ||
     pathname.startsWith("/internal")
@@ -93,32 +96,14 @@ export function NavAuthControl({
     return <DesktopAccountMenu />;
   }
 
+  // Just the entry point, not every account page — once on any account
+  // page, AccountSidebar already lists everything. A second full copy of
+  // that list here was exactly the "text-heavy navigation" to avoid.
   const mobileLinkClass = "block py-1 font-sans text-base text-navy-deep hover:text-gold";
   return (
     <>
-      <Link href="/requests" className={mobileLinkClass}>
-        My Requests
-      </Link>
-      <Link href="/orders" className={mobileLinkClass}>
-        My Orders
-      </Link>
-      <Link href="/places" className={mobileLinkClass}>
-        My Places
-      </Link>
-      <Link href="/lists" className={mobileLinkClass}>
-        My Lists
-      </Link>
-      <Link href="/household" className={mobileLinkClass}>
-        Household
-      </Link>
-      <Link href="/membership" className={mobileLinkClass}>
-        Membership
-      </Link>
-      <Link href="/profile" className={mobileLinkClass}>
-        Profile
-      </Link>
-      <Link href="/support" className={mobileLinkClass}>
-        Support
+      <Link href="/home" className={mobileLinkClass}>
+        My Account
       </Link>
       <form action={signOut}>
         <button
@@ -184,29 +169,11 @@ function DesktopAccountMenu() {
           role="menu"
           className="absolute right-0 top-full z-50 mt-2 w-44 rounded-sm border border-navy/10 bg-white py-2 shadow-lg"
         >
-          <Link href="/requests" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
-            My Requests
-          </Link>
-          <Link href="/orders" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
-            My Orders
-          </Link>
-          <Link href="/places" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
-            My Places
-          </Link>
-          <Link href="/lists" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
-            My Lists
-          </Link>
-          <Link href="/household" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
-            Household
-          </Link>
-          <Link href="/membership" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
-            Membership
-          </Link>
-          <Link href="/profile" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
-            Profile
-          </Link>
-          <Link href="/support" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
-            Support
+          {/* Just the entry point — AccountSidebar lists everything else
+              once you're on any account page, so this dropdown doesn't
+              need to be a second copy of that list to keep in sync. */}
+          <Link href="/home" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
+            My Account
           </Link>
           <form action={signOut}>
             <button

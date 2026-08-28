@@ -1,14 +1,23 @@
 import { PanelSidebar } from "@/components/layout/PanelSidebar";
 
+// Ordered by how often a customer actually needs it, not alphabetically
+// — Home first (the real landing point, not a specific function), then
+// Requests -> Deliveries -> Orders following the real lifecycle
+// (Customer -> Request -> Delivery -> Payment), then the supporting
+// account areas.
 const ACCOUNT_LINKS = [
+  { href: "/home", label: "Home" },
+  { href: "/services", label: "Services" },
   { href: "/requests", label: "My Requests" },
+  { href: "/deliveries", label: "My Deliveries" },
   { href: "/orders", label: "My Orders" },
-  { href: "/places", label: "My Places" },
   { href: "/lists", label: "My Lists" },
+  { href: "/places", label: "My Places" },
   { href: "/household", label: "Household" },
   { href: "/membership", label: "Membership" },
-  { href: "/profile", label: "Profile" },
+  { href: "/payments", label: "Payments" },
   { href: "/support", label: "Support" },
+  { href: "/profile", label: "Profile" },
 ];
 
 /**
