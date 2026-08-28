@@ -19,6 +19,8 @@ export function PanelSidebar({
   links,
   pathname,
   userEmail,
+  userName,
+  accountType,
   managingEmail,
 }: {
   links: PanelLink[];
@@ -27,6 +29,16 @@ export function PanelSidebar({
    *  accounts (e.g. a staff member who is also a driver) is currently
    *  signed in — this is display-only, not a role indicator. */
   userEmail?: string;
+  /** A real display name (customer profile name, driver name) when one
+   *  exists — shown as the primary line instead of the email, which is
+   *  demoted to a smaller secondary line. Falls back to email-only when
+   *  there's no name on file (e.g. staff, who have no name field). */
+  userName?: string;
+  /** Which panel this is — "Customer" / "Staff" / "Driver" — since the
+   *  same email can hold more than one role (a staff member who's also
+   *  a driver) and "Signed in as" alone doesn't say which hat they're
+   *  wearing right now. */
+  accountType?: string;
   /** Set when the signed-in user is a household member (see
    *  src/lib/household.ts) operating another account by full
    *  delegation — makes it unmistakable whose orders/places/payments
@@ -46,12 +58,24 @@ export function PanelSidebar({
     >
       {userEmail ? (
         <div className="mb-1 hidden flex-col gap-0.5 border-b border-navy/10 pb-3 md:flex">
-          <span className="font-sans text-[11px] uppercase tracking-[0.1em] text-charcoal/50">
-            Signed in as
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-sans text-[11px] uppercase tracking-[0.1em] text-charcoal/50">
+              Signed in as
+            </span>
+            {accountType ? (
+              <span className="rounded-full bg-navy/10 px-2 py-0.5 font-sans text-[10px] font-medium uppercase tracking-wide text-navy-deep">
+                {accountType}
+              </span>
+            ) : null}
+          </div>
+          <span className="truncate font-sans text-sm font-medium text-navy-deep" title={userName ?? userEmail}>
+            {userName ?? userEmail}
           </span>
-          <span className="truncate font-sans text-sm font-medium text-navy-deep" title={userEmail}>
-            {userEmail}
-          </span>
+          {userName ? (
+            <span className="truncate font-sans text-xs text-charcoal/50" title={userEmail}>
+              {userEmail}
+            </span>
+          ) : null}
           {managingEmail ? (
             <span className="mt-1 truncate font-sans text-xs text-gold" title={managingEmail}>
               Managing {managingEmail}&apos;s account

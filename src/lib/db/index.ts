@@ -22,14 +22,22 @@ export function getDb() {
 
   // `prepare: false` is required for connection poolers run in transaction
   // mode (e.g. Supabase's Supavisor pooler on port 6543); harmless against
-  // a direct connection too. `max: 1` matters just as much: each
-  // serverless function instance should hold at most one connection —
-  // postgres-js's default (10) multiplied across however many concurrent
-  // instances Vercel spins up is exactly what exhausted Supabase's
-  // pooler connection cap in production (EMAXCONNSESSION). The pooler
-  // itself is what multiplexes many of these single connections
-  // together; the app doesn't need its own pool on top of that.
-  const client = postgres(connectionString, { prepare: false, max: 1 });
+  // a direct connection too.
+  //
+  // `max`: postgres-js's default (10) per serverless instance, multiplied
+  // across however many concurrent instances Vercel spins up, is what
+  // exhausted the pooler in session mode (EMAXCONNSESSION). But `max: 1`
+  // has a real cost of its own under transaction mode: a page that fires
+  // several genuinely-independent queries via Promise.all (e.g. the
+  // account dashboard, /request-service's prefill data) can't actually
+  // run them concurrently with only one physical connection — they
+  // serialize through it, and each round trip to the pooler costs real
+  // cross-region latency. Transaction mode's whole design is multiplexing
+  // many short-lived client connections onto a shared backend pool (unlike
+  // session mode's one-dedicated-backend-connection-per-session), so a
+  // small per-instance max here is safe headroom, not a repeat of the
+  // session-mode problem.
+  const client = postgres(connectionString, { prepare: false, max: 5 });
   cached = drizzle(client, { schema });
   return cached;
 }

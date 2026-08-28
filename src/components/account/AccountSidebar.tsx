@@ -4,10 +4,12 @@ import { PanelSidebar } from "@/components/layout/PanelSidebar";
 // — Home first (the real landing point, not a specific function), then
 // Requests -> Deliveries -> Orders following the real lifecycle
 // (Customer -> Request -> Delivery -> Payment), then the supporting
-// account areas.
+// account areas. No separate "Services" entry: Home's own "Request
+// Service" action already covers that, and a second link to the public
+// marketing page just left the account panel entirely — a duplicate
+// path to the same place, not a distinct destination.
 const ACCOUNT_LINKS = [
   { href: "/home", label: "Home" },
-  { href: "/services", label: "Services" },
   { href: "/requests", label: "My Requests" },
   { href: "/deliveries", label: "My Deliveries" },
   { href: "/orders", label: "My Orders" },
@@ -29,13 +31,22 @@ const ACCOUNT_LINKS = [
 export function AccountSidebar({
   pathname,
   userEmail,
+  userName,
   managingEmail,
 }: {
   pathname: string;
   userEmail?: string;
+  userName?: string;
   managingEmail?: string;
 }) {
   return (
-    <PanelSidebar links={ACCOUNT_LINKS} pathname={pathname} userEmail={userEmail} managingEmail={managingEmail} />
+    <PanelSidebar
+      links={ACCOUNT_LINKS}
+      pathname={pathname}
+      userEmail={userEmail}
+      userName={userName}
+      accountType="Customer"
+      managingEmail={managingEmail}
+    />
   );
 }
