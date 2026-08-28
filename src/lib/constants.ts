@@ -26,6 +26,7 @@ export const FOOTER_LINKS: NavLink[] = [
   { label: "How It Works", href: "/how-it-works" },
   { label: "Service Area", href: "/service-area" },
   { label: "Business & Estates", href: "/#estates" },
+  { label: "Property Partners", href: "/#partners" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
   { label: "Privacy", href: "/privacy" },

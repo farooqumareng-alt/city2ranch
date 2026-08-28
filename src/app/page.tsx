@@ -9,6 +9,7 @@ import { TestimonialPlaceholder } from "@/components/home/TestimonialPlaceholder
 import { FoundingCTA } from "@/components/home/FoundingCTA";
 import { RouteExplainer } from "@/components/home/RouteExplainer";
 import { EstateTeaser } from "@/components/home/EstateTeaser";
+import { PartnerTeaser } from "@/components/home/PartnerTeaser";
 
 export default function Home() {
   return (
@@ -24,6 +25,7 @@ export default function Home() {
       <FoundingCTA />
       <RouteExplainer />
       <EstateTeaser />
+      <PartnerTeaser />
     </>
   );
 }

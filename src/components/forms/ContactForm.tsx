@@ -8,7 +8,7 @@ import type { ActionResult } from "@/lib/actions/types";
 
 const initialState: ActionResult | undefined = undefined;
 
-export function ContactForm() {
+export function ContactForm({ subjectPrefill }: { subjectPrefill?: string }) {
   const [state, formAction, pending] = useActionState(submitContact, initialState);
 
   if (state?.ok) {
@@ -35,7 +35,13 @@ export function ContactForm() {
         <TextField name="name" label="Full name" required error={fieldErrors?.name} />
         <TextField name="email" type="email" label="Email" required error={fieldErrors?.email} />
         <TextField name="phone" type="tel" label="Phone" error={fieldErrors?.phone} />
-        <TextField name="subject" label="Subject" required error={fieldErrors?.subject} />
+        <TextField
+          name="subject"
+          label="Subject"
+          required
+          defaultValue={subjectPrefill}
+          error={fieldErrors?.subject}
+        />
       </div>
       <TextareaField name="message" label="Message" required error={fieldErrors?.message} />
       <Button type="submit" variant="navy" disabled={pending} className="self-start">
