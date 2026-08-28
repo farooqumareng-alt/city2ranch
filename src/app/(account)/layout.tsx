@@ -34,7 +34,6 @@ export default async function AccountLayout({
   return (
     <Container className="flex flex-col gap-8 py-12 sm:py-16 md:flex-row md:items-start md:gap-10">
       <AccountSidebar
-        pathname={pathname}
         userEmail={user.email}
         userName={profile?.name ?? undefined}
         managingEmail={managingEmail}
