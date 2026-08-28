@@ -2,6 +2,20 @@
 // notifications. Not customer-facing marketing emails — just a fast,
 // readable way for the team to see what came in.
 
+// Email clients load images from a real URL, not the local /public
+// folder — same NEXT_PUBLIC_SITE_URL + localhost fallback every other
+// email-embedded link in this file already uses (signInUrl, orderUrl,
+// etc.), just read once here instead of threaded through every call
+// site. public/logo-email.png is a flattened PNG rasterized from
+// public/logo.svg — email clients (Outlook especially) have
+// inconsistent-to-nonexistent SVG support, so the raster export is the
+// only version safe to reference in HTML email.
+const LOGO_URL = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/logo-email.png`;
+// Matches the source SVG's aspect ratio (1272.42 x 464.74) — width/height
+// attributes are set explicitly so email clients reserve the right
+// space before the image itself loads.
+const LOGO_IMG = `<img src="${LOGO_URL}" width="140" height="51" alt="City2Ranch" style="display:block;border:0;">`;
+
 function renderFields(fields: Record<string, string | null | undefined>) {
   return Object.entries(fields)
     .filter(([, value]) => value !== undefined && value !== null && value !== "")
@@ -14,7 +28,8 @@ function wrap(title: string, fields: Record<string, string | null | undefined>) 
     subject: `${title} — City2Ranch`,
     html: `
       <div style="font-family:Arial,Helvetica,sans-serif;color:#171717;">
-        <h2 style="color:#0B2445;">${title}</h2>
+        ${LOGO_IMG}
+        <h2 style="color:#0B2445;margin-top:16px;">${title}</h2>
         <table style="border-collapse:collapse;">${renderFields(fields)}</table>
       </div>
     `,
@@ -107,8 +122,8 @@ function customerWrap(title: string, bodyHtml: string) {
     subject: `${title} — City2Ranch`,
     html: `
       <div style="font-family:Arial,Helvetica,sans-serif;color:#171717;max-width:480px;">
-        <p style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#C9A45C;font-weight:bold;">City2Ranch</p>
-        <h2 style="color:#0B2445;margin-top:4px;">${title}</h2>
+        ${LOGO_IMG}
+        <h2 style="color:#0B2445;margin-top:16px;">${title}</h2>
         ${bodyHtml}
       </div>
     `,
