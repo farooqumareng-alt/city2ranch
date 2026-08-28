@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ProfileForm } from "@/components/forms/ProfileForm";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { getOwnProfile } from "@/lib/actions/update-profile";
+import { getOwnProfile } from "@/lib/customer-profile";
 import { getEffectiveOwnerId } from "@/lib/household";
 
 export const metadata: Metadata = {
