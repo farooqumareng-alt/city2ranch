@@ -8,6 +8,7 @@ import { customerPlaces } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { placeSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
+import { getEffectiveOwnerId } from "@/lib/household";
 
 const FORM_FIELDS = ["label", "addressLine1", "addressLine2", "city", "state", "zip", "deliveryInstructions"];
 
@@ -39,6 +40,7 @@ export async function createPlace(
 ): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Please sign in to save a place." };
+  const ownerId = await getEffectiveOwnerId(user.id);
 
   const parsed = parsePlace(formData);
   if (!parsed.success) {
@@ -57,10 +59,10 @@ export async function createPlace(
     const existing = await db
       .select({ id: customerPlaces.id })
       .from(customerPlaces)
-      .where(eq(customerPlaces.authUserId, user.id));
+      .where(eq(customerPlaces.authUserId, ownerId));
 
     await db.insert(customerPlaces).values({
-      authUserId: user.id,
+      authUserId: ownerId,
       ...parsed.data,
       isDefault: existing.length === 0,
     });
@@ -85,6 +87,7 @@ export async function updatePlace(
 ): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Please sign in to update this place." };
+  const ownerId = await getEffectiveOwnerId(user.id);
 
   const parsed = parsePlace(formData);
   if (!parsed.success) {
@@ -101,7 +104,7 @@ export async function updatePlace(
     await db
       .update(customerPlaces)
       .set({ ...parsed.data, updatedAt: new Date() })
-      .where(and(eq(customerPlaces.id, placeId), eq(customerPlaces.authUserId, user.id)));
+      .where(and(eq(customerPlaces.id, placeId), eq(customerPlaces.authUserId, ownerId)));
   } catch (error) {
     console.error("[updatePlace] failed", error);
     return {
@@ -119,11 +122,12 @@ export async function updatePlace(
 export async function deletePlace(placeId: string): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
+  const ownerId = await getEffectiveOwnerId(user.id);
 
   const db = getDb();
   await db
     .delete(customerPlaces)
-    .where(and(eq(customerPlaces.id, placeId), eq(customerPlaces.authUserId, user.id)));
+    .where(and(eq(customerPlaces.id, placeId), eq(customerPlaces.authUserId, ownerId)));
 
   revalidatePath("/places");
   revalidatePath("/orders/new");
@@ -132,6 +136,7 @@ export async function deletePlace(placeId: string): Promise<void> {
 export async function setDefaultPlace(placeId: string): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
+  const ownerId = await getEffectiveOwnerId(user.id);
 
   const db = getDb();
   // Two statements, not one clever query — clearer to read, and this
@@ -139,11 +144,11 @@ export async function setDefaultPlace(placeId: string): Promise<void> {
   await db
     .update(customerPlaces)
     .set({ isDefault: false, updatedAt: new Date() })
-    .where(and(eq(customerPlaces.authUserId, user.id), eq(customerPlaces.isDefault, true)));
+    .where(and(eq(customerPlaces.authUserId, ownerId), eq(customerPlaces.isDefault, true)));
   await db
     .update(customerPlaces)
     .set({ isDefault: true, updatedAt: new Date() })
-    .where(and(eq(customerPlaces.id, placeId), eq(customerPlaces.authUserId, user.id)));
+    .where(and(eq(customerPlaces.id, placeId), eq(customerPlaces.authUserId, ownerId)));
 
   revalidatePath("/places");
   revalidatePath("/orders/new");

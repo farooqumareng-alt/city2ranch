@@ -4,6 +4,7 @@ const ACCOUNT_LINKS = [
   { href: "/requests", label: "My Requests" },
   { href: "/orders", label: "My Orders" },
   { href: "/places", label: "My Places" },
+  { href: "/household", label: "Household" },
   { href: "/membership", label: "Membership" },
   { href: "/profile", label: "Profile" },
   { href: "/support", label: "Support" },
@@ -15,6 +16,16 @@ const ACCOUNT_LINKS = [
  * these routes specifically so there's one account-nav surface, not
  * two competing ones.
  */
-export function AccountSidebar({ pathname, userEmail }: { pathname: string; userEmail?: string }) {
-  return <PanelSidebar links={ACCOUNT_LINKS} pathname={pathname} userEmail={userEmail} />;
+export function AccountSidebar({
+  pathname,
+  userEmail,
+  managingEmail,
+}: {
+  pathname: string;
+  userEmail?: string;
+  managingEmail?: string;
+}) {
+  return (
+    <PanelSidebar links={ACCOUNT_LINKS} pathname={pathname} userEmail={userEmail} managingEmail={managingEmail} />
+  );
 }

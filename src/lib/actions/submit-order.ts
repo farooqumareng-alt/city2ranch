@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { computePrice } from "@/lib/pricing/compute-price";
 import { getActivePricingRule, getZipMileage } from "@/lib/pricing/repository";
 import { logAuditEvent } from "@/lib/audit";
+import { getEffectiveOwner } from "@/lib/household";
 
 const FORM_FIELDS = [
   "storeId",
@@ -93,13 +94,19 @@ export async function submitOrder(
     const rule = await getActivePricingRule();
     const price = computePrice(rule, roundTripMiles);
 
+    // A household member (see src/lib/household.ts) submits an order
+    // that belongs to the owner's account, not a separate one of their
+    // own — same effective-owner resolution approve-and-pay.ts uses for
+    // its ownership check.
+    const owner = await getEffectiveOwner(user.id, user.email);
+
     const db = getDb();
     const [order] = await db
       .insert(orders)
       .values({
-        authUserId: user.id,
+        authUserId: owner.id,
         customerName: data.customerName,
-        customerEmail: user.email,
+        customerEmail: owner.email,
         customerPhone: data.customerPhone,
         storeId: data.storeId,
         retailerOrderNumber: data.retailerOrderNumber,

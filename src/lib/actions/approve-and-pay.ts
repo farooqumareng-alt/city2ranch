@@ -9,6 +9,7 @@ import { getStripe } from "@/lib/stripe/server";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { paymentServicesConfigured } from "@/lib/env";
+import { getEffectiveOwnerId } from "@/lib/household";
 
 /**
  * Bound to the "Approve & Pay" form as
@@ -31,7 +32,13 @@ export async function approveAndPayOrder(orderId: string) {
   const rows = await db.select().from(orders).where(eq(orders.id, orderId));
   const order = rows[0];
 
-  if (!order || order.authUserId !== user.id) redirect("/orders");
+  // A household member (see src/lib/household.ts) can approve and pay
+  // for the owner's order exactly as if they were the owner — this is
+  // the one check in the whole app where that distinction is real money,
+  // so it goes through the same resolver every other ownership check
+  // uses, not a one-off.
+  const effectiveOwnerId = await getEffectiveOwnerId(user.id);
+  if (!order || order.authUserId !== effectiveOwnerId) redirect("/orders");
 
   // Already progressed (e.g. a double-click) — idempotent no-op back to
   // the same page rather than erroring.

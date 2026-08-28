@@ -127,6 +127,20 @@
       "when": 1787808789551,
       "tag": "0017_rls_customer_places",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787843061069,
+      "tag": "0018_household_members",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787843068347,
+      "tag": "0019_rls_household_members",
+      "breakpoints": true
     }
   ]
 }

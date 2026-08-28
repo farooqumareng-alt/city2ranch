@@ -3,6 +3,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ProfileForm } from "@/components/forms/ProfileForm";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnProfile } from "@/lib/actions/update-profile";
+import { getEffectiveOwnerId } from "@/lib/household";
 
 export const metadata: Metadata = {
   title: "My Profile",
@@ -15,8 +16,9 @@ export default async function ProfilePage() {
   // allowed here" check to also mean "here's who you are."
   const user = await getCurrentUser();
   if (!user) return null;
+  const ownerId = await getEffectiveOwnerId(user.id);
 
-  const profile = await getOwnProfile(user.id);
+  const profile = await getOwnProfile(ownerId);
 
   return (
     <div className="flex flex-col gap-10">

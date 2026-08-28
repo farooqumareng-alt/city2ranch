@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnServiceRequests } from "@/lib/requests";
 import { SERVICE_TYPE_OPTIONS } from "@/lib/constants";
 import { formatPlainDate } from "@/lib/format";
+import { getEffectiveOwner } from "@/lib/household";
 
 export const metadata: Metadata = {
   title: "My Requests",
@@ -29,8 +30,11 @@ const SERVICE_TYPE_LABELS = Object.fromEntries(
 export default async function RequestsPage() {
   const user = await getCurrentUser();
   if (!user?.email) return null;
+  // A household member (see src/lib/household.ts) sees the owner's
+  // requests, matched by the owner's email.
+  const owner = await getEffectiveOwner(user.id, user.email);
 
-  const requests = await getOwnServiceRequests(user.email);
+  const requests = await getOwnServiceRequests(owner.email);
 
   return (
     <div className="flex flex-col gap-10">

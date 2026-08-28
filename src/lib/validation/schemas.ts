@@ -215,6 +215,10 @@ export const placeSchema = z.object({
 });
 export type PlaceInput = z.infer<typeof placeSchema>;
 
+export const householdInviteSchema = z.object({
+  email,
+});
+
 export const contactSchema = z.object({
   name: requiredText("Name"),
   email,

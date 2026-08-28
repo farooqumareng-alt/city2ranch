@@ -3,6 +3,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnSupportMessages } from "@/lib/support";
+import { getEffectiveOwner } from "@/lib/household";
 
 export const metadata: Metadata = {
   title: "Support",
@@ -19,8 +20,9 @@ const SUPPORT_STATUS_LABELS: Record<string, string> = {
 export default async function SupportPage() {
   const user = await getCurrentUser();
   if (!user?.email) return null;
+  const owner = await getEffectiveOwner(user.id, user.email);
 
-  const messages = await getOwnSupportMessages(user.email);
+  const messages = await getOwnSupportMessages(owner.email);
 
   return (
     <div className="flex flex-col gap-10">

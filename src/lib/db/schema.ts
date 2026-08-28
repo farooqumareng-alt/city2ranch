@@ -15,9 +15,14 @@ import {
 
 // Shadow reference to Supabase's auth.users table — lets us express real
 // foreign keys from our tables to auth identities without owning that
-// table (Supabase Auth manages its schema itself).
-const authUsers = pgSchema("auth").table("users", {
+// table (Supabase Auth manages its schema itself). `email` is included
+// (read-only, never written through this reference) so a query can join
+// an owner_auth_user_id straight to their email — see
+// src/lib/household.ts — without a second round trip through
+// getCurrentUser()/the Supabase admin API.
+export const authUsers = pgSchema("auth").table("users", {
   id: uuid("id").primaryKey(),
+  email: text("email"),
 });
 
 // Shared status lifecycle for the marketing-site lead-capture tables
@@ -29,6 +34,16 @@ export const leadStatusEnum = pgEnum("lead_status", [
   "contacted",
   "converted",
   "closed",
+]);
+
+// A household invite's lifecycle: 'invited' (owner sent it, not yet
+// accepted), 'active' (accepted — full delegated access), 'revoked'
+// (either the owner cut it off or the member declined/left — same
+// terminal state, the timestamps distinguish which if it ever matters).
+export const householdMemberStatusEnum = pgEnum("household_member_status", [
+  "invited",
+  "active",
+  "revoked",
 ]);
 
 export const serviceTypeEnum = pgEnum("service_type", [
@@ -218,6 +233,40 @@ export const customerPlaces = pgTable("customer_places", {
   isDefault: boolean("is_default").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
 });
+
+/**
+ * Full-delegation household access: an owner invites another email to
+ * operate their City2Ranch account — same orders, places, and profile,
+ * as if they were the owner. Deliberately flat, no chains: a person is
+ * either an independent owner (optionally with members under them) or a
+ * delegated member of exactly one owner, never both — enforced in
+ * src/lib/actions/household.ts, not here, since a DB constraint can't
+ * easily express "not also a member elsewhere." memberAuthUserId stays
+ * null until the invited email actually signs in and accepts (proving
+ * control of that inbox); getEffectiveOwnerId() only ever resolves
+ * through a row with status = 'active'.
+ */
+export const householdMembers = pgTable(
+  "household_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    ownerAuthUserId: uuid("owner_auth_user_id")
+      .notNull()
+      .references(() => authUsers.id),
+    memberEmail: text("member_email").notNull(),
+    memberAuthUserId: uuid("member_auth_user_id").references(() => authUsers.id),
+    status: householdMemberStatusEnum("status").notNull().default("invited"),
+    invitedAt: timestamp("invited_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => [unique().on(table.ownerAuthUserId, table.memberEmail)]
+);
 
 // ---------------------------------------------------------------------
 // City Pickup order fulfillment (Phase 1 real product)

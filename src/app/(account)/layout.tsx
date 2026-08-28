@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { AccountSidebar } from "@/components/account/AccountSidebar";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { getEffectiveOwner } from "@/lib/household";
 
 /**
  * Shared sign-in gate + sidebar shell for every account page (/orders,
@@ -19,13 +20,18 @@ export default async function AccountLayout({
   const user = await getCurrentUser();
   const pathname = (await headers()).get("x-pathname") ?? "/orders";
 
-  if (!user) {
+  if (!user?.email) {
     redirect(`/sign-in?next=${encodeURIComponent(pathname)}`);
   }
 
+  // A household member (see src/lib/household.ts) sees whose account
+  // they're actually managing, since it isn't their own.
+  const owner = await getEffectiveOwner(user.id, user.email);
+  const managingEmail = owner.id !== user.id ? owner.email : undefined;
+
   return (
     <Container className="flex flex-col gap-8 py-12 sm:py-16 md:flex-row md:items-start md:gap-10">
-      <AccountSidebar pathname={pathname} userEmail={user.email} />
+      <AccountSidebar pathname={pathname} userEmail={user.email} managingEmail={managingEmail} />
       <div className="min-w-0 flex-1">{children}</div>
     </Container>
   );

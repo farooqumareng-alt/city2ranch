@@ -7,6 +7,7 @@ import { stores } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnProfile } from "@/lib/actions/update-profile";
 import { getOwnPlaces } from "@/lib/actions/places";
+import { getEffectiveOwnerId } from "@/lib/household";
 
 export const metadata: Metadata = {
   title: "Request a City Pickup",
@@ -16,14 +17,17 @@ export const metadata: Metadata = {
 
 export default async function NewOrderPage() {
   const user = await getCurrentUser();
+  // A household member (see src/lib/household.ts) sees and adds to the
+  // owner's saved profile/places, not a separate set of their own.
+  const ownerId = user ? await getEffectiveOwnerId(user.id) : null;
   const db = getDb();
   const [activeStores, profile, places] = await Promise.all([
     db
       .select({ id: stores.id, name: stores.name, city: stores.city, state: stores.state })
       .from(stores)
       .where(eq(stores.isActive, true)),
-    user ? getOwnProfile(user.id) : Promise.resolve(null),
-    user ? getOwnPlaces(user.id) : Promise.resolve([]),
+    ownerId ? getOwnProfile(ownerId) : Promise.resolve(null),
+    ownerId ? getOwnPlaces(ownerId) : Promise.resolve([]),
   ]);
 
   return (

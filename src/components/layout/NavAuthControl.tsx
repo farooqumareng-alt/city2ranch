@@ -14,6 +14,7 @@ function isPanelRoute(pathname: string) {
     pathname.startsWith("/requests") ||
     pathname.startsWith("/orders") ||
     pathname.startsWith("/places") ||
+    pathname.startsWith("/household") ||
     pathname.startsWith("/membership") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/support") ||
@@ -103,6 +104,9 @@ export function NavAuthControl({
       <Link href="/places" className={mobileLinkClass}>
         My Places
       </Link>
+      <Link href="/household" className={mobileLinkClass}>
+        Household
+      </Link>
       <Link href="/membership" className={mobileLinkClass}>
         Membership
       </Link>
@@ -184,6 +188,9 @@ function DesktopAccountMenu() {
           </Link>
           <Link href="/places" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
             My Places
+          </Link>
+          <Link href="/household" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
+            Household
           </Link>
           <Link href="/membership" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
             Membership

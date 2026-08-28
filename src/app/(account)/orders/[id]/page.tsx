@@ -10,6 +10,7 @@ import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import { approveAndPayOrder } from "@/lib/actions/approve-and-pay";
 import { getOrderItems, getOrderFeeLines } from "@/lib/orders/concierge";
 import { formatPlainDate } from "@/lib/format";
+import { getEffectiveOwnerId } from "@/lib/household";
 
 export const metadata: Metadata = { title: "Order Details" };
 
@@ -56,10 +57,14 @@ export default async function OrderDetailPage({
 
   const order = rows[0];
 
+  // A household member (see src/lib/household.ts) can view the owner's
+  // order exactly as the owner would.
+  const effectiveOwnerId = await getEffectiveOwnerId(user.id);
+
   // Not found (wrong id) and not-yours (wrong owner) both 404 — an order
   // id belonging to someone else must never distinguish "doesn't exist"
   // from "exists but isn't yours."
-  if (!order || order.authUserId !== user.id) notFound();
+  if (!order || order.authUserId !== effectiveOwnerId) notFound();
 
   const isConcierge = order.serviceType === "concierge";
   const [items, feeLines] = isConcierge

@@ -3,6 +3,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnPlaces, deletePlace, setDefaultPlace } from "@/lib/actions/places";
+import { getEffectiveOwnerId } from "@/lib/household";
 
 export const metadata: Metadata = {
   title: "My Places",
@@ -12,8 +13,9 @@ export const metadata: Metadata = {
 export default async function PlacesPage() {
   const user = await getCurrentUser();
   if (!user) return null;
+  const ownerId = await getEffectiveOwnerId(user.id);
 
-  const places = await getOwnPlaces(user.id);
+  const places = await getOwnPlaces(ownerId);
 
   return (
     <div className="flex flex-col gap-10">

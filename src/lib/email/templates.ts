@@ -148,6 +148,19 @@ export function quoteReadyEmail(fields: { totalCents: number; signInUrl: string 
   );
 }
 
+export function householdInviteEmail(fields: { ownerEmail: string; signInUrl: string }) {
+  return customerWrap(
+    "You've Been Invited",
+    `
+      <p><strong>${fields.ownerEmail}</strong> has invited you to access their
+      City2Ranch account — you'll be able to see and manage their requests,
+      orders, and saved places.</p>
+      <p><a href="${fields.signInUrl}" style="color:#0B2445;">Sign in to accept</a></p>
+      <p style="color:#666;font-size:13px;">If you weren't expecting this, you can ignore this email.</p>
+    `
+  );
+}
+
 export function contactMessageEmail(fields: {
   name: string;
   email: string;

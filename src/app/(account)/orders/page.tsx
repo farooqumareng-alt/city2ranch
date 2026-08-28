@@ -8,6 +8,7 @@ import { orders, stores } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import { claimOrder } from "@/lib/actions/claim-order";
+import { getEffectiveOwner } from "@/lib/household";
 
 export const metadata: Metadata = {
   title: "My Orders",
@@ -20,6 +21,11 @@ export default async function OrdersPage() {
   // "you're allowed here" check to also mean "here's who you are."
   const user = await getCurrentUser();
   if (!user?.email) return null;
+
+  // A household member (see src/lib/household.ts) sees the owner's
+  // orders, including any of the owner's still-unclaimed ones (matched
+  // by the owner's email, not the member's own).
+  const owner = await getEffectiveOwner(user.id, user.email);
 
   const db = getDb();
   const rows = await db
@@ -37,12 +43,12 @@ export default async function OrdersPage() {
     .leftJoin(stores, eq(orders.storeId, stores.id))
     .where(
       or(
-        eq(orders.authUserId, user.id),
+        eq(orders.authUserId, owner.id),
         // A staff-created concierge order starts with no owner (see
         // claim-order.ts) — surfaced here by email match so the customer
         // can claim it, but not otherwise viewable (the detail page and
         // Approve & Pay both still require an exact authUserId match).
-        and(isNull(orders.authUserId), sql`lower(${orders.customerEmail}) = lower(${user.email})`)
+        and(isNull(orders.authUserId), sql`lower(${orders.customerEmail}) = lower(${owner.email})`)
       )
     )
     .orderBy(desc(orders.createdAt));

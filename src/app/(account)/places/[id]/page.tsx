@@ -7,6 +7,7 @@ import { updatePlace } from "@/lib/actions/places";
 import { getDb } from "@/lib/db";
 import { customerPlaces } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { getEffectiveOwnerId } from "@/lib/household";
 
 export const metadata: Metadata = { title: "Edit Place" };
 
@@ -18,12 +19,13 @@ export default async function EditPlacePage({
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) return null;
+  const ownerId = await getEffectiveOwnerId(user.id);
 
   const db = getDb();
   const rows = await db
     .select()
     .from(customerPlaces)
-    .where(and(eq(customerPlaces.id, id), eq(customerPlaces.authUserId, user.id)));
+    .where(and(eq(customerPlaces.id, id), eq(customerPlaces.authUserId, ownerId)));
   const place = rows[0];
   if (!place) notFound();
 

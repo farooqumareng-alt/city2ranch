@@ -7,6 +7,7 @@ import { customerProfiles } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { profileUpdateSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
+import { getEffectiveOwnerId } from "@/lib/household";
 
 export async function updateProfile(
   _prev: ActionResult | undefined,
@@ -16,6 +17,9 @@ export async function updateProfile(
   if (!user) {
     return { ok: false, message: "Please sign in to update your profile." };
   }
+  // A household member (see src/lib/household.ts) edits the owner's
+  // shared profile, not a separate one of their own.
+  const ownerId = await getEffectiveOwnerId(user.id);
 
   const parsed = profileUpdateSchema.safeParse({
     name: formData.get("name"),
@@ -43,7 +47,7 @@ export async function updateProfile(
     // created the first time someone saves it, updated every time after.
     await db
       .insert(customerProfiles)
-      .values({ authUserId: user.id, ...data })
+      .values({ authUserId: ownerId, ...data })
       .onConflictDoUpdate({
         target: customerProfiles.authUserId,
         set: { ...data, updatedAt: new Date() },
