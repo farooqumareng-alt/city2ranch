@@ -37,6 +37,7 @@ export function RequestServiceForm({
   profile,
   places = [],
   userEmail,
+  referralSource,
 }: {
   groceryItems?: GroceryItem[];
   notesPrefill?: string;
@@ -46,6 +47,10 @@ export function RequestServiceForm({
   profile?: ProfileDefaults;
   places?: Place[];
   userEmail?: string;
+  /** From ?ref=<slug> — e.g. a partner property's "City2Ranch Guest
+   *  Delivery" link/QR code. Captured silently, never a visible/editable
+   *  field; see schema.ts on service_requests.referralSource. */
+  referralSource?: string;
 }) {
   const [state, formAction, pending] = useActionState(
     submitServiceRequest,
@@ -110,6 +115,7 @@ export function RequestServiceForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-10">
+      <input type="hidden" name="referralSource" value={values?.referralSource ?? referralSource ?? ""} />
       {state && !state.ok ? (
         <p role="alert" className="font-sans text-sm text-red-600">
           {state.message}

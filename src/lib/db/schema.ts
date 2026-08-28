@@ -127,6 +127,15 @@ export const serviceRequests = pgTable("service_requests", {
   requestedDeliveryDate: date("requested_delivery_date"),
   notes: text("notes"),
   status: leadStatusEnum("status").notNull().default("new"),
+  // Lightweight B2B2C readiness: captures ?ref=<slug> from the URL a
+  // request came through (e.g. a cabin resort's own "City2Ranch Guest
+  // Delivery" link/QR code), with zero partner-management machinery
+  // built yet — no partners table, no dashboard, no commission tracking.
+  // A property can be handed a working referral link today; when real
+  // partnerships are formalized, this field is what that builds on, not
+  // something that gets replaced. Free text, not a foreign key — there's
+  // no partner entity to reference yet.
+  referralSource: text("referral_source"),
 });
 
 /**

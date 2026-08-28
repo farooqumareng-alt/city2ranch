@@ -26,9 +26,9 @@ export const dynamic = "force-dynamic";
 export default async function RequestServicePage({
   searchParams,
 }: {
-  searchParams: Promise<{ tier?: string }>;
+  searchParams: Promise<{ tier?: string; ref?: string }>;
 }) {
-  const { tier } = await searchParams;
+  const { tier, ref } = await searchParams;
   const user = await getCurrentUser();
   const ownerId = user ? await getEffectiveOwnerId(user.id) : null;
   const [groceryItems, savedLists, profile, places] = await Promise.all([
@@ -62,6 +62,7 @@ export default async function RequestServicePage({
           profile={profile}
           places={places}
           userEmail={user?.email}
+          referralSource={ref}
         />
       </div>
     </Container>

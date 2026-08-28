@@ -79,6 +79,7 @@ export function serviceRequestEmail(fields: {
   timingPreference: string;
   requestedDeliveryDate?: string;
   notes?: string;
+  referralSource?: string;
 }) {
   return wrap("New Private Service Request", {
     Name: fields.name,
@@ -94,6 +95,7 @@ export function serviceRequestEmail(fields: {
     Timing: fields.timingPreference,
     "Requested delivery date": fields.requestedDeliveryDate,
     Notes: fields.notes,
+    "Referred by": fields.referralSource,
   });
 }
 

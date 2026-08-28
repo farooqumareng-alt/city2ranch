@@ -95,6 +95,11 @@ export const serviceRequestSchema = z.object({
   timingPreference: requiredText("Timing preference"),
   requestedDeliveryDate: optionalDate,
   notes: optionalText,
+  // Captured silently from ?ref=<slug> on /request-service — never a
+  // user-typed field, so no length/format validation needed beyond
+  // treating an empty string as absent, same as every other optional
+  // field here.
+  referralSource: optionalText,
 });
 export type ServiceRequestInput = z.infer<typeof serviceRequestSchema>;
 

@@ -24,6 +24,7 @@ type SourceRequest = {
   zip: string;
   shoppingList: string | null;
   requestedDeliveryDate: string | null;
+  referralSource: string | null;
 };
 
 export function NewConciergeOrderForm({
@@ -86,6 +87,9 @@ export function NewConciergeOrderForm({
           <p className="mt-2 whitespace-pre-wrap font-sans text-sm text-charcoal/80">
             {source.shoppingList}
           </p>
+          {source.referralSource ? (
+            <p className="mt-2 font-sans text-xs font-medium text-gold">Referred by: {source.referralSource}</p>
+          ) : null}
         </div>
       ) : null}
 

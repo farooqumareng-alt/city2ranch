@@ -24,6 +24,7 @@ const FORM_FIELDS = [
   "timingPreference",
   "requestedDeliveryDate",
   "notes",
+  "referralSource",
 ];
 
 export async function submitServiceRequest(
@@ -46,6 +47,7 @@ export async function submitServiceRequest(
     timingPreference: formData.get("timingPreference"),
     requestedDeliveryDate: formData.get("requestedDeliveryDate"),
     notes: formData.get("notes"),
+    referralSource: formData.get("referralSource"),
   });
 
   if (!parsed.success) {

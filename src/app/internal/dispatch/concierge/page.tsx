@@ -59,6 +59,9 @@ export default async function ConciergeQueuePage() {
                       ? ` · Requested for ${formatPlainDate(req.requestedDeliveryDate)}`
                       : ""}
                   </p>
+                  {req.referralSource ? (
+                    <p className="font-sans text-xs font-medium text-gold">Referred by: {req.referralSource}</p>
+                  ) : null}
                 </div>
                 <Button href={`/internal/dispatch/concierge/new?fromRequest=${req.id}`} variant="outline-dark">
                   Start Quote
