@@ -18,6 +18,7 @@ const ACCOUNT_LINKS = [
   { href: "/household", label: "Household" },
   { href: "/membership", label: "Membership" },
   { href: "/payments", label: "Payments" },
+  { href: "/notifications", label: "Notifications" },
   { href: "/support", label: "Support" },
   { href: "/profile", label: "Profile" },
 ];

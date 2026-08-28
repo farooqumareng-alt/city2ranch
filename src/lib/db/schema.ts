@@ -208,6 +208,44 @@ export const customerProfiles = pgTable(
 );
 
 /**
+ * One row per account (owner-resolved, like customer_profiles) toggling
+ * which recurring emails a customer wants. Deliberately just one column
+ * for now: payment_receipts is the only recurring, per-owner email that
+ * exists today (src/app/api/stripe/webhook/route.ts's order-confirmed
+ * email — the one send site that always has a known authUserId by the
+ * time it fires). The other transactional emails in this codebase
+ * (household invite, concierge quote-ready-for-an-unclaimed-order) fire
+ * to an email address with no resolvable owner yet, so there's nothing
+ * real to gate them by — adding toggles for those would be fake, the
+ * same reasoning src/app/(account)/membership/page.tsx already applies
+ * to pricing it doesn't have yet. Add more columns here as more
+ * recurring, owner-scoped notifications get built.
+ *
+ * All-true default, and a *missing* row must be treated identically to
+ * an all-true row (see shouldNotify() in src/lib/notifications/
+ * should-send.ts) — nobody should silently stop getting a payment
+ * receipt just because this table now exists and they've never visited
+ * /notifications.
+ */
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    authUserId: uuid("auth_user_id")
+      .notNull()
+      .references(() => authUsers.id),
+    paymentReceipts: boolean("payment_receipts").notNull().default(true),
+  },
+  (table) => [unique().on(table.authUserId)]
+);
+
+/**
  * A customer's saved address book — "My Places" (ranch, lake house, guest
  * house...), not just a single default address. First foundational piece
  * of the long-term customer-account principle: the account is a

@@ -8,6 +8,7 @@ import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { getResend } from "@/lib/email/resend";
 import { orderPaymentConfirmedEmail } from "@/lib/email/templates";
+import { shouldNotify } from "@/lib/notifications/should-send";
 
 function generatePin(): string {
   return String(Math.floor(1000 + Math.random() * 9000));
@@ -86,23 +87,33 @@ export async function POST(request: NextRequest) {
         metadata: { stripePaymentIntentId: paymentIntentId },
       });
 
-      try {
-        const resend = getResend();
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-        const { subject, html } = orderPaymentConfirmedEmail({
-          storeName,
-          totalCents: order.totalCents,
-          deliveryPin,
-          orderUrl: `${siteUrl}/orders/${order.id}`,
-        });
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM ?? "notifications@city2ranch.com",
-          to: order.customerEmail,
-          subject,
-          html,
-        });
-      } catch (error) {
-        console.error("[stripe webhook] confirmation email failed", error);
+      // order.authUserId should always be set by now — approveAndPayOrder
+      // (the only path to payment_pending) requires it — but if it's ever
+      // absent there's no preference row to check against, so default to
+      // sending rather than silently dropping a payment confirmation.
+      const wantsReceipt = order.authUserId
+        ? await shouldNotify(order.authUserId, "paymentReceipts")
+        : true;
+
+      if (wantsReceipt) {
+        try {
+          const resend = getResend();
+          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+          const { subject, html } = orderPaymentConfirmedEmail({
+            storeName,
+            totalCents: order.totalCents,
+            deliveryPin,
+            orderUrl: `${siteUrl}/orders/${order.id}`,
+          });
+          await resend.emails.send({
+            from: process.env.EMAIL_FROM ?? "notifications@city2ranch.com",
+            to: order.customerEmail,
+            subject,
+            html,
+          });
+        } catch (error) {
+          console.error("[stripe webhook] confirmation email failed", error);
+        }
       }
     }
   }
