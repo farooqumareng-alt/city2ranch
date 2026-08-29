@@ -21,3 +21,16 @@ export function paymentServicesConfigured(): boolean {
 
 export const PAYMENT_UNAVAILABLE_MESSAGE =
   "We're unable to process payment online right now. Please call or email us directly and a concierge will assist you.";
+
+/** Same pattern again, for real membership billing: needs a working
+ *  Stripe connection AND a real recurring Price object per tier (see
+ *  src/lib/stripe/tiers.ts) — unlike a one-off order, a subscription
+ *  can't improvise pricing inline, so all three must actually exist. */
+export function membershipServicesConfigured(): boolean {
+  return (
+    paymentServicesConfigured() &&
+    Boolean(process.env.STRIPE_PRICE_ROUTE) &&
+    Boolean(process.env.STRIPE_PRICE_PRIVATE) &&
+    Boolean(process.env.STRIPE_PRICE_ESTATE)
+  );
+}

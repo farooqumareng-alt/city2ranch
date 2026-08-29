@@ -3,6 +3,7 @@ import { PanelSidebar } from "@/components/layout/PanelSidebar";
 const STAFF_LINKS = [
   { href: "/internal/dispatch", label: "Dispatch Queue" },
   { href: "/internal/dispatch/concierge", label: "Concierge Quotes" },
+  { href: "/internal/dispatch/settings", label: "Settings" },
 ];
 
 /** Same pattern as AccountSidebar/DriverSidebar. */

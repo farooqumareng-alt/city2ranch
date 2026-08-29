@@ -218,9 +218,125 @@ export const customerProfiles = pgTable(
     defaultDeliveryCity: text("default_delivery_city"),
     defaultDeliveryState: text("default_delivery_state"),
     defaultDeliveryZip: text("default_delivery_zip"),
+    // Set the first time this account subscribes to a Membership (see
+    // memberships below) — created once via Stripe's Customer API and
+    // reused for every later checkout/portal session, unlike a one-off
+    // order's Checkout Session, which never creates or stores a Stripe
+    // Customer at all (see approve-and-pay.ts). Not "saved payment
+    // info" itself — just an identifier — so this doesn't contradict
+    // customer_profiles' original no-saved-payment-info design; it's
+    // what a real Customer relationship requires once one exists.
+    stripeCustomerId: text("stripe_customer_id"),
   },
   (table) => [unique().on(table.authUserId)]
 );
+
+/**
+ * One row per account (owner-resolved, like customer_profiles) toggling
+ * which recurring emails a customer wants. Deliberately just one column
+ * for now: payment_receipts is the only recurring, per-owner email that
+ * exists today (src/app/api/stripe/webhook/route.ts's order-confirmed
+ * email — the one send site that always has a known authUserId by the
+ * time it fires). The other transactional emails in this codebase
+ * (household invite, concierge quote-ready-for-an-unclaimed-order) fire
+ * to an email address with no resolvable owner yet, so there's nothing
+ * real to gate them by — adding toggles for those would be fake, the
+ * same reasoning src/app/(account)/membership/page.tsx already applies
+ * to pricing it doesn't have yet. Add more columns here as more
+ * recurring, owner-scoped notifications get built.
+ *
+ * All-true default, and a *missing* row must be treated identically to
+ * an all-true row (see shouldNotify() in src/lib/notifications/
+ * should-send.ts) — nobody should silently stop getting a payment
+ * receipt just because this table now exists and they've never visited
+ * /notifications.
+ */
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    authUserId: uuid("auth_user_id")
+      .notNull()
+      .references(() => authUsers.id),
+    paymentReceipts: boolean("payment_receipts").notNull().default(true),
+    // Added alongside Recurring Services (see recurringServicePlans) —
+    // the "your recurring order was created, come review and pay"
+    // email fired from the cron route. Same all-true-default,
+    // missing-row-means-send rule as paymentReceipts.
+    recurringOrderCreated: boolean("recurring_order_created").notNull().default(true),
+  },
+  (table) => [unique().on(table.authUserId)]
+);
+
+// Matches src/lib/stripe/tiers.ts's MembershipTier keys, which are
+// deliberately the same strings as SERVICE_TIERS' `key` in
+// src/lib/constants.ts (the unpriced marketing-page tiers) even though
+// this is a separate enum — a real Stripe Price object is what actually
+// prices a membership, not this string.
+export const membershipTierEnum = pgEnum("membership_tier", ["route", "private", "estate"]);
+
+// Narrower than Stripe's own subscription.status (trialing, active,
+// past_due, canceled, unpaid, incomplete, incomplete_expired, paused) —
+// the webhook maps Stripe's states down to these three, since nothing
+// in this app's UI needs to distinguish e.g. "incomplete" from
+// "past_due" yet.
+export const membershipStatusEnum = pgEnum("membership_status", ["active", "past_due", "canceled"]);
+
+/**
+ * One row per account (owner-resolved) once it has ever subscribed —
+ * mirrors orders' relationship to Stripe (stripeCheckoutSessionId,
+ * stripePaymentIntentId) but for a recurring subscription instead of a
+ * one-off payment. Real enforcement of "does this account currently
+ * have an active membership" always means reading `status`, not just
+ * "does a row exist" — a canceled membership's row stays for history.
+ */
+export const memberships = pgTable(
+  "memberships",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    authUserId: uuid("auth_user_id")
+      .notNull()
+      .references(() => authUsers.id),
+    tier: membershipTierEnum("tier").notNull(),
+    status: membershipStatusEnum("status").notNull(),
+    stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
+    stripePriceId: text("stripe_price_id").notNull(),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  },
+  (table) => [unique().on(table.authUserId)]
+);
+
+/**
+ * A single settings row, seeded by its own migration (see
+ * drizzle/0030_membership_settings.sql) so the app never has to handle
+ * "no row exists yet." Per the business's 2026-08-28 launch strategy:
+ * membership billing must ship OFF by default and only go live once
+ * staff flips it on from /internal/dispatch/settings — there is no
+ * customer-facing path to subscribe while this is false, regardless of
+ * whether Stripe itself is configured. Deliberately its own narrow
+ * table (not a generic key-value settings table) — this app builds one
+ * real thing at a time, not speculative config infrastructure; add a
+ * zone-scoped variant later if/when membership-by-zone actually ships.
+ */
+export const membershipSettings = pgTable("membership_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  salesEnabled: boolean("sales_enabled").notNull().default(false),
+});
 
 /**
  * A customer's saved address book — "My Places" (ranch, lake house, guest
@@ -330,6 +446,85 @@ export const shoppingListItems = pgTable("shopping_list_items", {
   listId: uuid("list_id")
     .notNull()
     .references(() => shoppingLists.id, { onDelete: "cascade" }),
+  itemName: text("item_name").notNull(),
+  quantity: text("quantity").notNull().default("1"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const recurringPlanFrequencyEnum = pgEnum("recurring_plan_frequency", [
+  "weekly",
+  "biweekly",
+  "monthly",
+]);
+
+export const recurringPlanStatusEnum = pgEnum("recurring_plan_status", [
+  "active",
+  "paused",
+  "canceled",
+]);
+
+/**
+ * A customer's standing "shop for me on this schedule" request. The
+ * cron route (src/app/api/cron/recurring-services/route.ts) spawns a
+ * new concierge order from it each cycle. Deliberately a point-in-time
+ * snapshot at creation — a plain copy of address/contact fields, not a
+ * live FK to customer_places — matching how customer_places itself is
+ * already documented as decoupled from orders ("loading a place just
+ * pre-fills a form... client-side"). A recurring plan is no different
+ * in spirit, it just has no human available to re-fill a form from a
+ * changed place each cycle, so the "fill once, then it's independent"
+ * step has to happen at plan-creation time instead of at submit time.
+ * Editing or deleting a saved place/list later never retroactively
+ * changes an active plan, same as it never changes a past order.
+ *
+ * Only concierge plans are supported — City Pickup needs a fresh
+ * retailer order number every occurrence (see orders.retailerOrderNumber's
+ * doc comment), which can't be templated, so there's nothing to spawn
+ * automatically for that service type.
+ */
+export const recurringServicePlans = pgTable("recurring_service_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  authUserId: uuid("auth_user_id")
+    .notNull()
+    .references(() => authUsers.id),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  deliveryAddressLine1: text("delivery_address_line1").notNull(),
+  deliveryAddressLine2: text("delivery_address_line2"),
+  deliveryCity: text("delivery_city").notNull(),
+  deliveryState: text("delivery_state").notNull(),
+  // NOT NULL + FK'd to zip_mileage, unlike customer_places' permissive
+  // zip column — a plan feeds unattended order creation, so "does this
+  // ZIP have route data" must be true up front, not discovered as a
+  // failure during a 3am cron run.
+  deliveryZip: text("delivery_zip")
+    .notNull()
+    .references(() => zipMileage.zip),
+  customerNotes: text("customer_notes"),
+  frequency: recurringPlanFrequencyEnum("frequency").notNull(),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+  status: recurringPlanStatusEnum("status").notNull().default("active"),
+});
+
+/** The plan's own shopping list — a snapshot copy at creation time
+ *  (possibly seeded from an existing shopping_lists row, but not a
+ *  live reference to one — see recurringServicePlans' doc comment).
+ *  Same shape as order_items/shopping_list_items by design: this is
+ *  exactly what gets copied into order_items each time the plan spawns
+ *  an order. */
+export const recurringServicePlanItems = pgTable("recurring_service_plan_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  planId: uuid("plan_id")
+    .notNull()
+    .references(() => recurringServicePlans.id, { onDelete: "cascade" }),
   itemName: text("item_name").notNull(),
   quantity: text("quantity").notNull().default("1"),
   notes: text("notes"),
