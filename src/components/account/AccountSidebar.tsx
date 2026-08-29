@@ -32,10 +32,12 @@ export function AccountSidebar({
   userEmail,
   userName,
   managingEmail,
+  managingRole,
 }: {
   userEmail?: string;
   userName?: string;
   managingEmail?: string;
+  managingRole?: string;
 }) {
   return (
     <PanelSidebar
@@ -44,6 +46,7 @@ export function AccountSidebar({
       userName={userName}
       accountType="Customer"
       managingEmail={managingEmail}
+      managingRole={managingRole}
     />
   );
 }

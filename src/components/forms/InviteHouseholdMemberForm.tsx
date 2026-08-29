@@ -2,8 +2,9 @@
 
 import { useActionState } from "react";
 import { inviteHouseholdMember } from "@/lib/actions/household";
-import { TextField } from "@/components/ui/FormField";
+import { TextField, SelectField } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
+import { HOUSEHOLD_ROLE_OPTIONS } from "@/lib/constants";
 import type { ActionResult } from "@/lib/actions/types";
 
 const initialState: ActionResult | undefined = undefined;
@@ -31,6 +32,13 @@ export function InviteHouseholdMemberForm() {
         defaultValue={values?.email}
         error={fieldErrors?.email}
         className="sm:min-w-[280px]"
+      />
+      <SelectField
+        name="role"
+        label="Access"
+        defaultValue="full"
+        options={HOUSEHOLD_ROLE_OPTIONS}
+        className="sm:min-w-[240px]"
       />
       <Button type="submit" variant="navy" disabled={pending}>
         {pending ? "Sending…" : "Send Invite"}

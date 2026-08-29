@@ -2,6 +2,7 @@ import { cache } from "react";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { householdMembers } from "@/lib/db/schema";
+import type { HouseholdRole } from "./household-roles";
 
 // Reaches auth.users.email via a raw correlated subquery rather than a
 // Drizzle-managed join — schema.ts's authUsers shadow table intentionally
@@ -51,19 +52,49 @@ export const getEffectiveOwnerId = cache(async (userId: string): Promise<string>
 export const getEffectiveOwner = cache(async (
   userId: string,
   userEmail: string
-): Promise<{ id: string; email: string }> => {
+): Promise<{ id: string; email: string; role: HouseholdRole }> => {
   const db = getDb();
   const rows = await db
     .select({
       ownerAuthUserId: householdMembers.ownerAuthUserId,
       ownerEmail: ownerEmailSubquery(householdMembers.ownerAuthUserId),
+      role: householdMembers.role,
     })
     .from(householdMembers)
     .where(and(eq(householdMembers.memberAuthUserId, userId), eq(householdMembers.status, "active")));
 
   const owner = rows[0];
-  if (!owner) return { id: userId, email: userEmail };
-  return { id: owner.ownerAuthUserId, email: owner.ownerEmail ?? userEmail };
+  if (!owner) return { id: userId, email: userEmail, role: "full" };
+  return { id: owner.ownerAuthUserId, email: owner.ownerEmail ?? userEmail, role: owner.role };
+});
+
+// Re-exported so every existing call site can keep importing role/action
+// helpers from "@/lib/household" — the split into household-roles.ts is
+// purely so the pure logic is unit-testable (see that file's comment).
+export type { HouseholdRole, HouseholdAction } from "./household-roles";
+export { canPerform } from "./household-roles";
+
+/** Same resolution as getEffectiveOwnerId, but also returns the acting
+ *  user's role — a plain owner (not a delegated member) always resolves
+ *  to "full" over their own account. Use this instead of
+ *  getEffectiveOwnerId at any write path where the action matters (see
+ *  canPerform above); read-only paths that don't distinguish roles can
+ *  keep using the plain id resolvers. cache()'d for the same reason as
+ *  getEffectiveOwnerId/getEffectiveOwner above — this is called from
+ *  both a page's layout and the page itself on nearly every account
+ *  route. */
+export const getEffectiveOwnerWithRole = cache(async (
+  userId: string
+): Promise<{ ownerId: string; role: HouseholdRole }> => {
+  const db = getDb();
+  const rows = await db
+    .select({ ownerAuthUserId: householdMembers.ownerAuthUserId, role: householdMembers.role })
+    .from(householdMembers)
+    .where(and(eq(householdMembers.memberAuthUserId, userId), eq(householdMembers.status, "active")));
+
+  const membership = rows[0];
+  if (!membership) return { ownerId: userId, role: "full" };
+  return { ownerId: membership.ownerAuthUserId, role: membership.role };
 });
 
 /** Everything the /household page needs to render whichever of the
@@ -82,6 +113,7 @@ export async function getHouseholdData(userId: string, email: string) {
       .select({
         id: householdMembers.id,
         invitedAt: householdMembers.invitedAt,
+        role: householdMembers.role,
         ownerEmail: ownerEmailSubquery(householdMembers.ownerAuthUserId),
       })
       .from(householdMembers)
@@ -91,6 +123,7 @@ export async function getHouseholdData(userId: string, email: string) {
         id: householdMembers.id,
         ownerAuthUserId: householdMembers.ownerAuthUserId,
         acceptedAt: householdMembers.acceptedAt,
+        role: householdMembers.role,
         ownerEmail: ownerEmailSubquery(householdMembers.ownerAuthUserId),
       })
       .from(householdMembers)
