@@ -10,7 +10,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { computePrice } from "@/lib/pricing/compute-price";
 import { getActivePricingRule, getZipMileage } from "@/lib/pricing/repository";
 import { logAuditEvent } from "@/lib/audit";
-import { getEffectiveOwner } from "@/lib/household";
+import { canPerform, getEffectiveOwner, getEffectiveOwnerWithRole } from "@/lib/household";
 
 const FORM_FIELDS = [
   "storeId",
@@ -37,6 +37,15 @@ export async function submitOrder(
   const user = await getCurrentUser();
   if (!user?.email) {
     return { ok: false, message: "Please sign in to submit an order." };
+  }
+
+  // The order form already hides itself for a household member whose
+  // role can't place orders (see orders/new/page.tsx) — re-checked here
+  // regardless, since a household member could otherwise call this
+  // action directly and bypass a UI-only gate.
+  const { role } = await getEffectiveOwnerWithRole(user.id);
+  if (!canPerform(role, "place_order")) {
+    return { ok: false, message: "You don't have permission to place orders on this account." };
   }
 
   const parsed = orderSubmitSchema.safeParse({

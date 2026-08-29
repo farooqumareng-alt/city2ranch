@@ -8,7 +8,7 @@ import { customerPlaces } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { placeSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 
 const FORM_FIELDS = [
   "label",
@@ -52,7 +52,10 @@ export async function createPlace(
 ): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Please sign in to save a place." };
-  const ownerId = await getEffectiveOwnerId(user.id);
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  if (!canPerform(role, "manage_places")) {
+    return { ok: false, message: "You have view-only access to this account and can't save places." };
+  }
 
   const parsed = parsePlace(formData);
   if (!parsed.success) {
@@ -99,7 +102,10 @@ export async function updatePlace(
 ): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Please sign in to update this place." };
-  const ownerId = await getEffectiveOwnerId(user.id);
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  if (!canPerform(role, "manage_places")) {
+    return { ok: false, message: "You have view-only access to this account and can't update places." };
+  }
 
   const parsed = parsePlace(formData);
   if (!parsed.success) {
@@ -134,7 +140,8 @@ export async function updatePlace(
 export async function deletePlace(placeId: string): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
-  const ownerId = await getEffectiveOwnerId(user.id);
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  if (!canPerform(role, "manage_places")) return;
 
   const db = getDb();
   await db
@@ -148,7 +155,8 @@ export async function deletePlace(placeId: string): Promise<void> {
 export async function setDefaultPlace(placeId: string): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
-  const ownerId = await getEffectiveOwnerId(user.id);
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  if (!canPerform(role, "manage_places")) return;
 
   const db = getDb();
   // Two statements, not one clever query — clearer to read, and this

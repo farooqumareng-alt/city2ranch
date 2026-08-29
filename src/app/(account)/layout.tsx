@@ -4,7 +4,7 @@ import { Container } from "@/components/ui/Container";
 import { AccountSidebar } from "@/components/account/AccountSidebar";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getEffectiveOwner } from "@/lib/household";
-import { getOwnProfile } from "@/lib/actions/update-profile";
+import { getOwnProfile } from "@/lib/customer-profile";
 
 /**
  * Shared sign-in gate + sidebar shell for every account page (/orders,
@@ -26,18 +26,21 @@ export default async function AccountLayout({
   }
 
   // A household member (see src/lib/household.ts) sees whose account
-  // they're actually managing, since it isn't their own.
+  // they're actually managing, since it isn't their own — and their own
+  // role there, since "managing" doesn't imply full access anymore.
   const owner = await getEffectiveOwner(user.id, user.email);
-  const managingEmail = owner.id !== user.id ? owner.email : undefined;
+  const isDelegated = owner.id !== user.id;
+  const managingEmail = isDelegated ? owner.email : undefined;
+  const managingRole = isDelegated && owner.role !== "full" ? owner.role : undefined;
   const profile = await getOwnProfile(owner.id);
 
   return (
     <Container className="flex flex-col gap-8 py-12 sm:py-16 md:flex-row md:items-start md:gap-10">
       <AccountSidebar
-        pathname={pathname}
         userEmail={user.email}
         userName={profile?.name ?? undefined}
         managingEmail={managingEmail}
+        managingRole={managingRole}
       />
       <div className="min-w-0 flex-1">{children}</div>
     </Container>

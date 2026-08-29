@@ -7,7 +7,7 @@ import { householdMembers } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getResend } from "@/lib/email/resend";
 import { householdInviteEmail } from "@/lib/email/templates";
-import { householdInviteSchema } from "@/lib/validation/schemas";
+import { householdInviteSchema, householdRole } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
 /**
@@ -43,7 +43,10 @@ export async function inviteHouseholdMember(
   const user = await getCurrentUser();
   if (!user?.email) return { ok: false, message: "Please sign in." };
 
-  const parsed = householdInviteSchema.safeParse({ email: formData.get("email") });
+  const parsed = householdInviteSchema.safeParse({
+    email: formData.get("email"),
+    role: formData.get("role") || undefined,
+  });
   if (!parsed.success) {
     return {
       ok: false,
@@ -71,6 +74,7 @@ export async function inviteHouseholdMember(
       ownerAuthUserId: user.id,
       memberEmail: inviteEmail,
       status: "invited",
+      role: parsed.data.role,
     });
   } catch (error) {
     console.error("[inviteHouseholdMember] failed", error);
@@ -145,6 +149,24 @@ export async function declineHouseholdInvite(inviteId: string) {
         sql`lower(${householdMembers.memberEmail}) = lower(${user.email})`
       )
     );
+
+  revalidatePath("/household");
+}
+
+/** Owner changing what an existing member (invited or active) is allowed
+ *  to do — scoped to rows the caller actually owns, same as revoke. */
+export async function updateHouseholdMemberRole(memberId: string, formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) return;
+
+  const parsed = householdRole.safeParse(formData.get("role"));
+  if (!parsed.success) return;
+
+  const db = getDb();
+  await db
+    .update(householdMembers)
+    .set({ role: parsed.data })
+    .where(and(eq(householdMembers.id, memberId), eq(householdMembers.ownerAuthUserId, user.id)));
 
   revalidatePath("/household");
 }
