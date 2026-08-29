@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { signOut } from "@/lib/actions/sign-out";
 
 export type PanelLink = { href: string; label: string };
@@ -11,20 +14,26 @@ export type PanelLink = { href: string; label: string };
  * responsive row-on-mobile/column-on-desktop, Sign Out) so the three
  * panels don't drift into three slightly different sidebars over time.
  *
- * Server component: links are static per-panel and signOut is already
- * a server action, so no client state is needed here (unlike the
- * top-nav "My Account" dropdown, which needs open/close state).
+ * Client component specifically so the active-link highlight can use
+ * usePathname() — this used to take `pathname` as a prop computed
+ * server-side (from the x-pathname header each layout set), but a
+ * shared layout like (account)/layout.tsx is kept across client-side
+ * navigations to a sibling page (see Next's "client-side transitions"
+ * docs) rather than re-rendered on every click, so that server-computed
+ * pathname went stale — the highlight would lag one navigation behind
+ * whatever page was actually showing. usePathname() reads the client
+ * router's live state instead, so it's always correct immediately,
+ * with no extra round trip.
  */
 export function PanelSidebar({
   links,
-  pathname,
   userEmail,
   userName,
   accountType,
   managingEmail,
+  managingRole,
 }: {
   links: PanelLink[];
-  pathname: string;
   /** Shown above the links so it's never ambiguous which of several
    *  accounts (e.g. a staff member who is also a driver) is currently
    *  signed in — this is display-only, not a role indicator. */
@@ -40,12 +49,17 @@ export function PanelSidebar({
    *  wearing right now. */
   accountType?: string;
   /** Set when the signed-in user is a household member (see
-   *  src/lib/household.ts) operating another account by full
-   *  delegation — makes it unmistakable whose orders/places/payments
-   *  are actually being shown, since they aren't the signed-in
-   *  person's own. */
+   *  src/lib/household.ts) operating another account by delegation —
+   *  makes it unmistakable whose orders/places/payments are actually
+   *  being shown, since they aren't the signed-in person's own. */
   managingEmail?: string;
+  /** Set alongside managingEmail when the delegated member's role is
+   *  something less than full access (e.g. "ordering", "view_only") —
+   *  omitted for full access, since that was the only option before
+   *  roles existed and stays the unlabeled default. */
+  managingRole?: string;
 }) {
+  const pathname = usePathname();
   const linkBase =
     "whitespace-nowrap rounded-sm px-3 py-2 font-sans text-sm transition-colors hover:bg-white hover:text-gold";
   const activeClass = "bg-white font-medium text-navy-deep";
@@ -79,6 +93,7 @@ export function PanelSidebar({
           {managingEmail ? (
             <span className="mt-1 truncate font-sans text-xs text-gold" title={managingEmail}>
               Managing {managingEmail}&apos;s account
+              {managingRole ? ` (${managingRole.replace("_", " ")})` : ""}
             </span>
           ) : null}
         </div>

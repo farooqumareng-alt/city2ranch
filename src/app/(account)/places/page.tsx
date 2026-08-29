@@ -3,7 +3,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnPlaces, deletePlace, setDefaultPlace } from "@/lib/actions/places";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 import { DROPOFF_LOCATION_OPTIONS } from "@/lib/constants";
 
 const DROPOFF_LABELS = Object.fromEntries(DROPOFF_LOCATION_OPTIONS.map((o) => [o.value, o.label]));
@@ -16,7 +16,8 @@ export const metadata: Metadata = {
 export default async function PlacesPage() {
   const user = await getCurrentUser();
   if (!user) return null;
-  const ownerId = await getEffectiveOwnerId(user.id);
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  const canManage = canPerform(role, "manage_places");
 
   const places = await getOwnPlaces(ownerId);
 
@@ -28,9 +29,11 @@ export default async function PlacesPage() {
           title="My Places"
           description="Save your properties once, then pick from them when you place a request."
         />
-        <Button href="/places/new" variant="navy">
-          Add a Place
-        </Button>
+        {canManage ? (
+          <Button href="/places/new" variant="navy">
+            Add a Place
+          </Button>
+        ) : null}
       </div>
 
       {places.length === 0 ? (
@@ -69,23 +72,25 @@ export default async function PlacesPage() {
                   {place.accessNotes ? <p>{place.accessNotes}</p> : null}
                 </div>
               ) : null}
-              <div className="flex flex-wrap gap-3 border-t border-navy/10 pt-3">
-                <Button href={`/places/${place.id}`} variant="outline-dark" size="md">
-                  Edit
-                </Button>
-                {!place.isDefault ? (
-                  <form action={setDefaultPlace.bind(null, place.id)}>
+              {canManage ? (
+                <div className="flex flex-wrap gap-3 border-t border-navy/10 pt-3">
+                  <Button href={`/places/${place.id}`} variant="outline-dark" size="md">
+                    Edit
+                  </Button>
+                  {!place.isDefault ? (
+                    <form action={setDefaultPlace.bind(null, place.id)}>
+                      <Button type="submit" variant="outline-dark" size="md">
+                        Set as default
+                      </Button>
+                    </form>
+                  ) : null}
+                  <form action={deletePlace.bind(null, place.id)}>
                     <Button type="submit" variant="outline-dark" size="md">
-                      Set as default
+                      Delete
                     </Button>
                   </form>
-                ) : null}
-                <form action={deletePlace.bind(null, place.id)}>
-                  <Button type="submit" variant="outline-dark" size="md">
-                    Delete
-                  </Button>
-                </form>
-              </div>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

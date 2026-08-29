@@ -1,6 +1,6 @@
 {
-  "id": "82ed9ba6-773d-4f6b-ae18-67fa21120e42",
-  "prevId": "b5ec0f59-560c-4332-bc07-153a079cfefa",
+  "id": "04cc1d4f-cd83-4470-a55f-588cdca1ee9b",
+  "prevId": "69da5c9a-37ba-4c81-9034-db4ad4066e46",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -648,6 +648,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'invited'"
+        },
+        "role": {
+          "name": "role",
+          "type": "household_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'full'"
         },
         "invited_at": {
           "name": "invited_at",
@@ -2000,6 +2008,15 @@
         "invited",
         "active",
         "revoked"
+      ]
+    },
+    "public.household_role": {
+      "name": "household_role",
+      "schema": "public",
+      "values": [
+        "full",
+        "ordering",
+        "view_only"
       ]
     },
     "public.lead_status": {

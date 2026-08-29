@@ -1,6 +1,6 @@
 {
-  "id": "69da5c9a-37ba-4c81-9034-db4ad4066e46",
-  "prevId": "21e3394d-d0ae-44d2-bcc8-accf060d06fc",
+  "id": "1c286058-6dcf-483b-9b3e-39593c0442ac",
+  "prevId": "04cc1d4f-cd83-4470-a55f-588cdca1ee9b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -716,6 +716,76 @@
           "columns": [
             "owner_auth_user_id",
             "member_email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notification_preferences": {
+      "name": "notification_preferences",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "auth_user_id": {
+          "name": "auth_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payment_receipts": {
+          "name": "payment_receipts",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "notification_preferences_auth_user_id_users_id_fk": {
+          "name": "notification_preferences_auth_user_id_users_id_fk",
+          "tableFrom": "notification_preferences",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "auth_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "notification_preferences_auth_user_id_unique": {
+          "name": "notification_preferences_auth_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "auth_user_id"
           ]
         }
       },

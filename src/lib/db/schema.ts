@@ -47,6 +47,21 @@ export const householdMemberStatusEnum = pgEnum("household_member_status", [
   "revoked",
 ]);
 
+// What a delegated member is allowed to do while acting as the owner.
+// 'full' matches every existing member's behavior before this column
+// existed (the default, so accepting an old invite or one sent without
+// picking a role keeps working exactly as before) — everything the owner
+// can do, including approving payment. 'ordering' can place orders and
+// manage places/lists but not pay or manage the household itself.
+// 'view_only' can look but not act. Enforced in the account server
+// actions (approve-and-pay.ts, submit-order.ts, places.ts), not here —
+// see getEffectiveOwnerWithRole() in src/lib/household.ts.
+export const householdRoleEnum = pgEnum("household_role", [
+  "full",
+  "ordering",
+  "view_only",
+]);
+
 export const serviceTypeEnum = pgEnum("service_type", [
   "groceries",
   "private_shopping",
@@ -311,6 +326,7 @@ export const householdMembers = pgTable(
     memberEmail: text("member_email").notNull(),
     memberAuthUserId: uuid("member_auth_user_id").references(() => authUsers.id),
     status: householdMemberStatusEnum("status").notNull().default("invited"),
+    role: householdRoleEnum("role").notNull().default("full"),
     invitedAt: timestamp("invited_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
