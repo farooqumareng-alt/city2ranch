@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
@@ -34,11 +35,24 @@ export async function createSupabaseServerClient() {
   });
 }
 
-/** Convenience: the signed-in user, or null. */
-export async function getCurrentUser() {
+/**
+ * Convenience: the signed-in user, or null.
+ *
+ * Wrapped in React's cache() — every account/dispatch/driver layout
+ * calls this once for its own auth gate, and every page under it calls
+ * it again for its own (never-skip-the-real-check) re-verification.
+ * Before this, that meant two full supabase.auth.getUser() network
+ * round trips (a real request to Supabase's auth server, not a local
+ * check) on every single page view. cache() scopes the memoization to
+ * this one request only — see the React/Next docs on request
+ * memoization — so the second call becomes free, without weakening the
+ * "every action re-verifies itself" security posture at all: it's the
+ * same underlying check, just not repeated on the wire.
+ */
+export const getCurrentUser = cache(async () => {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-}
+});

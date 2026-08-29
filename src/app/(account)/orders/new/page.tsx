@@ -5,7 +5,7 @@ import { OrderPickupForm } from "@/components/forms/OrderPickupForm";
 import { getDb } from "@/lib/db";
 import { stores } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { getOwnProfile } from "@/lib/actions/update-profile";
+import { getOwnProfile } from "@/lib/customer-profile";
 import { getOwnPlaces } from "@/lib/actions/places";
 import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 

@@ -7,7 +7,7 @@ import { SERVICE_TIERS } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getEffectiveOwnerId } from "@/lib/household";
 import { getOwnShoppingListsWithItems } from "@/lib/shopping-lists";
-import { getOwnProfile } from "@/lib/actions/update-profile";
+import { getOwnProfile } from "@/lib/customer-profile";
 import { getOwnPlaces } from "@/lib/actions/places";
 
 export const metadata: Metadata = {

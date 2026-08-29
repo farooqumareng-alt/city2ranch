@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getEffectiveOwnerId } from "@/lib/household";
 import { getAccountDashboard } from "@/lib/account-dashboard";
-import { getOwnProfile } from "@/lib/actions/update-profile";
+import { getOwnProfile } from "@/lib/customer-profile";
 import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import { formatPlainDate } from "@/lib/format";
 
