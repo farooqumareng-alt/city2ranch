@@ -304,3 +304,18 @@ export const contactSchema = z.object({
   message: requiredText("Message", 10),
 });
 export type ContactInput = z.infer<typeof contactSchema>;
+
+// Super-admin team management (src/app/internal/dispatch/admin) — the
+// target must already have a real auth.users row (see
+// src/lib/actions/team-management.ts's doc comment); these schemas
+// only validate the form fields, not whether that account exists.
+export const addStaffSchema = z.object({
+  email,
+  label: optionalText,
+});
+
+export const addDriverSchema = z.object({
+  email,
+  name: requiredText("Name"),
+  phone,
+});

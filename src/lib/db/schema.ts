@@ -169,10 +169,19 @@ export const contactMessages = pgTable("contact_messages", {
   status: leadStatusEnum("status").notNull().default("new"),
 });
 
+// A super_admin can manage staff/driver accounts from
+// /internal/dispatch/admin (see src/lib/actions/team-management.ts);
+// plain staff can't. Deliberately just one tier above the baseline —
+// not a speculative multi-level hierarchy — see src/lib/staff-roles.ts.
+export const staffRoleEnum = pgEnum("staff_role", ["staff", "super_admin"]);
+
 /**
- * Staff/dispatcher role marker. No self-serve signup — a row is inserted
- * manually (Supabase SQL editor) once someone has signed in via magic
- * link at least once, using their real auth.users id.
+ * Staff/dispatcher role marker. The *first* super_admin still has no
+ * self-serve path — that one row is inserted/promoted manually
+ * (Supabase SQL editor) once someone has signed in via magic link at
+ * least once, using their real auth.users id. After that, a
+ * super_admin can add/disable further staff and driver accounts from
+ * the app itself.
  */
 export const staff = pgTable(
   "staff",
@@ -185,6 +194,8 @@ export const staff = pgTable(
       .notNull()
       .references(() => authUsers.id),
     label: text("label"),
+    role: staffRoleEnum("role").notNull().default("staff"),
+    isActive: boolean("is_active").notNull().default(true),
   },
   (table) => [unique().on(table.authUserId)]
 );
