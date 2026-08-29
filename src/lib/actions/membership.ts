@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/server";
 import { getMembershipPriceId, type MembershipTier } from "@/lib/stripe/tiers";
 import { membershipServicesConfigured } from "@/lib/env";
-import { getEffectiveOwner } from "@/lib/household";
+import { canPerform, getEffectiveOwner } from "@/lib/household";
 import { getMembershipSettings } from "@/lib/actions/membership-settings";
 
 // Deliberately not using src/lib/audit.ts's logAuditEvent here —
@@ -31,12 +31,14 @@ export async function getOwnMembership(authUserId: string) {
  * — same leading-bound-arg convention as approveAndPayOrder.bind(null,
  * order.id).
  *
- * NOTE for whoever merges this alongside household-permissions: once
- * that branch's getEffectiveOwnerWithRole exists here, this should
- * require role "full" before subscribing, the same way
- * approve-and-pay.ts requires it to pay — subscribing is a billing
- * action for the whole household, not something a delegated member
- * should be able to do on the owner's behalf without full access.
+ * Requires role "full" (see src/lib/household.ts) — subscribing is a
+ * recurring billing commitment for the whole household, not something
+ * a delegated member should be able to start on the owner's behalf
+ * without full access. Reuses the "pay" action rather than adding a
+ * new one: both are "this moves the household's money" checks, and
+ * keeping them under one action avoids the two ever silently drifting
+ * apart (e.g. someone loosening "pay" for one-off orders without
+ * realizing it also loosens who can start a subscription).
  */
 export async function subscribeMembership(tier: MembershipTier) {
   const user = await getCurrentUser();
@@ -56,6 +58,11 @@ export async function subscribeMembership(tier: MembershipTier) {
   if (!priceId) redirect("/membership");
 
   const owner = await getEffectiveOwner(user.id, user.email);
+  // The membership page already hides Subscribe for a role that can't
+  // pay (see the membership page's own role check) — re-checked here
+  // regardless, since a form action must never trust the UI alone.
+  if (!canPerform(owner.role, "pay")) redirect("/membership");
+
   const db = getDb();
 
   // Reuse an existing Stripe Customer if this account already has one
@@ -116,6 +123,8 @@ export async function cancelMembership(membershipId: string) {
   if (!user?.email) redirect("/sign-in?next=/membership");
 
   const owner = await getEffectiveOwner(user.id, user.email);
+  if (!canPerform(owner.role, "pay")) redirect("/membership");
+
   const db = getDb();
   const rows = await db.select().from(memberships).where(eq(memberships.id, membershipId));
   const membership = rows[0];
