@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 import {
   getOwnRecurringServicePlans,
   pauseRecurringServicePlan,
@@ -30,7 +30,8 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function RecurringServicesPage() {
   const user = await getCurrentUser();
   if (!user) return null;
-  const ownerId = await getEffectiveOwnerId(user.id);
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  const canManage = canPerform(role, "place_order");
 
   const plans = await getOwnRecurringServicePlans(ownerId);
 
@@ -42,9 +43,11 @@ export default async function RecurringServicesPage() {
           title="Recurring Services"
           description="Standing shop-for-you requests — a new order is created for you to review and pay on the schedule you set. Never charged automatically."
         />
-        <Button href="/recurring-services/new" variant="navy">
-          New Recurring Request
-        </Button>
+        {canManage ? (
+          <Button href="/recurring-services/new" variant="navy">
+            New Recurring Request
+          </Button>
+        ) : null}
       </div>
 
       {plans.length === 0 ? (
@@ -80,29 +83,31 @@ export default async function RecurringServicesPage() {
                   Next order: {new Date(plan.nextRunAt).toLocaleDateString()}
                 </p>
               ) : null}
-              <div className="flex flex-wrap gap-3 border-t border-navy/10 pt-3">
-                {plan.status === "active" ? (
-                  <form action={pauseRecurringServicePlan.bind(null, plan.id)}>
-                    <Button type="submit" variant="outline-dark" size="md">
-                      Pause
-                    </Button>
-                  </form>
-                ) : null}
-                {plan.status === "paused" ? (
-                  <form action={resumeRecurringServicePlan.bind(null, plan.id)}>
-                    <Button type="submit" variant="outline-dark" size="md">
-                      Resume
-                    </Button>
-                  </form>
-                ) : null}
-                {plan.status !== "canceled" ? (
-                  <form action={cancelRecurringServicePlan.bind(null, plan.id)}>
-                    <Button type="submit" variant="outline-dark" size="md">
-                      Cancel
-                    </Button>
-                  </form>
-                ) : null}
-              </div>
+              {canManage ? (
+                <div className="flex flex-wrap gap-3 border-t border-navy/10 pt-3">
+                  {plan.status === "active" ? (
+                    <form action={pauseRecurringServicePlan.bind(null, plan.id)}>
+                      <Button type="submit" variant="outline-dark" size="md">
+                        Pause
+                      </Button>
+                    </form>
+                  ) : null}
+                  {plan.status === "paused" ? (
+                    <form action={resumeRecurringServicePlan.bind(null, plan.id)}>
+                      <Button type="submit" variant="outline-dark" size="md">
+                        Resume
+                      </Button>
+                    </form>
+                  ) : null}
+                  {plan.status !== "canceled" ? (
+                    <form action={cancelRecurringServicePlan.bind(null, plan.id)}>
+                      <Button type="submit" variant="outline-dark" size="md">
+                        Cancel
+                      </Button>
+                    </form>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

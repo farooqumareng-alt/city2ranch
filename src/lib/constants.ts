@@ -178,6 +178,15 @@ export const TIMING_OPTIONS = [
   { value: "on_demand", label: "Private / on-demand request" },
 ] as const;
 
+// Mirrors src/lib/db/schema.ts's householdRoleEnum — kept as plain
+// strings here (not imported from the schema) since this file also
+// backs client components, which can't import server-only DB code.
+export const HOUSEHOLD_ROLE_OPTIONS = [
+  { value: "full", label: "Full access — can request service and pay" },
+  { value: "ordering", label: "Can request service, can't pay" },
+  { value: "view_only", label: "View only" },
+] as const;
+
 export const DROPOFF_LOCATION_OPTIONS = [
   { value: "front_door", label: "Front door" },
   { value: "back_door", label: "Back door" },

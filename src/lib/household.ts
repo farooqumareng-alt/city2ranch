@@ -1,6 +1,8 @@
+import { cache } from "react";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { householdMembers } from "@/lib/db/schema";
+import type { HouseholdRole } from "./household-roles";
 
 // Reaches auth.users.email via a raw correlated subquery rather than a
 // Drizzle-managed join — schema.ts's authUsers shadow table intentionally
@@ -23,38 +25,77 @@ function ownerEmailSubquery(ownerIdColumn: typeof householdMembers.ownerAuthUser
  * call instead of using the signed-in user's id directly — see
  * submit-order.ts, approve-and-pay.ts, places.ts, update-profile.ts,
  * and the (account) pages for orders/places/profile.
+ *
+ * Wrapped in React's cache() — (account)/layout.tsx resolves this once
+ * for the sidebar/profile, then the page underneath resolves it again
+ * for its own data. Both calls are real, deliberate (never trust the
+ * layout alone), but without cache() they were also two separate round
+ * trips to the DB pool for the exact same query on every page view.
+ * cache() scopes the memoization to this one request, so the repeat
+ * call becomes free instead of a second hop through the pooler.
  */
-export async function getEffectiveOwnerId(userId: string): Promise<string> {
+export const getEffectiveOwnerId = cache(async (userId: string): Promise<string> => {
   const db = getDb();
   const rows = await db
     .select({ ownerAuthUserId: householdMembers.ownerAuthUserId })
     .from(householdMembers)
     .where(and(eq(householdMembers.memberAuthUserId, userId), eq(householdMembers.status, "active")));
   return rows[0]?.ownerAuthUserId ?? userId;
-}
+});
 
 /** Same resolution as getEffectiveOwnerId, but also returns the owner's
  *  email — for the one call site (submitOrder) that needs to stamp a
  *  new order's customer_email with whoever the order actually belongs
  *  to, not whichever household member happened to submit it. Avoids a
- *  second round trip for the common (non-delegated) case. */
-export async function getEffectiveOwner(
+ *  second round trip for the common (non-delegated) case. Also
+ *  cache()'d, same reasoning as getEffectiveOwnerId above. */
+export const getEffectiveOwner = cache(async (
   userId: string,
   userEmail: string
-): Promise<{ id: string; email: string }> {
+): Promise<{ id: string; email: string; role: HouseholdRole }> => {
   const db = getDb();
   const rows = await db
     .select({
       ownerAuthUserId: householdMembers.ownerAuthUserId,
       ownerEmail: ownerEmailSubquery(householdMembers.ownerAuthUserId),
+      role: householdMembers.role,
     })
     .from(householdMembers)
     .where(and(eq(householdMembers.memberAuthUserId, userId), eq(householdMembers.status, "active")));
 
   const owner = rows[0];
-  if (!owner) return { id: userId, email: userEmail };
-  return { id: owner.ownerAuthUserId, email: owner.ownerEmail ?? userEmail };
-}
+  if (!owner) return { id: userId, email: userEmail, role: "full" };
+  return { id: owner.ownerAuthUserId, email: owner.ownerEmail ?? userEmail, role: owner.role };
+});
+
+// Re-exported so every existing call site can keep importing role/action
+// helpers from "@/lib/household" — the split into household-roles.ts is
+// purely so the pure logic is unit-testable (see that file's comment).
+export type { HouseholdRole, HouseholdAction } from "./household-roles";
+export { canPerform } from "./household-roles";
+
+/** Same resolution as getEffectiveOwnerId, but also returns the acting
+ *  user's role — a plain owner (not a delegated member) always resolves
+ *  to "full" over their own account. Use this instead of
+ *  getEffectiveOwnerId at any write path where the action matters (see
+ *  canPerform above); read-only paths that don't distinguish roles can
+ *  keep using the plain id resolvers. cache()'d for the same reason as
+ *  getEffectiveOwnerId/getEffectiveOwner above — this is called from
+ *  both a page's layout and the page itself on nearly every account
+ *  route. */
+export const getEffectiveOwnerWithRole = cache(async (
+  userId: string
+): Promise<{ ownerId: string; role: HouseholdRole }> => {
+  const db = getDb();
+  const rows = await db
+    .select({ ownerAuthUserId: householdMembers.ownerAuthUserId, role: householdMembers.role })
+    .from(householdMembers)
+    .where(and(eq(householdMembers.memberAuthUserId, userId), eq(householdMembers.status, "active")));
+
+  const membership = rows[0];
+  if (!membership) return { ownerId: userId, role: "full" };
+  return { ownerId: membership.ownerAuthUserId, role: membership.role };
+});
 
 /** Everything the /household page needs to render whichever of the
  *  three states (independent owner, active member elsewhere, pending
@@ -72,6 +113,7 @@ export async function getHouseholdData(userId: string, email: string) {
       .select({
         id: householdMembers.id,
         invitedAt: householdMembers.invitedAt,
+        role: householdMembers.role,
         ownerEmail: ownerEmailSubquery(householdMembers.ownerAuthUserId),
       })
       .from(householdMembers)
@@ -81,6 +123,7 @@ export async function getHouseholdData(userId: string, email: string) {
         id: householdMembers.id,
         ownerAuthUserId: householdMembers.ownerAuthUserId,
         acceptedAt: householdMembers.acceptedAt,
+        role: householdMembers.role,
         ownerEmail: ownerEmailSubquery(householdMembers.ownerAuthUserId),
       })
       .from(householdMembers)

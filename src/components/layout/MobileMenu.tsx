@@ -2,11 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { NAV_LINKS } from "@/lib/constants";
 import { NavAuthControl } from "@/components/layout/NavAuthControl";
+import { isPanelRoute } from "@/lib/panel-routes";
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  // PanelSidebar (see AccountSidebar/StaffSidebar/DriverSidebar) already
+  // renders every link this menu would, plus Sign Out, as its own
+  // horizontal scroll row on mobile — the hamburger here would only open
+  // onto a redundant second copy of the same navigation.
+  if (isPanelRoute(pathname)) return null;
 
   return (
     <div className="md:hidden">

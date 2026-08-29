@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { RecurringServicePlanForm } from "@/components/forms/RecurringServicePlanForm";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { getEffectiveOwnerId } from "@/lib/household";
-import { getOwnProfile } from "@/lib/actions/update-profile";
+import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
+import { getOwnProfile } from "@/lib/customer-profile";
 import { getOwnPlaces } from "@/lib/actions/places";
 import { getOwnShoppingListsWithItems } from "@/lib/shopping-lists";
 
@@ -14,7 +14,9 @@ export const metadata: Metadata = {
 
 export default async function NewRecurringServicePlanPage() {
   const user = await getCurrentUser();
-  const ownerId = user ? await getEffectiveOwnerId(user.id) : null;
+  const effective = user ? await getEffectiveOwnerWithRole(user.id) : null;
+  const ownerId = effective?.ownerId ?? null;
+  const canManage = effective ? canPerform(effective.role, "place_order") : false;
 
   const [profile, places, savedLists] = await Promise.all([
     ownerId ? getOwnProfile(ownerId) : Promise.resolve(null),
@@ -30,7 +32,13 @@ export default async function NewRecurringServicePlanPage() {
         description="Shop for me on a schedule — a concierge builds and prices each order fresh, you approve and pay each one."
       />
       <div className="max-w-2xl">
-        <RecurringServicePlanForm profile={profile} places={places} savedLists={savedLists} />
+        {canManage ? (
+          <RecurringServicePlanForm profile={profile} places={places} savedLists={savedLists} />
+        ) : (
+          <p className="font-sans text-sm text-charcoal/70">
+            You have view-only access to this account and can&apos;t set up recurring requests.
+          </p>
+        )}
       </div>
     </div>
   );

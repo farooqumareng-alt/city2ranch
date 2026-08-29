@@ -5,7 +5,7 @@ import { SERVICE_TIERS } from "@/lib/constants";
 import { MEMBERSHIP_TIERS, type MembershipTier } from "@/lib/stripe/tiers";
 import { membershipServicesConfigured } from "@/lib/env";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { canPerform, getEffectiveOwner } from "@/lib/household";
 import { getMembershipSettings } from "@/lib/actions/membership-settings";
 import { getOwnMembership, subscribeMembership, cancelMembership } from "@/lib/actions/membership";
 
@@ -71,9 +71,15 @@ export default async function MembershipPage() {
   }
 
   // Sales are live — real pricing and a real Checkout flow.
-  const ownerId = user ? await getEffectiveOwnerId(user.id) : null;
-  const membership = ownerId ? await getOwnMembership(ownerId) : null;
+  const owner = user?.email ? await getEffectiveOwner(user.id, user.email) : null;
+  const membership = owner ? await getOwnMembership(owner.id) : null;
   const hasMembership = membership && membership.status !== "canceled";
+  // A delegated household member without "full" access can look, but
+  // subscribing/canceling is a billing commitment for the whole
+  // household — same role gate the action itself re-checks server-side
+  // (see subscribeMembership/cancelMembership), mirrored here so the
+  // button isn't shown only to silently redirect back on click.
+  const canManageBilling = owner ? canPerform(owner.role, "pay") : false;
 
   return (
     <div className="flex flex-col gap-10">
@@ -96,7 +102,7 @@ export default async function MembershipPage() {
               </p>
             ) : null}
           </div>
-          {membership.status === "active" ? (
+          {membership.status === "active" && canManageBilling ? (
             <form action={cancelMembership.bind(null, membership.id)}>
               <Button type="submit" variant="outline-dark" size="md">
                 Cancel
@@ -131,11 +137,17 @@ export default async function MembershipPage() {
                     </li>
                   ))}
                 </ul>
-                <form action={subscribeMembership.bind(null, tier.key as MembershipTier)} className="mt-auto">
-                  <Button type="submit" variant="navy" className="self-start">
-                    Subscribe
-                  </Button>
-                </form>
+                {canManageBilling ? (
+                  <form action={subscribeMembership.bind(null, tier.key as MembershipTier)} className="mt-auto">
+                    <Button type="submit" variant="navy" className="self-start">
+                      Subscribe
+                    </Button>
+                  </form>
+                ) : (
+                  <p className="mt-auto font-sans text-xs text-charcoal/60">
+                    Ask the account owner to subscribe.
+                  </p>
+                )}
               </div>
             );
           })}

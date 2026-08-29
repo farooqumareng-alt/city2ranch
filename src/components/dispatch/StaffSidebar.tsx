@@ -7,6 +7,6 @@ const STAFF_LINKS = [
 ];
 
 /** Same pattern as AccountSidebar/DriverSidebar. */
-export function StaffSidebar({ pathname, userEmail }: { pathname: string; userEmail?: string }) {
-  return <PanelSidebar links={STAFF_LINKS} pathname={pathname} userEmail={userEmail} accountType="Staff" />;
+export function StaffSidebar({ userEmail }: { userEmail?: string }) {
+  return <PanelSidebar links={STAFF_LINKS} userEmail={userEmail} accountType="Staff" />;
 }

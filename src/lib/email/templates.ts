@@ -1,23 +1,128 @@
-// Minimal, dependency-free email bodies for internal concierge-team
-// notifications. Not customer-facing marketing emails — just a fast,
-// readable way for the team to see what came in.
+/**
+ * One shared, professional HTML shell for every email this app sends —
+ * internal concierge-team notifications ("New X" leads) and customer-
+ * facing transactional emails alike. Table-based layout with every
+ * style inlined, on purpose: email clients don't share a rendering
+ * engine the way browsers do, and Outlook desktop in particular
+ * (Word's engine, not a browser engine) drops flexbox/grid, most
+ * shorthand CSS, and external/`<style>` stylesheets entirely. Tables +
+ * inline styles are the only layout approach that survives across
+ * Outlook, Gmail, Apple Mail, and Yahoo without silently breaking.
+ */
 
-function renderFields(fields: Record<string, string | null | undefined>) {
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+// Email clients load images from a real URL, not the local /public
+// folder. public/logo-email.png is a flattened PNG rasterized from
+// public/logo.svg — email-client SVG support is inconsistent-to-
+// nonexistent (Outlook especially), so the raster export is the only
+// version safe to reference here.
+const LOGO_URL = `${SITE_URL}/logo-email.png`;
+// Matches the source SVG's aspect ratio (1272.42 x 464.74) — width/height
+// attributes are set explicitly so email clients reserve the right
+// space before the image itself loads.
+const LOGO_IMG = `<img src="${LOGO_URL}" width="160" height="58" alt="City2Ranch" style="display:inline-block;border:0;max-width:160px;height:auto;">`;
+
+const COLORS = {
+  navy: "#0B2445",
+  gold: "#C9A45C",
+  ivory: "#F4EFE6",
+  hairline: "#EFE9DC",
+  body: "#333333",
+  muted: "#8A8377",
+  text: "#171717",
+};
+
+/**
+ * The chrome every email shares: logo header, serif title, sans-serif
+ * body, and a consistent footer with a real way back to the site and
+ * to support — the difference between "an automated message" and a
+ * business a customer can actually reach. `bodyHtml` is the only part
+ * that varies per email.
+ */
+function renderShell(title: string, bodyHtml: string): string {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>${title}</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:${COLORS.ivory};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${COLORS.ivory};">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#FFFFFF;border:1px solid ${COLORS.hairline};border-radius:6px;">
+            <tr>
+              <td style="padding:32px 40px 24px;text-align:center;border-bottom:1px solid ${COLORS.hairline};">
+                ${LOGO_IMG}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:36px 40px;font-family:Georgia,'Times New Roman',serif;color:${COLORS.text};">
+                <h1 style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.3;color:${COLORS.navy};font-weight:normal;">${title}</h1>
+                <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.65;color:${COLORS.body};">
+                  ${bodyHtml}
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 40px 32px;border-top:1px solid ${COLORS.hairline};font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:${COLORS.muted};text-align:center;">
+                <p style="margin:0 0 6px;color:${COLORS.navy};font-weight:bold;letter-spacing:0.04em;">CITY2RANCH</p>
+                <p style="margin:0 0 10px;">Rural shopping, delivery &amp; concierge service.</p>
+                <p style="margin:0;">
+                  <a href="${SITE_URL}" style="color:${COLORS.gold};text-decoration:none;">city2ranch.com</a>
+                  &nbsp;&middot;&nbsp;
+                  <a href="${SITE_URL}/contact" style="color:${COLORS.gold};text-decoration:none;">Contact Us</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+/** A real button, not a plain colored link — the primary action in any
+ *  transactional email (approve a quote, accept an invite, review an
+ *  order) deserves to look like the one thing to click, matching this
+ *  site's own gold primary-button styling. */
+function ctaButton(label: string, href: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;">
+    <tr>
+      <td style="border-radius:4px;background-color:${COLORS.gold};">
+        <a href="${href}" style="display:inline-block;padding:13px 30px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${COLORS.navy};text-decoration:none;">${label}</a>
+      </td>
+    </tr>
+  </table>`;
+}
+
+function renderFields(fields: Record<string, string | null | undefined>): string {
   return Object.entries(fields)
     .filter(([, value]) => value !== undefined && value !== null && value !== "")
-    .map(([label, value]) => `<tr><td style="padding:4px 12px 4px 0;color:#666;">${label}</td><td>${value}</td></tr>`)
+    .map(
+      ([label, value]) => `<tr>
+        <td style="padding:10px 16px 10px 0;border-bottom:1px solid ${COLORS.hairline};font-family:Arial,Helvetica,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:${COLORS.muted};vertical-align:top;white-space:nowrap;">${label}</td>
+        <td style="padding:10px 0;border-bottom:1px solid ${COLORS.hairline};font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:${COLORS.text};">${value}</td>
+      </tr>`
+    )
     .join("");
 }
 
+/** Internal concierge-team notifications ("New X" leads) — a fast,
+ *  readable fact sheet, not a customer-facing marketing email, but
+ *  still built on the same professional shell as everything else this
+ *  app sends. */
 function wrap(title: string, fields: Record<string, string | null | undefined>) {
+  const bodyHtml = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+    ${renderFields(fields)}
+  </table>`;
   return {
     subject: `${title} — City2Ranch`,
-    html: `
-      <div style="font-family:Arial,Helvetica,sans-serif;color:#171717;">
-        <h2 style="color:#0B2445;">${title}</h2>
-        <table style="border-collapse:collapse;">${renderFields(fields)}</table>
-      </div>
-    `,
+    html: renderShell(title, bodyHtml),
   };
 }
 
@@ -99,19 +204,14 @@ export function serviceRequestEmail(fields: {
   });
 }
 
-// Customer-facing transactional emails get slightly more considered
-// framing than the internal "New X" notifications above — this is the
-// customer's own receipt/confirmation, not an internal alert.
+/** Customer-facing transactional emails — same shell as the internal
+ *  notifications above, just addressed to the customer instead of the
+ *  team. `bodyHtml` is plain paragraphs/ctaButton() output; the shell
+ *  supplies the logo, heading, and footer around it. */
 function customerWrap(title: string, bodyHtml: string) {
   return {
     subject: `${title} — City2Ranch`,
-    html: `
-      <div style="font-family:Arial,Helvetica,sans-serif;color:#171717;max-width:480px;">
-        <p style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#C9A45C;font-weight:bold;">City2Ranch</p>
-        <h2 style="color:#0B2445;margin-top:4px;">${title}</h2>
-        ${bodyHtml}
-      </div>
-    `,
+    html: renderShell(title, bodyHtml),
   };
 }
 
@@ -129,11 +229,17 @@ export function orderPaymentConfirmedEmail(fields: {
   return customerWrap(
     "Payment Confirmed",
     `
-      <p>${orderLine} Total charged: <strong>$${total}</strong>.</p>
-      <p>Your delivery PIN:</p>
-      <p style="font-size:28px;letter-spacing:0.2em;color:#C9A45C;font-weight:bold;">${fields.deliveryPin}</p>
-      <p style="color:#666;font-size:13px;">Give this to your driver at delivery to confirm it's you.</p>
-      <p><a href="${fields.orderUrl}" style="color:#0B2445;">Track your order</a></p>
+      <p style="margin:0 0 20px;">${orderLine} Total charged: <strong>$${total}</strong>.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border:1px solid ${COLORS.hairline};border-radius:4px;background-color:${COLORS.ivory};">
+        <tr>
+          <td style="padding:18px 28px;text-align:center;">
+            <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:${COLORS.muted};">Delivery PIN</p>
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;letter-spacing:0.2em;color:${COLORS.navy};font-weight:bold;">${fields.deliveryPin}</p>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:0 0 20px;color:${COLORS.muted};font-size:13px;">Give this to your driver at delivery to confirm it's you.</p>
+      ${ctaButton("Track Your Order", fields.orderUrl)}
     `
   );
 }
@@ -143,9 +249,9 @@ export function quoteReadyEmail(fields: { totalCents: number; signInUrl: string 
   return customerWrap(
     "Your Quote Is Ready",
     `
-      <p>Your City2Ranch concierge has finished your quote — total: <strong>$${total}</strong>.</p>
-      <p>Sign in to review the details and approve it before anything is charged.</p>
-      <p><a href="${fields.signInUrl}" style="color:#0B2445;">Sign in to review your quote</a></p>
+      <p style="margin:0 0 20px;">Your City2Ranch concierge has finished your quote — total: <strong>$${total}</strong>.</p>
+      <p style="margin:0 0 20px;">Sign in to review the details and approve it before anything is charged.</p>
+      ${ctaButton("Review Your Quote", fields.signInUrl)}
     `
   );
 }
@@ -154,10 +260,10 @@ export function recurringOrderCreatedEmail(fields: { orderUrl: string }) {
   return customerWrap(
     "Your Recurring Order Is Ready",
     `
-      <p>A new order was just created from your recurring City2Ranch request.</p>
-      <p>Sign in to review your shopping list and approve it before anything is charged — recurring
-      requests never charge you automatically.</p>
-      <p><a href="${fields.orderUrl}" style="color:#0B2445;">Review your order</a></p>
+      <p style="margin:0 0 20px;">A new order was just created from your recurring City2Ranch request.</p>
+      <p style="margin:0 0 20px;">Sign in to review your shopping list and approve it before anything is
+      charged — recurring requests never charge you automatically.</p>
+      ${ctaButton("Review Your Order", fields.orderUrl)}
     `
   );
 }
@@ -166,11 +272,11 @@ export function householdInviteEmail(fields: { ownerEmail: string; signInUrl: st
   return customerWrap(
     "You've Been Invited",
     `
-      <p><strong>${fields.ownerEmail}</strong> has invited you to access their
+      <p style="margin:0 0 20px;"><strong>${fields.ownerEmail}</strong> has invited you to access their
       City2Ranch account — you'll be able to see and manage their requests,
       orders, and saved places.</p>
-      <p><a href="${fields.signInUrl}" style="color:#0B2445;">Sign in to accept</a></p>
-      <p style="color:#666;font-size:13px;">If you weren't expecting this, you can ignore this email.</p>
+      ${ctaButton("Sign In to Accept", fields.signInUrl)}
+      <p style="margin:20px 0 0;color:${COLORS.muted};font-size:13px;">If you weren't expecting this, you can safely ignore this email.</p>
     `
   );
 }

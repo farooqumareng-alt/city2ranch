@@ -31,24 +31,24 @@ const ACCOUNT_LINKS = [
  * two competing ones.
  */
 export function AccountSidebar({
-  pathname,
   userEmail,
   userName,
   managingEmail,
+  managingRole,
 }: {
-  pathname: string;
   userEmail?: string;
   userName?: string;
   managingEmail?: string;
+  managingRole?: string;
 }) {
   return (
     <PanelSidebar
       links={ACCOUNT_LINKS}
-      pathname={pathname}
       userEmail={userEmail}
       userName={userName}
       accountType="Customer"
       managingEmail={managingEmail}
+      managingRole={managingRole}
     />
   );
 }

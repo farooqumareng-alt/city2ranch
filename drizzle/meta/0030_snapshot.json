@@ -1,6 +1,6 @@
 {
-  "id": "48f93719-6c8f-41e3-9263-9a8ac14bfe0f",
-  "prevId": "bb3af4cf-015a-49f0-9652-666d6e916420",
+  "id": "14456e10-7602-4a20-902c-577369aa714b",
+  "prevId": "781f70f7-e61e-4922-b68c-8fc2a5dbd5f4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -655,6 +655,14 @@
           "notNull": true,
           "default": "'invited'"
         },
+        "role": {
+          "name": "role",
+          "type": "household_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'full'"
+        },
         "invited_at": {
           "name": "invited_at",
           "type": "timestamp with time zone",
@@ -890,13 +898,6 @@
         },
         "payment_receipts": {
           "name": "payment_receipts",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "recurring_order_created": {
-          "name": "recurring_order_created",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
@@ -1580,215 +1581,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.recurring_service_plan_items": {
-      "name": "recurring_service_plan_items",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "plan_id": {
-          "name": "plan_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "item_name": {
-          "name": "item_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quantity": {
-          "name": "quantity",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'1'"
-        },
-        "notes": {
-          "name": "notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "recurring_service_plan_items_plan_id_recurring_service_plans_id_fk": {
-          "name": "recurring_service_plan_items_plan_id_recurring_service_plans_id_fk",
-          "tableFrom": "recurring_service_plan_items",
-          "tableTo": "recurring_service_plans",
-          "columnsFrom": [
-            "plan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.recurring_service_plans": {
-      "name": "recurring_service_plans",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "auth_user_id": {
-          "name": "auth_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "customer_name": {
-          "name": "customer_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "customer_email": {
-          "name": "customer_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "customer_phone": {
-          "name": "customer_phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "delivery_address_line1": {
-          "name": "delivery_address_line1",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "delivery_address_line2": {
-          "name": "delivery_address_line2",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "delivery_city": {
-          "name": "delivery_city",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "delivery_state": {
-          "name": "delivery_state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "delivery_zip": {
-          "name": "delivery_zip",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "customer_notes": {
-          "name": "customer_notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "frequency": {
-          "name": "frequency",
-          "type": "recurring_plan_frequency",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "next_run_at": {
-          "name": "next_run_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "recurring_plan_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'active'"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "recurring_service_plans_auth_user_id_users_id_fk": {
-          "name": "recurring_service_plans_auth_user_id_users_id_fk",
-          "tableFrom": "recurring_service_plans",
-          "tableTo": "users",
-          "schemaTo": "auth",
-          "columnsFrom": [
-            "auth_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "recurring_service_plans_delivery_zip_zip_mileage_zip_fk": {
-          "name": "recurring_service_plans_delivery_zip_zip_mileage_zip_fk",
-          "tableFrom": "recurring_service_plans",
-          "tableTo": "zip_mileage",
-          "columnsFrom": [
-            "delivery_zip"
-          ],
-          "columnsTo": [
-            "zip"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.service_area_leads": {
       "name": "service_area_leads",
       "schema": "",
@@ -2360,6 +2152,15 @@
         "revoked"
       ]
     },
+    "public.household_role": {
+      "name": "household_role",
+      "schema": "public",
+      "values": [
+        "full",
+        "ordering",
+        "view_only"
+      ]
+    },
     "public.lead_status": {
       "name": "lead_status",
       "schema": "public",
@@ -2420,24 +2221,6 @@
         "completed",
         "cancelled",
         "failed"
-      ]
-    },
-    "public.recurring_plan_frequency": {
-      "name": "recurring_plan_frequency",
-      "schema": "public",
-      "values": [
-        "weekly",
-        "biweekly",
-        "monthly"
-      ]
-    },
-    "public.recurring_plan_status": {
-      "name": "recurring_plan_status",
-      "schema": "public",
-      "values": [
-        "active",
-        "paused",
-        "canceled"
       ]
     },
     "public.service_type": {

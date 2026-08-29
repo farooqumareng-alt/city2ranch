@@ -262,8 +262,13 @@ export const placeSchema = z.object({
 });
 export type PlaceInput = z.infer<typeof placeSchema>;
 
+export const householdRole = z.enum(["full", "ordering", "view_only"]);
+
 export const householdInviteSchema = z.object({
   email,
+  // Defaults to "full" so an empty/omitted field (e.g. an older client)
+  // keeps today's behavior — full delegated access.
+  role: householdRole.default("full"),
 });
 
 // A saved shopping list — same item shape as conciergeOrderItemSchema

@@ -5,26 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { signOut } from "@/lib/actions/sign-out";
-
-/** Routes where a PanelSidebar (AccountSidebar/StaffSidebar/
- *  DriverSidebar) already renders its own account nav + Sign Out — the
- *  top nav's account control would just duplicate it there. */
-function isPanelRoute(pathname: string) {
-  return (
-    pathname.startsWith("/home") ||
-    pathname.startsWith("/requests") ||
-    pathname.startsWith("/deliveries") ||
-    pathname.startsWith("/orders") ||
-    pathname.startsWith("/places") ||
-    pathname.startsWith("/lists") ||
-    pathname.startsWith("/household") ||
-    pathname.startsWith("/membership") ||
-    pathname.startsWith("/payments") ||
-    pathname.startsWith("/profile") ||
-    pathname.startsWith("/support") ||
-    pathname.startsWith("/internal")
-  );
-}
+import { isPanelRoute } from "@/lib/panel-routes";
 
 /**
  * The only part of the Nav that depends on the auth session — resolved

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { recurringServicePlanItems, recurringServicePlans } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { getEffectiveOwner } from "@/lib/household";
+import { canPerform, getEffectiveOwner } from "@/lib/household";
 import { getZipMileage } from "@/lib/pricing/repository";
 import { recurringServicePlanCreateSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
@@ -129,6 +129,17 @@ export async function createRecurringServicePlan(
   }
 
   const owner = await getEffectiveOwner(user.id, user.email);
+  // Setting up a standing request is the same "can this person commit
+  // the household to something" gate submit-order.ts uses for a
+  // one-off order — a view-only household member shouldn't be able to
+  // start a recurring plan on the owner's behalf.
+  if (!canPerform(owner.role, "place_order")) {
+    return {
+      ok: false,
+      message: "You don't have permission to set up recurring requests on this account.",
+      values: valuesFromFormData(formData, FORM_FIELDS),
+    };
+  }
 
   try {
     const db = getDb();
@@ -192,6 +203,7 @@ export async function pauseRecurringServicePlan(planId: string) {
   const user = await getCurrentUser();
   if (!user?.email) return;
   const owner = await getEffectiveOwner(user.id, user.email);
+  if (!canPerform(owner.role, "place_order")) return;
   await setPlanStatus(planId, owner.id, "paused");
 }
 
@@ -203,6 +215,7 @@ export async function resumeRecurringServicePlan(planId: string) {
   const user = await getCurrentUser();
   if (!user?.email) return;
   const owner = await getEffectiveOwner(user.id, user.email);
+  if (!canPerform(owner.role, "place_order")) return;
 
   const db = getDb();
   await db
@@ -216,5 +229,6 @@ export async function cancelRecurringServicePlan(planId: string) {
   const user = await getCurrentUser();
   if (!user?.email) return;
   const owner = await getEffectiveOwner(user.id, user.email);
+  if (!canPerform(owner.role, "place_order")) return;
   await setPlanStatus(planId, owner.id, "canceled");
 }
