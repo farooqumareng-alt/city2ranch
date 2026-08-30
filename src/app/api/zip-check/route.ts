@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isZipServed } from "@/lib/zip-coverage";
+import { getServiceZoneStatus } from "@/lib/pricing/service-zone";
 import { zipCheckSchema } from "@/lib/validation/schemas";
 
 export async function GET(request: NextRequest) {
@@ -13,8 +13,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const { status } = await getServiceZoneStatus(parsed.data.zip);
+
   return NextResponse.json({
     zip: parsed.data.zip,
-    available: isZipServed(parsed.data.zip),
+    status,
   });
 }

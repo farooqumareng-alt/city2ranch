@@ -7,7 +7,7 @@ import { getDb } from "@/lib/db";
 import { recurringServicePlanItems, recurringServicePlans } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { canPerform, getEffectiveOwner } from "@/lib/household";
-import { getZipMileage } from "@/lib/pricing/repository";
+import { getServiceZoneStatus } from "@/lib/pricing/service-zone";
 import { recurringServicePlanCreateSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
@@ -118,11 +118,17 @@ export async function createRecurringServicePlan(
   // Same check submitOrder makes for City Pickup — a plan feeds
   // unattended order creation, so "does this ZIP have route data" must
   // be settled now, not discovered as a silent skip during a cron run.
-  const roundTripMiles = await getZipMileage(data.deliveryZip);
+  const { status, roundTripMiles } = await getServiceZoneStatus(data.deliveryZip);
   if (roundTripMiles == null) {
+    // Previously always said "contact us directly" with no way forward —
+    // now points to the same waitlist every other zone-gated flow does,
+    // and acknowledges when there's already real demand for the area.
     return {
       ok: false,
-      message: "Your location requires a custom City2Ranch service quote before a recurring plan can be set up here. Please contact us directly.",
+      message:
+        status === "developing"
+          ? "We're already building a route in your area — join the waitlist from the Service Area page and we'll prioritize it before setting up a recurring plan."
+          : "Your location requires a custom City2Ranch service quote before a recurring plan can be set up here. Join the waitlist from the Service Area page and a concierge will follow up.",
       fieldErrors: { deliveryZip: "No route configured for this ZIP code." },
       values: valuesFromFormData(formData, FORM_FIELDS),
     };

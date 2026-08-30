@@ -8,7 +8,8 @@ import { orderSubmitSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { computePrice } from "@/lib/pricing/compute-price";
-import { getActivePricingRule, getZipMileage } from "@/lib/pricing/repository";
+import { getActivePricingRule } from "@/lib/pricing/repository";
+import { getServiceZoneStatus } from "@/lib/pricing/service-zone";
 import { logAuditEvent } from "@/lib/audit";
 import { canPerform, getEffectiveOwner, getEffectiveOwnerWithRole } from "@/lib/household";
 
@@ -86,15 +87,19 @@ export async function submitOrder(
   try {
     // Mileage is looked up server-side from the ZIP — never accepted as
     // customer input, so a customer can never manipulate the price.
-    const roundTripMiles = await getZipMileage(data.deliveryZip);
+    const { status, roundTripMiles } = await getServiceZoneStatus(data.deliveryZip);
     if (roundTripMiles == null) {
-      // No route data for this ZIP — never invent a price. Point the
-      // customer at the waitlist (real lead-capture) rather than a dead
-      // end; a concierge follows up once this corridor is configured.
+      // Neither tier can be priced without real mileage — never invent
+      // one. The message differs (matching what the ZIP-check widget
+      // would already have told them), but the outcome is the same:
+      // point to the waitlist, a concierge follows up once this
+      // corridor is configured.
       return {
         ok: false,
         message:
-          "Your location requires a custom City2Ranch service quote. Join the waitlist from the Service Area page and a concierge will follow up.",
+          status === "developing"
+            ? "We're already building a route in your area — join the waitlist from the Service Area page and we'll prioritize it."
+            : "Your location requires a custom City2Ranch service quote. Join the waitlist from the Service Area page and a concierge will follow up.",
         fieldErrors: { deliveryZip: "Quote required for this ZIP code." },
         values: valuesFromFormData(formData, FORM_FIELDS),
       };
