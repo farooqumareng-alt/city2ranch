@@ -60,6 +60,9 @@ async function transitionWithReason(
     metadata: { reason },
   });
 
+  // Same reasoning as assign-driver.ts — both the queue and the
+  // dashboard need to reflect a cancel/fail immediately.
+  revalidatePath("/internal/dispatch/queue");
   revalidatePath("/internal/dispatch");
   return { ok: true };
 }

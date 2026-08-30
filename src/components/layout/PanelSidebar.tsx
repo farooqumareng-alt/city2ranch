@@ -4,7 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/lib/actions/sign-out";
 
-export type PanelLink = { href: string; label: string };
+export type PanelLink = {
+  href: string;
+  label: string;
+  /** Match only pathname === href, never a prefix — needed for a link
+   *  whose href is itself a *parent* path of sibling routes (e.g.
+   *  "/internal/dispatch" once /internal/dispatch/queue and
+   *  /internal/dispatch/concierge exist alongside it), where the
+   *  default prefix match would make it show active on every one of
+   *  those siblings too. Leave unset for every ordinary link — this
+   *  only matters when a link's own href is a strict prefix of another
+   *  link's href on the same panel. */
+  exact?: boolean;
+};
 
 /**
  * Shared sidebar shell for every signed-in panel — the customer account
@@ -107,7 +119,9 @@ export function PanelSidebar({
         </div>
       ) : null}
       {links.map((link) => {
-        const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+        const active = link.exact
+          ? pathname === link.href
+          : pathname === link.href || pathname.startsWith(`${link.href}/`);
         return (
           <Link
             key={link.href}
