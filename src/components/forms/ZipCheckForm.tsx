@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { WaitlistForm } from "@/components/forms/WaitlistForm";
 
-type Result = { zip: string; available: boolean } | null;
+type ServiceZoneStatus = "active" | "developing" | "outside";
+type Result = { zip: string; status: ServiceZoneStatus } | null;
 
 export function ZipCheckForm() {
   const [zip, setZip] = useState("");
@@ -29,7 +30,7 @@ export function ZipCheckForm() {
         throw new Error("lookup failed");
       }
       const data = await res.json();
-      setResult({ zip: data.zip, available: data.available });
+      setResult({ zip: data.zip, status: data.status });
     } catch {
       setError(
         "We couldn't check that ZIP code right now. Please try again shortly."
@@ -76,31 +77,44 @@ export function ZipCheckForm() {
         </p>
       ) : null}
 
-      {result ? (
-        result.available ? (
-          <div className="rounded-sm border border-gold/40 bg-gold/10 p-6">
-            <p className="font-serif text-lg text-navy-deep">
-              Service Available
-            </p>
-            <p className="mt-2 font-sans text-sm text-charcoal/70">
-              Your area is currently within a City2Ranch service route.
-            </p>
-            <Button href="/request-service" variant="gold" className="mt-4">
-              Request Service
-            </Button>
+      {result?.status === "active" ? (
+        <div className="rounded-sm border border-gold/40 bg-gold/10 p-6">
+          <p className="font-serif text-lg text-navy-deep">
+            Service Available
+          </p>
+          <p className="mt-2 font-sans text-sm text-charcoal/70">
+            Your area is currently within a City2Ranch service route.
+          </p>
+          <Button href="/request-service" variant="gold" className="mt-4">
+            Request Service
+          </Button>
+        </div>
+      ) : null}
+
+      {result?.status === "developing" ? (
+        <div className="rounded-sm border border-navy/15 bg-white/70 p-6">
+          <p className="font-serif text-lg text-navy-deep">Building This Route</p>
+          <p className="mt-2 font-sans text-sm text-charcoal/70">
+            We don&apos;t have an active route in your area yet, but others nearby have
+            already asked — join them and we&apos;ll prioritize it.
+          </p>
+          <div className="mt-6">
+            <WaitlistForm zip={result.zip} />
           </div>
-        ) : (
-          <div className="rounded-sm border border-navy/15 bg-white/70 p-6">
-            <p className="font-serif text-lg text-navy-deep">Coming Soon</p>
-            <p className="mt-2 font-sans text-sm text-charcoal/70">
-              We don&apos;t currently have a route serving your area, but
-              we&apos;re building service in your region.
-            </p>
-            <div className="mt-6">
-              <WaitlistForm zip={result.zip} />
-            </div>
+        </div>
+      ) : null}
+
+      {result?.status === "outside" ? (
+        <div className="rounded-sm border border-navy/15 bg-white/70 p-6">
+          <p className="font-serif text-lg text-navy-deep">Outside Our Current Area</p>
+          <p className="mt-2 font-sans text-sm text-charcoal/70">
+            We don&apos;t currently have a route serving your area. Let us know
+            you&apos;re interested and we&apos;ll reach out as City2Ranch expands.
+          </p>
+          <div className="mt-6">
+            <WaitlistForm zip={result.zip} />
           </div>
-        )
+        </div>
       ) : null}
     </div>
   );
