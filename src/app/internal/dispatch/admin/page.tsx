@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
@@ -68,7 +69,16 @@ export default async function TeamAdminPage() {
             {driverRows.map((driver) => (
               <Row key={driver.id}>
                 <div>
-                  <p className="font-sans text-sm text-navy-deep">{driver.name}</p>
+                  {/* Just the name links, not the whole row via Row's own
+                      href prop — this row also has ActiveToggleButton's
+                      <form> in it, and nesting a form inside an anchor
+                      is invalid HTML. */}
+                  <Link
+                    href={`/internal/dispatch/admin/drivers/${driver.id}`}
+                    className="font-sans text-sm text-navy-deep underline decoration-navy/20 hover:text-gold"
+                  >
+                    {driver.name}
+                  </Link>
                   <p className="font-sans text-xs text-charcoal/60">
                     {driver.email ?? "(no email on file)"}
                     {driver.phone ? ` · ${driver.phone}` : ""}

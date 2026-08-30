@@ -1,9 +1,9 @@
 "use server";
 
-import { and, count, eq, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
-import { drivers, staff } from "@/lib/db/schema";
+import { drivers, orders, staff } from "@/lib/db/schema";
 import { requireSuperAdmin } from "@/lib/auth/roles";
 import { addDriverSchema, addStaffSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
@@ -84,6 +84,75 @@ export async function listDrivers() {
     })
     .from(drivers)
     .orderBy(drivers.createdAt);
+}
+
+/**
+ * Used by /internal/dispatch/admin/drivers/[id] — everything listDrivers()
+ * doesn't have: the driver's full assignment history (every order ever
+ * assigned to them, any status — not just the active ones their own
+ * /internal/driver page shows) and honest performance stats. No ratings,
+ * no on-time %, no availability — nothing in this schema collects any
+ * of that; only what's actually computable from real columns
+ * (assignedAt/completedAt) is included.
+ */
+export async function getDriverDetail(driverId: string) {
+  await requireSuperAdmin();
+  const db = getDb();
+
+  const [driverRows, assignmentHistory, statsRows] = await Promise.all([
+    db
+      .select({
+        id: drivers.id,
+        name: drivers.name,
+        phone: drivers.phone,
+        label: drivers.label,
+        isActive: drivers.isActive,
+        createdAt: drivers.createdAt,
+        email: sql<string | null>`(SELECT email FROM auth.users WHERE id = ${drivers.authUserId})`,
+      })
+      .from(drivers)
+      .where(eq(drivers.id, driverId)),
+
+    db
+      .select({
+        id: orders.id,
+        status: orders.status,
+        serviceType: orders.serviceType,
+        customerName: orders.customerName,
+        assignedAt: orders.assignedAt,
+        completedAt: orders.completedAt,
+      })
+      .from(orders)
+      .where(eq(orders.driverId, driverId))
+      .orderBy(desc(orders.assignedAt))
+      .limit(50),
+
+    // avg() only over completed orders with both timestamps set — a
+    // cancelled-before-pickup or still-in-flight order has no
+    // meaningful duration to average in.
+    db
+      .select({
+        completedCount: sql<number>`count(*) filter (where ${orders.status} = 'completed')`,
+        failedCount: sql<number>`count(*) filter (where ${orders.status} = 'failed')`,
+        avgDurationSeconds: sql<string | null>`avg(extract(epoch from (${orders.completedAt} - ${orders.assignedAt}))) filter (where ${orders.status} = 'completed')`,
+      })
+      .from(orders)
+      .where(eq(orders.driverId, driverId)),
+  ]);
+
+  const driver = driverRows[0];
+  if (!driver) return null;
+
+  const avgDurationSeconds = statsRows[0]?.avgDurationSeconds;
+  return {
+    driver,
+    assignmentHistory,
+    stats: {
+      completedCount: Number(statsRows[0]?.completedCount ?? 0),
+      failedCount: Number(statsRows[0]?.failedCount ?? 0),
+      avgDeliveryHours: avgDurationSeconds ? Number(avgDurationSeconds) / 3600 : null,
+    },
+  };
 }
 
 export async function addStaffMember(
