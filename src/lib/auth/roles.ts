@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { drivers, staff } from "@/lib/db/schema";
@@ -31,6 +31,25 @@ export async function requireStaff() {
   // that need "who is this" — the panel sidebar's "Signed in as" line, in
   // particular — don't have to make a second getCurrentUser() call.
   return { ...staffMember, email: user.email };
+}
+
+/**
+ * Cheap existence check, not a gate — used by the *customer* account
+ * sidebar to decide whether to show a "Staff Dashboard" link at all.
+ * Someone can hold both a customer account and a staff row on the same
+ * auth identity (there's no separate "staff signup" — a super_admin
+ * just adds an existing customer's email as staff), and nothing in the
+ * customer panel pointed that out before this: a staff/super_admin
+ * signing in landed on their ordinary customer Home with no way to
+ * discover /internal/dispatch except already knowing the URL.
+ */
+export async function isActiveStaffMember(authUserId: string): Promise<boolean> {
+  const db = getDb();
+  const rows = await db
+    .select({ id: staff.id })
+    .from(staff)
+    .where(and(eq(staff.authUserId, authUserId), eq(staff.isActive, true)));
+  return rows.length > 0;
 }
 
 /** Gates the team-management admin panel (/internal/dispatch/admin) and

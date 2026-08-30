@@ -32,6 +32,7 @@ export function PanelSidebar({
   accountType,
   managingEmail,
   managingRole,
+  crossPanelLink,
 }: {
   links: PanelLink[];
   /** Shown above the links so it's never ambiguous which of several
@@ -58,6 +59,13 @@ export function PanelSidebar({
    *  omitted for full access, since that was the only option before
    *  roles existed and stays the unlabeled default. */
   managingRole?: string;
+  /** A way into a *different* panel the same signed-in person also has
+   *  access to (e.g. a customer who's also staff, jumping to
+   *  /internal/dispatch) — rendered distinctly from `links` (which are
+   *  all destinations within this one panel) with its own visual
+   *  separation, and visible at every breakpoint, unlike the "Signed in
+   *  as" identity block above which is desktop-only. */
+  crossPanelLink?: PanelLink;
 }) {
   const pathname = usePathname();
   const linkBase =
@@ -111,6 +119,14 @@ export function PanelSidebar({
           </Link>
         );
       })}
+      {crossPanelLink ? (
+        <Link
+          href={crossPanelLink.href}
+          className={`${linkBase} mt-1 border-t border-navy/10 pt-3 font-medium text-gold hover:bg-transparent md:mt-1 md:border-t md:pt-3`}
+        >
+          {crossPanelLink.label} →
+        </Link>
+      ) : null}
       <form action={signOut}>
         <button
           type="submit"
