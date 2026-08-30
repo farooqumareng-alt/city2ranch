@@ -15,6 +15,9 @@ export function DriverSidebar({
       userEmail={userEmail}
       userName={userName}
       accountType="Driver"
+      // Same reasoning as StaffSidebar's crossPanelLink — every signed-in
+      // person already has a normal account at /home, driver or not.
+      crossPanelLink={{ href: "/home", label: "My Account" }}
     />
   );
 }

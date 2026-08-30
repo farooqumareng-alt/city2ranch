@@ -20,5 +20,16 @@ export function StaffSidebar({
   isSuperAdmin?: boolean;
 }) {
   const links = isSuperAdmin ? [...STAFF_LINKS, ADMIN_LINK] : STAFF_LINKS;
-  return <PanelSidebar links={links} userEmail={userEmail} accountType="Staff" />;
+  return (
+    <PanelSidebar
+      links={links}
+      userEmail={userEmail}
+      accountType="Staff"
+      // Unconditional, unlike AccountSidebar's isStaff check — there's
+      // no separate "customer signup," every signed-in person already
+      // has a normal account at /home, staff or not. Closes the loop
+      // AccountSidebar's own "Staff Dashboard" link opened the other way.
+      crossPanelLink={{ href: "/home", label: "My Account" }}
+    />
+  );
 }
