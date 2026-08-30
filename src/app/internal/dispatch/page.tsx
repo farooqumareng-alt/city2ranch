@@ -1,131 +1,97 @@
 import type { Metadata } from "next";
-import { asc, eq, inArray } from "drizzle-orm";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { getDb } from "@/lib/db";
-import { orders, stores, drivers } from "@/lib/db/schema";
-import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
-import { canTransition } from "@/lib/orders/status";
-import { cancelOrder, failOrder } from "@/lib/actions/staff-order-exceptions";
-import { AssignDriverForm } from "@/components/dispatch/AssignDriverForm";
-import { OrderExceptionForm } from "@/components/dispatch/OrderExceptionForm";
-import { formatPlainDate } from "@/lib/format";
+import { Card } from "@/components/ui/Card";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { RowList, Row } from "@/components/ui/RowList";
+import { getOperationsDashboard } from "@/lib/operations-dashboard";
 
-export const metadata: Metadata = { title: "Dispatch" };
+export const metadata: Metadata = { title: "Operations Center" };
 
-// Orders that are actionable from dispatch: paid orders need a driver,
-// and once assigned they stay visible here until they leave the driver's
-// hands (completed/cancelled/failed drop off the queue).
-const ACTIVE_STATUSES = ["paid", "driver_assigned", "picked_up", "in_transit"] as const;
+function StatTile({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="font-sans text-[11px] uppercase tracking-[0.1em] text-charcoal/50">{label}</p>
+      <p className="font-serif text-2xl text-navy-deep">{value}</p>
+    </div>
+  );
+}
 
-export default async function DispatchPage() {
-  const db = getDb();
-
-  const [activeOrders, activeDrivers] = await Promise.all([
-    db
-      .select({
-        id: orders.id,
-        status: orders.status,
-        createdAt: orders.createdAt,
-        serviceType: orders.serviceType,
-        customerName: orders.customerName,
-        customerPhone: orders.customerPhone,
-        retailerOrderNumber: orders.retailerOrderNumber,
-        deliveryCity: orders.deliveryCity,
-        deliveryState: orders.deliveryState,
-        deliveryZip: orders.deliveryZip,
-        requestedDeliveryDate: orders.requestedDeliveryDate,
-        totalCents: orders.totalCents,
-        storeName: stores.name,
-        driverName: drivers.name,
-      })
-      .from(orders)
-      // leftJoin: a concierge order may have no store at all.
-      .leftJoin(stores, eq(orders.storeId, stores.id))
-      .leftJoin(drivers, eq(orders.driverId, drivers.id))
-      .where(inArray(orders.status, ACTIVE_STATUSES))
-      .orderBy(asc(orders.createdAt)),
-    db
-      .select({ id: drivers.id, name: drivers.name })
-      .from(drivers)
-      .where(eq(drivers.isActive, true)),
-  ]);
-
-  const driverOptions = activeDrivers.map((d) => ({ value: d.id, label: d.name }));
+export default async function DispatchDashboardPage() {
+  const { stats, needsAttention } = await getOperationsDashboard();
+  const hasAnyAttentionItems =
+    needsAttention.unassignedPaidOrders.length > 0 ||
+    needsAttention.agedConciergeQuotes.length > 0 ||
+    needsAttention.recentFailedOrders.length > 0;
 
   return (
     <div className="flex flex-col gap-10">
       <SectionHeading
         eyebrow="STAFF"
-        title="Dispatch Queue"
-        description="Orders awaiting a driver, or already in the driver's hands."
+        title="Operations Center"
+        description="Today's fulfillment status at a glance."
       />
 
-      {activeOrders.length === 0 ? (
-        <p className="font-sans text-sm text-charcoal/70">
-          Nothing needs attention right now.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {activeOrders.map((order) => {
-            const canCancel = canTransition(order.status, "cancelled");
-            const canFail = canTransition(order.status, "failed");
-            return (
-              <div
-                key={order.id}
-                className="flex flex-col gap-4 rounded-sm border border-navy/10 bg-white/60 p-6"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="font-serif text-lg text-navy-deep">
-                      {order.customerName} — {order.storeName ?? "Concierge"}
-                    </p>
-                    <p className="font-sans text-xs text-charcoal/60">
-                      {order.retailerOrderNumber ? `Order #${order.retailerOrderNumber} · ` : ""}
-                      {order.deliveryCity}, {order.deliveryState} {order.deliveryZip} ·{" "}
-                      {order.customerPhone}
-                    </p>
-                    <p className="font-sans text-xs text-charcoal/60">
-                      Placed {new Date(order.createdAt).toLocaleString()}
-                      {order.requestedDeliveryDate
-                        ? ` · Requested for ${formatPlainDate(order.requestedDeliveryDate)}`
-                        : ""}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="font-sans text-sm font-medium text-navy-deep">
-                      {ORDER_STATUS_LABELS[order.status]}
-                    </span>
-                    <span className="font-sans text-sm text-charcoal/70">
-                      ${(order.totalCents / 100).toFixed(2)}
-                    </span>
-                    {order.driverName ? (
-                      <span className="font-sans text-xs text-charcoal/60">
-                        Driver: {order.driverName}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
+      <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <Card padding="sm">
+          <StatTile label="New Leads" value={stats.newLeads} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Pending Quotes" value={stats.pendingConciergeQuotes} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Awaiting Payment" value={stats.awaitingPayment} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Active Jobs" value={stats.activeJobs} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Active Drivers" value={stats.activeDrivers} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Collected Today" value={`$${(stats.todaysRevenueCents / 100).toFixed(2)}`} />
+        </Card>
+      </div>
 
-                <div className="flex flex-col gap-3 border-t border-navy/10 pt-4">
-                  {order.status === "paid" ? (
-                    <AssignDriverForm orderId={order.id} driverOptions={driverOptions} />
-                  ) : null}
-                  {canCancel ? (
-                    <OrderExceptionForm
-                      orderId={order.id}
-                      action={cancelOrder}
-                      label="Cancel"
-                    />
-                  ) : null}
-                  {canFail ? (
-                    <OrderExceptionForm orderId={order.id} action={failOrder} label="Flag failed" />
-                  ) : null}
+      <section className="flex flex-col gap-4">
+        <h3 className="font-serif text-lg text-navy-deep">Needs Attention</h3>
+        {!hasAnyAttentionItems ? (
+          <EmptyState message="Nothing needs attention right now." />
+        ) : (
+          <RowList>
+            {needsAttention.unassignedPaidOrders.map((order) => (
+              <Row key={order.id} href="/internal/dispatch/queue">
+                <div>
+                  <p className="font-sans text-sm text-navy-deep">{order.customerName}</p>
+                  <p className="font-sans text-xs text-charcoal/60">Paid, no driver assigned yet</p>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                <StatusBadge status="paid" />
+              </Row>
+            ))}
+            {needsAttention.agedConciergeQuotes.map((order) => (
+              <Row key={order.id} href={`/internal/dispatch/concierge/${order.id}`}>
+                <div>
+                  <p className="font-sans text-sm text-navy-deep">{order.customerName}</p>
+                  <p className="font-sans text-xs text-charcoal/60">Quote stalled over 24 hours</p>
+                </div>
+                <StatusBadge status={order.status} />
+              </Row>
+            ))}
+            {needsAttention.recentFailedOrders.map((order) => (
+              <Row key={order.id} href={order.customerPhone ? `tel:${order.customerPhone}` : undefined}>
+                <div>
+                  <p className="font-sans text-sm text-navy-deep">{order.customerName}</p>
+                  <p className="font-sans text-xs text-charcoal/60">
+                    Flagged failed — needs a follow-up call
+                    {order.customerPhone ? ` (${order.customerPhone})` : ""}
+                  </p>
+                </div>
+                <StatusBadge status="failed" />
+              </Row>
+            ))}
+          </RowList>
+        )}
+      </section>
     </div>
   );
 }

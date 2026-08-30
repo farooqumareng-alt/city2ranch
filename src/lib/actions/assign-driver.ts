@@ -59,6 +59,11 @@ export async function assignDriver(
     metadata: { driverId },
   });
 
+  // Both paths: the queue (where this order actually lives) and the
+  // dashboard (whose stats/Needs-Attention feed this mutation affects) —
+  // without the second call the dashboard would show stale data until
+  // an unrelated navigation forced a refetch.
+  revalidatePath("/internal/dispatch/queue");
   revalidatePath("/internal/dispatch");
   return { ok: true };
 }

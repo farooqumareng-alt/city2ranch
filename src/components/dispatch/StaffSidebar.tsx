@@ -1,7 +1,12 @@
 import { PanelSidebar } from "@/components/layout/PanelSidebar";
 
 const STAFF_LINKS = [
-  { href: "/internal/dispatch", label: "Dispatch Queue" },
+  // exact: true — /internal/dispatch is now the Operations Center home,
+  // and a plain prefix match would otherwise also light this up on
+  // every sibling below it (queue, concierge, settings all share this
+  // same URL prefix). See PanelSidebar.tsx's PanelLink.exact doc.
+  { href: "/internal/dispatch", label: "Dashboard", exact: true },
+  { href: "/internal/dispatch/queue", label: "Dispatch Queue" },
   { href: "/internal/dispatch/concierge", label: "Concierge Quotes" },
   { href: "/internal/dispatch/settings", label: "Settings" },
 ];

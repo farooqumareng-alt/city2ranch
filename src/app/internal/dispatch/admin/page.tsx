@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { RowList, Row } from "@/components/ui/RowList";
 import { requireSuperAdmin } from "@/lib/auth/roles";
 import { listStaff, listDrivers, setStaffActive, setDriverActive } from "@/lib/actions/team-management";
 import { AddStaffForm } from "@/components/forms/AddStaffForm";
@@ -15,9 +17,6 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default async function TeamAdminPage() {
-  // Called directly here, not just relied on via DispatchLayout (which
-  // only calls requireStaff()) — a plain staff member navigating
-  // straight to this URL must 404, not just fail to see the nav link.
   await requireSuperAdmin();
 
   const [staffRows, driverRows] = await Promise.all([listStaff(), listDrivers()]);
@@ -32,56 +31,58 @@ export default async function TeamAdminPage() {
 
       <section className="flex flex-col gap-6">
         <h3 className="font-serif text-lg text-navy-deep">Staff</h3>
-        <div className="flex flex-col divide-y divide-navy/10 border-y border-navy/10">
-          {staffRows.map((member) => (
-            <div key={member.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
-              <div>
-                <p className="font-sans text-sm text-navy-deep">{member.email ?? "(no email on file)"}</p>
-                <p className="font-sans text-xs text-charcoal/60">
-                  {member.label ? `${member.label} · ` : ""}
-                  {ROLE_LABELS[member.role] ?? member.role}
-                  {!member.isActive ? " · Disabled" : ""}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <RoleToggleButton staffId={member.id} currentRole={member.role} />
-                <ActiveToggleButton
-                  action={setStaffActive.bind(null, member.id)}
-                  isActive={member.isActive}
-                />
-              </div>
-            </div>
-          ))}
-          {staffRows.length === 0 ? (
-            <p className="py-4 font-sans text-sm text-charcoal/60">No staff members yet.</p>
-          ) : null}
-        </div>
+        {staffRows.length === 0 ? (
+          <EmptyState message="No staff members yet." />
+        ) : (
+          <RowList>
+            {staffRows.map((member) => (
+              <Row key={member.id}>
+                <div>
+                  <p className="font-sans text-sm text-navy-deep">{member.email ?? "(no email on file)"}</p>
+                  <p className="font-sans text-xs text-charcoal/60">
+                    {member.label ? `${member.label} · ` : ""}
+                    {ROLE_LABELS[member.role] ?? member.role}
+                    {!member.isActive ? " · Disabled" : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <RoleToggleButton staffId={member.id} currentRole={member.role} />
+                  <ActiveToggleButton
+                    action={setStaffActive.bind(null, member.id)}
+                    isActive={member.isActive}
+                  />
+                </div>
+              </Row>
+            ))}
+          </RowList>
+        )}
         <AddStaffForm />
       </section>
 
       <section className="flex flex-col gap-6">
         <h3 className="font-serif text-lg text-navy-deep">Drivers</h3>
-        <div className="flex flex-col divide-y divide-navy/10 border-y border-navy/10">
-          {driverRows.map((driver) => (
-            <div key={driver.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
-              <div>
-                <p className="font-sans text-sm text-navy-deep">{driver.name}</p>
-                <p className="font-sans text-xs text-charcoal/60">
-                  {driver.email ?? "(no email on file)"}
-                  {driver.phone ? ` · ${driver.phone}` : ""}
-                  {!driver.isActive ? " · Disabled" : ""}
-                </p>
-              </div>
-              <ActiveToggleButton
-                action={setDriverActive.bind(null, driver.id)}
-                isActive={driver.isActive}
-              />
-            </div>
-          ))}
-          {driverRows.length === 0 ? (
-            <p className="py-4 font-sans text-sm text-charcoal/60">No drivers yet.</p>
-          ) : null}
-        </div>
+        {driverRows.length === 0 ? (
+          <EmptyState message="No drivers yet." />
+        ) : (
+          <RowList>
+            {driverRows.map((driver) => (
+              <Row key={driver.id}>
+                <div>
+                  <p className="font-sans text-sm text-navy-deep">{driver.name}</p>
+                  <p className="font-sans text-xs text-charcoal/60">
+                    {driver.email ?? "(no email on file)"}
+                    {driver.phone ? ` · ${driver.phone}` : ""}
+                    {!driver.isActive ? " · Disabled" : ""}
+                  </p>
+                </div>
+                <ActiveToggleButton
+                  action={setDriverActive.bind(null, driver.id)}
+                  isActive={driver.isActive}
+                />
+              </Row>
+            ))}
+          </RowList>
+        )}
         <AddDriverForm />
       </section>
     </div>
