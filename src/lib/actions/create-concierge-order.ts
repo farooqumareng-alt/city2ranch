@@ -11,6 +11,12 @@ import { conciergeOrderCreateSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 import { logAuditEvent } from "@/lib/audit";
 
+/** Thrown inside the transaction above purely to trigger a rollback and
+ *  a specific message when a service request was already converted —
+ *  see the comment at that check for why this exists alongside the
+ *  real database-level guard. */
+class ServiceRequestAlreadyConvertedError extends Error {}
+
 // itemsJson deliberately excluded — it's re-serialized client-side from
 // NewConciergeOrderForm's own `items` state, which a failed submission
 // never clears (only the flat fields below need round-tripping here).
@@ -88,6 +94,23 @@ export async function createConciergeOrder(
 
     const db = getDb();
     orderId = await db.transaction(async (tx) => {
+      // A double-submit of this form (e.g. a slow connection triggering
+      // a retry) used to be able to convert one service request into
+      // two independently-payable concierge orders. Checked inside the
+      // transaction, and backed by a real partial unique index on
+      // orders.service_request_id as the actual race-proof guard — this
+      // check is just what turns that constraint violation into a clear
+      // message instead of the generic catch-all below.
+      if (serviceRequestId) {
+        const existing = await tx
+          .select({ status: serviceRequests.status })
+          .from(serviceRequests)
+          .where(eq(serviceRequests.id, serviceRequestId));
+        if (existing[0]?.status === "converted") {
+          throw new ServiceRequestAlreadyConvertedError();
+        }
+      }
+
       const [order] = await tx
         .insert(orders)
         .values({
@@ -138,6 +161,13 @@ export async function createConciergeOrder(
       metadata: { itemCount: items.length, serviceRequestId },
     });
   } catch (error) {
+    if (error instanceof ServiceRequestAlreadyConvertedError) {
+      return {
+        ok: false,
+        message: "This service request has already been converted into an order.",
+        values: valuesFromFormData(formData, FORM_FIELDS),
+      };
+    }
     console.error("[createConciergeOrder] failed", error);
     return {
       ok: false,

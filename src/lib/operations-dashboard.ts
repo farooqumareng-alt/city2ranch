@@ -1,6 +1,7 @@
 import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { drivers, orders, serviceRequests } from "@/lib/db/schema";
+import { requireStaff } from "@/lib/auth/roles";
 
 const ACTIVE_JOB_STATUSES = ["paid", "driver_assigned", "picked_up", "in_transit"] as const;
 // A proxy for "probably not yet handled" — there's no acknowledgedAt/
@@ -25,6 +26,11 @@ const AGED_QUOTE_HOURS = 24;
  * customer-side action on their own order, not a staff to-do).
  */
 export async function getOperationsDashboard() {
+  // This data function, not just the page rendering it, is the real
+  // authorization boundary — the DispatchLayout gate alone was never
+  // meant to be the only thing standing between an authenticated
+  // non-staff user and every customer's order/PII data.
+  await requireStaff();
   const db = getDb();
   const now = new Date();
   // "Today" is a UTC-day boundary, not business-timezone-aware — there's

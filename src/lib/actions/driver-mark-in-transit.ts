@@ -39,10 +39,17 @@ export async function markInTransit(
     };
   }
 
-  await db
+  const updated = await db
     .update(orders)
     .set({ status: "in_transit", updatedAt: new Date() })
-    .where(eq(orders.id, order.id));
+    .where(and(eq(orders.id, order.id), eq(orders.status, order.status)))
+    .returning({ id: orders.id });
+  if (updated.length === 0) {
+    return {
+      ok: false,
+      message: `This order can't be marked on the way from its current status (${order.status}).`,
+    };
+  }
 
   await logAuditEvent({
     orderId: order.id,

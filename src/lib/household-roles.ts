@@ -6,11 +6,33 @@
  * configured, unlike the Next.js build.
  */
 export type HouseholdRole = "full" | "ordering" | "view_only";
-export type HouseholdAction = "pay" | "place_order" | "manage_places";
+export type HouseholdAction =
+  | "pay"
+  | "place_order"
+  | "manage_places"
+  // Added in the security remediation pass (2026-08-30): six actions
+  // (shopping lists, profile, notification preferences, order
+  // messages, claiming an unclaimed order) resolved the household
+  // owner and wrote to their data with no role check at all, so
+  // "view_only" didn't actually mean view-only. Grouped at the same
+  // tier as their closest existing precedent rather than inventing new
+  // tiers — see each action's own call site for the reasoning.
+  | "manage_lists"
+  | "manage_profile"
+  | "manage_notifications"
+  | "message";
 
 const ROLE_ACTIONS: Record<HouseholdRole, ReadonlySet<HouseholdAction>> = {
-  full: new Set(["pay", "place_order", "manage_places"]),
-  ordering: new Set(["place_order", "manage_places"]),
+  full: new Set([
+    "pay",
+    "place_order",
+    "manage_places",
+    "manage_lists",
+    "manage_profile",
+    "manage_notifications",
+    "message",
+  ]),
+  ordering: new Set(["place_order", "manage_places", "manage_lists", "manage_profile", "message"]),
   view_only: new Set(),
 };
 

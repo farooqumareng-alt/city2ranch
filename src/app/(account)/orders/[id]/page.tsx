@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Button } from "@/components/ui/Button";
 import { getDb } from "@/lib/db";
-import { orders, stores, drivers } from "@/lib/db/schema";
+import { orders, stores, drivers, orderDeliveryPins } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import { approveAndPayOrder } from "@/lib/actions/approve-and-pay";
+import { JobActionButton } from "@/components/driver/JobActionButton";
 import { getOrderItems, getOrderFeeLines } from "@/lib/orders/concierge";
 import { formatPlainDate } from "@/lib/format";
 import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
@@ -43,7 +43,6 @@ export default async function OrderDetailPage({
       requestedDeliveryDate: orders.requestedDeliveryDate,
       serviceLabel: orders.serviceLabel,
       totalCents: orders.totalCents,
-      deliveryPin: orders.deliveryPin,
       paidAt: orders.paidAt,
       completedAt: orders.completedAt,
       storeName: stores.name,
@@ -69,11 +68,17 @@ export default async function OrderDetailPage({
   if (!order || order.authUserId !== effectiveOwnerId) notFound();
 
   const isConcierge = order.serviceType === "concierge";
-  const [items, feeLines, messages] = await Promise.all([
+  // The PIN lives in its own table now (see the doc comment on
+  // orderDeliveryPins in schema.ts) — fetched only after the ownership
+  // check above has already passed, same authorization boundary as
+  // every other field on this page.
+  const [items, feeLines, messages, pinRows] = await Promise.all([
     isConcierge ? getOrderItems(order.id) : Promise.resolve([]),
     isConcierge ? getOrderFeeLines(order.id) : Promise.resolve([]),
     getOrderMessages(order.id),
+    db.select({ pin: orderDeliveryPins.pin }).from(orderDeliveryPins).where(eq(orderDeliveryPins.orderId, order.id)),
   ]);
+  const deliveryPin = pinRows[0]?.pin ?? null;
 
   return (
     <div className="flex flex-col gap-10">
@@ -136,11 +141,11 @@ export default async function OrderDetailPage({
               <p className="font-sans text-sm text-charcoal/70">{order.driverName}</p>
             </div>
           ) : null}
-          {order.deliveryPin ? (
+          {deliveryPin ? (
             <div>
               <h3 className="font-serif text-lg text-navy-deep">Delivery PIN</h3>
               <p className="font-serif text-2xl tracking-widest text-gold">
-                {order.deliveryPin}
+                {deliveryPin}
               </p>
               <p className="font-sans text-xs text-charcoal/60">
                 Give this to your driver at delivery to confirm it&apos;s you.
@@ -186,11 +191,13 @@ export default async function OrderDetailPage({
               <p className="font-sans text-xs text-charcoal/60">
                 Final pricing confirmed before service begins.
               </p>
-              <form action={approveAndPayOrder.bind(null, order.id)}>
-                <Button type="submit" variant="gold" className="w-full">
-                  Approve &amp; Pay
-                </Button>
-              </form>
+              <JobActionButton
+                action={approveAndPayOrder.bind(null, order.id)}
+                label="Approve & Pay"
+                pendingLabel="Approving…"
+                variant="gold"
+                size="md"
+              />
             </>
           ) : order.status === "priced" ? (
             <p className="font-sans text-sm text-charcoal/70">

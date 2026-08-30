@@ -1,0 +1,1 @@
+ALTER TABLE "memberships" ADD COLUMN "stripe_event_created_at" timestamp with time zone;

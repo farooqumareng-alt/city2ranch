@@ -4,6 +4,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { getDb } from "@/lib/db";
 import { orders, stores, drivers } from "@/lib/db/schema";
 import { QueueBoard } from "@/components/dispatch/QueueBoard";
+import { requireStaff } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Dispatch Queue" };
 
@@ -13,6 +14,10 @@ export const metadata: Metadata = { title: "Dispatch Queue" };
 const ACTIVE_STATUSES = ["paid", "driver_assigned", "picked_up", "in_transit"] as const;
 
 export default async function DispatchQueuePage() {
+  // Re-checked here, not just relied on via DispatchLayout — this page
+  // queries customer order/PII data directly, with no other gate of
+  // its own before this fix.
+  await requireStaff();
   const db = getDb();
 
   const [activeOrders, activeDrivers] = await Promise.all([

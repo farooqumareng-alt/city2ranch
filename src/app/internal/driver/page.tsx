@@ -41,8 +41,10 @@ export default async function DriverPage() {
   const recentSince = recentSinceDate();
 
   const [assignedOrders, recentOrders] = await Promise.all([
-    // Deliberately does NOT select orders.deliveryPin — the driver must
-    // ask the customer for it in person, never read it off this page.
+    // Deliberately never joins orderDeliveryPins here — the driver must
+    // ask the customer for it in person, never read it off this page
+    // (the table also has no RLS policy at all, so it isn't reachable
+    // from a driver's own PostgREST session either).
     db
       .select({
         id: orders.id,

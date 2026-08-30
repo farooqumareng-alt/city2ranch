@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { notificationPreferences } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 import type { ActionResult } from "@/lib/actions/types";
 
 /** Used by /notifications. A customer who's never visited the page has
@@ -31,8 +31,17 @@ export async function updateNotificationPreferences(
   // A household member (see src/lib/household.ts) sets the owner's
   // shared preferences, not a separate set of their own — the emails
   // this gates (e.g. a payment receipt) go to the order's owner either
-  // way.
-  const ownerId = await getEffectiveOwnerId(user.id);
+  // way. Full-only, unlike manage_lists/manage_profile: this controls
+  // what the *owner* is told about their own billing and orders, closer
+  // in kind to "pay" than to the operational manage_places/manage_lists
+  // tier.
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  if (!canPerform(role, "manage_notifications")) {
+    return {
+      ok: false,
+      message: "You don't have permission to change notification settings on this account.",
+    };
+  }
 
   // A checkbox's absence from FormData means "unchecked", not "field
   // missing" — there's no validation to fail here.

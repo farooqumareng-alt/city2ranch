@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { orderFeeLines, orders } from "@/lib/db/schema";
@@ -13,6 +13,11 @@ import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
 import { logAuditEvent } from "@/lib/audit";
 import { getResend } from "@/lib/email/resend";
 import { quoteReadyEmail } from "@/lib/email/templates";
+
+/** Thrown inside the transaction below purely to trigger a rollback
+ *  when the compare-and-swap status update loses a race — never
+ *  surfaced to the caller directly, caught and translated below. */
+class ConciergeQuoteRaceError extends Error {}
 
 /**
  * Replaces a concierge order's fee lines, recomputes totalCents as their
@@ -71,10 +76,15 @@ export async function finalizeConciergeQuote(
           sortOrder: index,
         }))
       );
-      await tx
+      const updated = await tx
         .update(orders)
         .set({ status: "priced", totalCents, updatedAt: new Date() })
-        .where(eq(orders.id, orderId));
+        .where(and(eq(orders.id, orderId), eq(orders.status, order.status)))
+        .returning({ id: orders.id });
+      // Throwing (not just flagging) rolls back the fee-line replacement
+      // too — a lost race here shouldn't leave new fee lines attached to
+      // an order whose status update didn't actually apply.
+      if (updated.length === 0) throw new ConciergeQuoteRaceError();
     });
 
     await logAuditEvent({
@@ -110,6 +120,12 @@ export async function finalizeConciergeQuote(
       }
     }
   } catch (error) {
+    if (error instanceof ConciergeQuoteRaceError) {
+      return {
+        ok: false,
+        message: `This order can't be quoted from its current status (${order.status}).`,
+      };
+    }
     console.error("[finalizeConciergeQuote] failed", error);
     return {
       ok: false,
@@ -139,10 +155,12 @@ export async function reopenConciergeQuote(orderId: string) {
     return;
   }
 
-  await db
+  const updated = await db
     .update(orders)
     .set({ status: "quote_pending", updatedAt: new Date() })
-    .where(eq(orders.id, orderId));
+    .where(and(eq(orders.id, orderId), eq(orders.status, order.status)))
+    .returning({ id: orders.id });
+  if (updated.length === 0) return;
 
   await logAuditEvent({
     orderId,

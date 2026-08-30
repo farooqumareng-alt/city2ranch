@@ -6,7 +6,7 @@ import { getDb } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { logAuditEvent } from "@/lib/audit";
-import { getEffectiveOwner } from "@/lib/household";
+import { canPerform, getEffectiveOwner } from "@/lib/household";
 
 /**
  * Lets a signed-in customer attach themselves to a concierge order staff
@@ -23,6 +23,11 @@ export async function claimOrder(orderId: string) {
   if (!user?.email) return;
 
   const owner = await getEffectiveOwner(user.id, user.email);
+  // Attaching an unclaimed order to the owner's account is the same
+  // "can this person commit the household to something" gate
+  // submitOrder uses for a one-off order — a view-only household
+  // member shouldn't be able to do this on the owner's behalf either.
+  if (!canPerform(owner.role, "place_order")) return;
 
   const db = getDb();
   const [claimed] = await db

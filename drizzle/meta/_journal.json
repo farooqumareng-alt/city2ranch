@@ -239,6 +239,41 @@
       "when": 1787980581685,
       "tag": "0033_staff_role",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788124073821,
+      "tag": "0034_membership_event_ordering",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1788124084520,
+      "tag": "0035_rls_household_staff_driver_hardening",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788124172912,
+      "tag": "0036_integrity_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1788124358895,
+      "tag": "0037_order_delivery_pins",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1788125543735,
+      "tag": "0038_fix_household_members_check_recursion",
+      "breakpoints": true
     }
   ]
 }
