@@ -204,14 +204,28 @@ export function serviceRequestEmail(fields: {
   });
 }
 
+// A closing sign-off, not a contact channel — this site publishes no
+// phone number and no specific support address anywhere (not even its
+// own footer or /contact page, which is a form, not a listed email),
+// so a signature here stays to a team name rather than inventing
+// contact details nothing actually monitors. The real way back to the
+// business is the "Contact Us" link the shell's footer already has.
+const SIGNATURE = `
+  <div style="margin-top:28px;padding-top:20px;border-top:1px solid ${COLORS.hairline};">
+    <p style="margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:${COLORS.text};">Warm regards,</p>
+    <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:${COLORS.navy};font-weight:bold;">The City2Ranch Concierge Team</p>
+  </div>
+`;
+
 /** Customer-facing transactional emails — same shell as the internal
  *  notifications above, just addressed to the customer instead of the
- *  team. `bodyHtml` is plain paragraphs/ctaButton() output; the shell
- *  supplies the logo, heading, and footer around it. */
+ *  team (and signed accordingly — see SIGNATURE). `bodyHtml` is plain
+ *  paragraphs/ctaButton() output; the shell supplies the logo, heading,
+ *  and footer around it. */
 function customerWrap(title: string, bodyHtml: string) {
   return {
     subject: `${title} — City2Ranch`,
-    html: renderShell(title, bodyHtml),
+    html: renderShell(title, bodyHtml + SIGNATURE),
   };
 }
 
