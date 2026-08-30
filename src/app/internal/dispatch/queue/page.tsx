@@ -22,6 +22,7 @@ export default async function DispatchQueuePage() {
         status: orders.status,
         createdAt: orders.createdAt,
         serviceType: orders.serviceType,
+        authUserId: orders.authUserId,
         customerName: orders.customerName,
         customerPhone: orders.customerPhone,
         retailerOrderNumber: orders.retailerOrderNumber,
