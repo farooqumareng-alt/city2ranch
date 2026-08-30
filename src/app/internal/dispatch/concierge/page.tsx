@@ -81,13 +81,23 @@ export default async function ConciergeQueuePage() {
         ) : (
           <div className="flex flex-col divide-y divide-navy/10 border-y border-navy/10">
             {conciergeOnly.map((order) => (
-              <Link
-                key={order.id}
-                href={`/internal/dispatch/concierge/${order.id}`}
-                className="flex flex-wrap items-center justify-between gap-4 py-4 hover:bg-white/50"
-              >
+              <div key={order.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
                 <div>
-                  <p className="font-serif text-base text-navy-deep">{order.customerName}</p>
+                  {/* Split from a whole-row link to the order (below) so
+                      each destination is explicit — a nested <Link>
+                      inside another isn't valid HTML. authUserId is
+                      already on this row (a bare select() above), no
+                      query change needed. */}
+                  {order.authUserId ? (
+                    <Link
+                      href={`/internal/dispatch/admin/customers/${order.authUserId}`}
+                      className="font-serif text-base text-navy-deep underline decoration-navy/20 hover:text-gold"
+                    >
+                      {order.customerName}
+                    </Link>
+                  ) : (
+                    <p className="font-serif text-base text-navy-deep">{order.customerName}</p>
+                  )}
                   <p className="font-sans text-xs text-charcoal/60">
                     {new Date(order.createdAt).toLocaleDateString()}
                   </p>
@@ -101,8 +111,14 @@ export default async function ConciergeQueuePage() {
                       ${(order.totalCents / 100).toFixed(2)}
                     </span>
                   ) : null}
+                  <Link
+                    href={`/internal/dispatch/concierge/${order.id}`}
+                    className="font-sans text-sm font-medium text-navy-deep underline decoration-navy/20 hover:text-gold"
+                  >
+                    View Quote →
+                  </Link>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

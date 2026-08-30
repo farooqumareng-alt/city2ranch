@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -15,6 +16,7 @@ export type QueueOrder = {
   status: OrderStatus;
   createdAt: Date;
   serviceType: "pickup" | "concierge";
+  authUserId: string | null;
   customerName: string;
   customerPhone: string | null;
   retailerOrderNumber: string | null;
@@ -154,7 +156,17 @@ export function QueueBoard({
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <p className="font-serif text-lg text-navy-deep">
-                          {order.customerName} — {order.storeName ?? "Concierge"}
+                          {order.authUserId ? (
+                            <Link
+                              href={`/internal/dispatch/admin/customers/${order.authUserId}`}
+                              className="underline decoration-navy-deep/20 hover:text-gold"
+                            >
+                              {order.customerName}
+                            </Link>
+                          ) : (
+                            order.customerName
+                          )}{" "}
+                          — {order.storeName ?? "Concierge"}
                         </p>
                         <p className="font-sans text-xs text-charcoal/60">
                           {order.retailerOrderNumber ? `Order #${order.retailerOrderNumber} · ` : ""}
