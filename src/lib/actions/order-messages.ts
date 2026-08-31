@@ -49,5 +49,5 @@ export async function postOrderMessage(orderId: string, formData: FormData): Pro
   });
 
   revalidatePath(`/my-services/${orderId}`);
-  revalidatePath(`/internal/dispatch/concierge/${orderId}`);
+  revalidatePath(`/internal/dispatch/orders/${orderId}`);
 }

@@ -176,5 +176,5 @@ export async function createConciergeOrder(
     };
   }
 
-  redirect(`/internal/dispatch/concierge/${orderId}`);
+  redirect(`/internal/dispatch/orders/${orderId}`);
 }

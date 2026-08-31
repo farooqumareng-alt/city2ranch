@@ -71,11 +71,12 @@ export async function assignDriver(
     metadata: { driverId },
   });
 
-  // Both paths: the queue (where this order actually lives) and the
-  // dashboard (whose stats/Needs-Attention feed this mutation affects) —
-  // without the second call the dashboard would show stale data until
-  // an unrelated navigation forced a refetch.
+  // All three: the queue (where this order actually lives), the
+  // dashboard (whose stats/Needs-Attention feed this mutation affects),
+  // and this order's own Service Record — without these an unrelated
+  // navigation would be needed to see anything refresh.
   revalidatePath("/internal/dispatch/queue");
   revalidatePath("/internal/dispatch");
+  revalidatePath(`/internal/dispatch/orders/${orderId}`);
   return { ok: true };
 }

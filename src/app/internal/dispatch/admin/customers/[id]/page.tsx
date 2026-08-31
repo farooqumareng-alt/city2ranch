@@ -131,16 +131,13 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                   <StatusBadge status={order.status} />
                 </>
               );
-              // Only concierge orders have a staff-facing detail page to
-              // link to today — a plain (City Pickup) order has none,
-              // so it renders the same content without a link rather
-              // than pointing somewhere that 404s.
-              return order.serviceType === "concierge" ? (
-                <Row key={order.id} href={`/internal/dispatch/concierge/${order.id}`}>
+              // Every order now has a staff-facing Service Record
+              // (approved UX blueprint) — City Pickup used to have none
+              // to link to, hence the old serviceType check here.
+              return (
+                <Row key={order.id} href={`/internal/dispatch/orders/${order.id}`}>
                   {inner}
                 </Row>
-              ) : (
-                <Row key={order.id}>{inner}</Row>
               );
             })}
           </RowList>
@@ -173,7 +170,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       </section>
 
       <Link href="/internal/dispatch/queue" className="font-sans text-sm text-gold hover:text-gold-light">
-        ← Back to Dispatch Queue
+        ← Back to Work Queue
       </Link>
     </div>
   );

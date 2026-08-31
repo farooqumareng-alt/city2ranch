@@ -3,11 +3,10 @@ import { PanelSidebar } from "@/components/layout/PanelSidebar";
 const STAFF_LINKS = [
   // exact: true — /internal/dispatch is now the Operations Center home,
   // and a plain prefix match would otherwise also light this up on
-  // every sibling below it (queue, concierge, settings all share this
+  // every sibling below it (queue, stores, settings all share this
   // same URL prefix). See PanelSidebar.tsx's PanelLink.exact doc.
-  { href: "/internal/dispatch", label: "Dashboard", exact: true },
-  { href: "/internal/dispatch/queue", label: "Dispatch Queue" },
-  { href: "/internal/dispatch/concierge", label: "Concierge Quotes" },
+  { href: "/internal/dispatch", label: "Overview", exact: true },
+  { href: "/internal/dispatch/queue", label: "Work Queue" },
   // Operations-data screens (Step 7) — real CRUD for tables that used to
   // be SQL/seed-file-only. Staff-level, not super-admin-only, matching
   // RLS's own "any active staff" gate on all four tables.

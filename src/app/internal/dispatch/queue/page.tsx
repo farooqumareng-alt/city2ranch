@@ -1,66 +1,47 @@
 import type { Metadata } from "next";
-import { asc, eq, inArray } from "drizzle-orm";
-import { SectionHeading } from "@/components/ui/SectionHeading";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { orders, stores, drivers } from "@/lib/db/schema";
-import { QueueBoard } from "@/components/dispatch/QueueBoard";
+import { drivers } from "@/lib/db/schema";
+import { SectionHeading } from "@/components/ui/SectionHeading";
+import { WorkQueueBoard } from "@/components/dispatch/WorkQueueBoard";
+import { getWorkQueue, WORK_QUEUE_TABS, type WorkQueueBucket } from "@/lib/work-queue";
 import { requireStaff } from "@/lib/auth/roles";
 
-export const metadata: Metadata = { title: "Dispatch Queue" };
+export const metadata: Metadata = { title: "Work Queue" };
 
-// Orders that are actionable from dispatch: paid orders need a driver,
-// and once assigned they stay visible here until they leave the driver's
-// hands (completed/cancelled/failed drop off the queue).
-const ACTIVE_STATUSES = ["paid", "driver_assigned", "picked_up", "in_transit"] as const;
-
-export default async function DispatchQueuePage() {
+/**
+ * The unified Work Queue (approved blueprint) — replaces this same URL's
+ * old "Dispatch Queue" content (paid+ only) and absorbs
+ * /internal/dispatch/concierge's quote-stage content, which now
+ * redirects here. Same route, new scope: every service, tabbed by what
+ * staff needs to do next rather than split across two pages.
+ */
+export default async function WorkQueuePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   // Re-checked here, not just relied on via DispatchLayout — this page
-  // queries customer order/PII data directly, with no other gate of
-  // its own before this fix.
+  // queries every customer's order/PII data directly.
   await requireStaff();
+  const { tab } = await searchParams;
+  const initialTab = WORK_QUEUE_TABS.some((t) => t.key === tab) ? (tab as WorkQueueBucket) : undefined;
+
   const db = getDb();
-
-  const [activeOrders, activeDrivers] = await Promise.all([
-    db
-      .select({
-        id: orders.id,
-        status: orders.status,
-        createdAt: orders.createdAt,
-        serviceType: orders.serviceType,
-        authUserId: orders.authUserId,
-        customerName: orders.customerName,
-        customerPhone: orders.customerPhone,
-        retailerOrderNumber: orders.retailerOrderNumber,
-        deliveryCity: orders.deliveryCity,
-        deliveryState: orders.deliveryState,
-        deliveryZip: orders.deliveryZip,
-        requestedDeliveryDate: orders.requestedDeliveryDate,
-        totalCents: orders.totalCents,
-        storeName: stores.name,
-        driverName: drivers.name,
-      })
-      .from(orders)
-      // leftJoin: a concierge order may have no store at all.
-      .leftJoin(stores, eq(orders.storeId, stores.id))
-      .leftJoin(drivers, eq(orders.driverId, drivers.id))
-      .where(inArray(orders.status, ACTIVE_STATUSES))
-      .orderBy(asc(orders.createdAt)),
-    db
-      .select({ id: drivers.id, name: drivers.name })
-      .from(drivers)
-      .where(eq(drivers.isActive, true)),
+  const [items, activeDrivers] = await Promise.all([
+    getWorkQueue(),
+    db.select({ id: drivers.id, name: drivers.name }).from(drivers).where(eq(drivers.isActive, true)),
   ]);
-
   const driverOptions = activeDrivers.map((d) => ({ value: d.id, label: d.name }));
 
   return (
     <div className="flex flex-col gap-10">
       <SectionHeading
         eyebrow="STAFF"
-        title="Dispatch Queue"
-        description="Orders awaiting a driver, or already in the driver's hands."
+        title="Work Queue"
+        description="Every request and order, one place — tabbed by what needs to happen next."
       />
-      <QueueBoard orders={activeOrders} driverOptions={driverOptions} />
+      <WorkQueueBoard items={items} driverOptions={driverOptions} initialTab={initialTab} />
     </div>
   );
 }

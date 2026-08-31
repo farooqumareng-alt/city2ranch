@@ -74,7 +74,7 @@ export default async function DispatchDashboardPage() {
               </Row>
             ))}
             {needsAttention.agedConciergeQuotes.map((order) => (
-              <Row key={order.id} href={`/internal/dispatch/concierge/${order.id}`}>
+              <Row key={order.id} href={`/internal/dispatch/orders/${order.id}`}>
                 <div>
                   <p className="font-sans text-sm text-navy-deep">{order.customerName}</p>
                   <p className="font-sans text-xs text-charcoal/60">Quote stalled over 24 hours</p>
