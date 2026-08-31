@@ -8,6 +8,13 @@ const STAFF_LINKS = [
   { href: "/internal/dispatch", label: "Dashboard", exact: true },
   { href: "/internal/dispatch/queue", label: "Dispatch Queue" },
   { href: "/internal/dispatch/concierge", label: "Concierge Quotes" },
+  // Operations-data screens (Step 7) — real CRUD for tables that used to
+  // be SQL/seed-file-only. Staff-level, not super-admin-only, matching
+  // RLS's own "any active staff" gate on all four tables.
+  { href: "/internal/dispatch/stores", label: "Stores" },
+  { href: "/internal/dispatch/pricing", label: "Pricing" },
+  { href: "/internal/dispatch/zip-coverage", label: "ZIP Coverage" },
+  { href: "/internal/dispatch/grocery-items", label: "Grocery Items" },
   { href: "/internal/dispatch/settings", label: "Settings" },
 ];
 
