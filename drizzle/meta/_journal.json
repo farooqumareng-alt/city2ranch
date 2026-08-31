@@ -281,6 +281,13 @@
       "when": 1788139392605,
       "tag": "0039_pricing_rules_one_active_index",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1788148799126,
+      "tag": "0040_restore_delivery_pin_compat_column",
+      "breakpoints": true
     }
   ]
 }
