@@ -274,6 +274,13 @@
       "when": 1788125543735,
       "tag": "0038_fix_household_members_check_recursion",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1788139392605,
+      "tag": "0039_pricing_rules_one_active_index",
+      "breakpoints": true
     }
   ]
 }

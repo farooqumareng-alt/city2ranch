@@ -319,3 +319,91 @@ export const addDriverSchema = z.object({
   name: requiredText("Name"),
   phone,
 });
+
+// Admin operations-data screens (src/app/internal/dispatch/{stores,
+// pricing,zip-coverage,grocery-items}) — real CRUD for tables that were
+// previously SQL/seed-file-only. `market` is deliberately absent from
+// every one of these: every row's market is hardcoded "default" at
+// insert (see the doc comments on stores.market/pricingRules.market/
+// zipMileage.market in schema.ts) until a second market actually exists.
+
+export const storeSchema = z.object({
+  name: requiredText("Store name"),
+  addressLine1: requiredText("Address"),
+  city: requiredText("City"),
+  state: requiredText("State", 2),
+  zip,
+  phone: optionalText,
+});
+export type StoreInput = z.infer<typeof storeSchema>;
+
+// Dollar-string input ("15.00"), same transform-to-cents pattern as
+// feeLineSchema above — staff type real dollar amounts, never raw cents.
+function dollarsToCents(label: string) {
+  return requiredText(label).transform((value, ctx) => {
+    const cents = Math.round(Number(value) * 100);
+    if (!Number.isFinite(cents) || cents < 0) {
+      ctx.addIssue({ code: "custom", message: `Enter a valid ${label.toLowerCase()}.` });
+      return z.NEVER;
+    }
+    return cents;
+  });
+}
+
+export const pricingRuleSchema = z.object({
+  serviceLabel: optionalText,
+  baseFeeCents: dollarsToCents("Base fee"),
+  perMileCents: dollarsToCents("Per-mile fee"),
+  // Optional: an empty minFee field means "no minimum," not zero.
+  minFeeCents: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value, ctx) => {
+      if (!value) return undefined;
+      const cents = Math.round(Number(value) * 100);
+      if (!Number.isFinite(cents) || cents < 0) {
+        ctx.addIssue({ code: "custom", message: "Enter a valid minimum fee, or leave it blank." });
+        return z.NEVER;
+      }
+      return cents;
+    }),
+  note: optionalText,
+});
+export type PricingRuleInput = z.infer<typeof pricingRuleSchema>;
+
+export const zipMileageCreateSchema = z.object({
+  zip,
+  roundTripMiles: requiredText("Round-trip miles").transform((value, ctx) => {
+    const miles = Number(value);
+    if (!Number.isFinite(miles) || miles < 0) {
+      ctx.addIssue({ code: "custom", message: "Enter a valid number of miles." });
+      return z.NEVER;
+    }
+    // Stored as a Postgres `numeric` column, which drizzle-orm/postgres-js
+    // always returns (and expects on write) as a string, never a number
+    // — same convention as submitOrder's `roundTripMiles: String(...)`.
+    return String(miles);
+  }),
+  label: optionalText,
+});
+export type ZipMileageCreateInput = z.infer<typeof zipMileageCreateSchema>;
+
+// Editing an existing ZIP row never touches the zip value itself — see
+// the doc comment on zip immutability in zip-mileage-management.ts.
+export const zipMileageUpdateSchema = zipMileageCreateSchema.omit({ zip: true });
+export type ZipMileageUpdateInput = z.infer<typeof zipMileageUpdateSchema>;
+
+export const groceryItemCreateSchema = z.object({
+  name: requiredText("Item name"),
+  category: requiredText("Category"),
+});
+export type GroceryItemCreateInput = z.infer<typeof groceryItemCreateSchema>;
+
+// Editing only ever renames an item — see the doc comment on
+// grocery-item-management.ts for why category/sortOrder aren't editable
+// here.
+export const groceryItemUpdateSchema = z.object({
+  name: requiredText("Item name"),
+});
+export type GroceryItemUpdateInput = z.infer<typeof groceryItemUpdateSchema>;
