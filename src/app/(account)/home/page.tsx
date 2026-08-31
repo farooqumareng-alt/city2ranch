@@ -56,10 +56,10 @@ export default async function AccountHomePage() {
           </Link>
         )}
         <Link
-          href="/deliveries"
+          href="/my-services"
           className="rounded-sm border border-navy/10 bg-white/60 p-4 text-center font-sans text-sm font-medium text-navy-deep transition-colors hover:border-gold"
         >
-          View Deliveries
+          My Services
         </Link>
         <Link
           href="/support"
@@ -81,7 +81,7 @@ export default async function AccountHomePage() {
               </p>
               <p className="font-sans text-sm text-charcoal/70">{ORDER_STATUS_LABELS[dashboard.nextUp.status]}</p>
             </div>
-            <Button href={`/orders/${dashboard.nextUp.id}`} variant="navy" size="md">
+            <Button href={`/my-services/${dashboard.nextUp.id}`} variant="navy" size="md">
               View Details
             </Button>
           </div>
@@ -123,7 +123,7 @@ export default async function AccountHomePage() {
             <ul className="flex flex-col gap-2">
               {dashboard.recentOrders.map((order) => (
                 <li key={order.id} className="flex items-center justify-between gap-3 font-sans text-sm">
-                  <Link href={`/orders/${order.id}`} className="text-charcoal/80 hover:text-gold">
+                  <Link href={`/my-services/${order.id}`} className="text-charcoal/80 hover:text-gold">
                     {order.serviceType === "concierge" ? "Concierge Order" : (order.storeName ?? "Order")}
                     {order.createdAt ? ` — ${formatPlainDate(order.createdAt.toISOString().slice(0, 10))}` : ""}
                   </Link>

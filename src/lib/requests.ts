@@ -14,6 +14,19 @@ import { orders, serviceRequests } from "@/lib/db/schema";
  * boundary (this table has no per-customer secrets), just a "here's what
  * you told us" view.
  */
+// Customer-facing wording for service_requests.status — distinct from
+// the internal "new/contacted/converted/closed" pipeline language staff
+// sees, and from ORDER_STATUS_LABELS (a request isn't an order yet).
+// Lives here, not in a page component, so both /my-services and any
+// future staff-facing reuse read the same wording — moved out of the
+// old /requests page when My Services absorbed it.
+export const REQUEST_STATUS_LABELS: Record<string, string> = {
+  new: "Received — awaiting review",
+  contacted: "Your concierge is in touch",
+  converted: "Quote in progress",
+  closed: "Closed",
+};
+
 export async function getOwnServiceRequests(email: string) {
   const db = getDb();
   return db

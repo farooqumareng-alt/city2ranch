@@ -162,5 +162,5 @@ export async function submitOrder(
     };
   }
 
-  redirect(`/orders/${orderId}`);
+  redirect(`/my-services/${orderId}`);
 }

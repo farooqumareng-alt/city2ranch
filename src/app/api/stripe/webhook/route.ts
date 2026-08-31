@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
             storeName,
             totalCents: order.totalCents,
             deliveryPin,
-            orderUrl: `${siteUrl}/orders/${order.id}`,
+            orderUrl: `${siteUrl}/my-services/${order.id}`,
           });
           await resend.emails.send({
             from: process.env.EMAIL_FROM ?? "notifications@city2ranch.com",

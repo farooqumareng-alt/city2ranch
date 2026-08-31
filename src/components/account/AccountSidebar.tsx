@@ -1,18 +1,15 @@
 import { PanelSidebar } from "@/components/layout/PanelSidebar";
 
-// Ordered by how often a customer actually needs it, not alphabetically
-// — Home first (the real landing point, not a specific function), then
-// Requests -> Deliveries -> Orders following the real lifecycle
-// (Customer -> Request -> Delivery -> Payment), then the supporting
-// account areas. No separate "Services" entry: Home's own "Request
-// Service" action already covers that, and a second link to the public
-// marketing page just left the account panel entirely — a duplicate
-// path to the same place, not a distinct destination.
+// Approved UX blueprint (Navigation map, Decision 2): My Requests, My
+// Deliveries, and My Orders were three pages built from the same
+// underlying orders/service_requests data — collapsed into one "My
+// Services" destination rather than three, matching how a customer
+// actually thinks about it ("where is everything I've asked for").
+// Places/Lists stay separate items rather than merging further — they're
+// reference data a customer sets up once, not a lifecycle stage.
 const ACCOUNT_LINKS = [
   { href: "/home", label: "Home" },
-  { href: "/requests", label: "My Requests" },
-  { href: "/deliveries", label: "My Deliveries" },
-  { href: "/orders", label: "My Orders" },
+  { href: "/my-services", label: "My Services" },
   { href: "/lists", label: "My Lists" },
   { href: "/places", label: "My Places" },
   { href: "/recurring-services", label: "Recurring Services" },

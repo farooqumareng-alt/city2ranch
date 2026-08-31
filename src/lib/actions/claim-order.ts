@@ -51,5 +51,5 @@ export async function claimOrder(orderId: string) {
     });
   }
 
-  revalidatePath("/orders");
+  revalidatePath("/my-services");
 }

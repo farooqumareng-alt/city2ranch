@@ -61,7 +61,7 @@ export default async function PaymentsPage() {
                   ${(row.totalCents / 100).toFixed(2)}
                 </span>
                 <Link
-                  href={`/orders/${row.id}`}
+                  href={`/my-services/${row.id}`}
                   className="font-sans text-sm text-navy-deep underline decoration-gold/50 underline-offset-4 hover:text-gold"
                 >
                   View Receipt
