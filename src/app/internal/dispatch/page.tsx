@@ -4,19 +4,11 @@ import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
+import { StatTile } from "@/components/ui/StatTile";
 import { getOperationsDashboard } from "@/lib/operations-dashboard";
 import { requireStaff } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Operations Center" };
-
-function StatTile({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <p className="font-sans text-[11px] uppercase tracking-[0.1em] text-charcoal/50">{label}</p>
-      <p className="font-serif text-2xl text-navy-deep">{value}</p>
-    </div>
-  );
-}
 
 export default async function DispatchDashboardPage() {
   // Re-checked here, not just relied on via DispatchLayout (requireStaff()

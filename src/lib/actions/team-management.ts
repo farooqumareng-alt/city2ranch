@@ -8,7 +8,10 @@ import { requireSuperAdmin } from "@/lib/auth/roles";
 import { addDriverSchema, addStaffSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
-const ADMIN_PATH = "/internal/dispatch/admin";
+// Moved to /admin/team when Business Overview took over the plain
+// /admin URL (approved UX blueprint, Phase 5) — the page every one of
+// these actions actually affects.
+const ADMIN_PATH = "/internal/dispatch/admin/team";
 const NO_ACCOUNT_MESSAGE =
   "No account exists for that email yet — they need to sign in to City2Ranch at least once, then try adding them again.";
 
