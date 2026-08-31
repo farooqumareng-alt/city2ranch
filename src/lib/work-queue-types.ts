@@ -13,6 +13,7 @@ export type WorkQueueBucket =
   | "awaiting_customer"
   | "needs_payment"
   | "ready_to_dispatch"
+  | "awaiting_driver_response"
   | "in_progress"
   | "exceptions"
   | "completed";
@@ -46,6 +47,7 @@ export const WORK_QUEUE_TABS: { key: WorkQueueBucket; label: string }[] = [
   { key: "awaiting_customer", label: "Awaiting Customer" },
   { key: "needs_payment", label: "Needs Payment" },
   { key: "ready_to_dispatch", label: "Ready to Dispatch" },
+  { key: "awaiting_driver_response", label: "Awaiting Driver Response" },
   { key: "in_progress", label: "In Progress" },
   { key: "exceptions", label: "Exceptions" },
   { key: "completed", label: "Completed" },

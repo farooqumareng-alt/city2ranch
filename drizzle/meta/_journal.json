@@ -295,6 +295,13 @@
       "when": 1788193760989,
       "tag": "0041_drop_delivery_pin_compat_column",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1788193991368,
+      "tag": "0042_pending_acceptance_status",
+      "breakpoints": true
     }
   ]
 }

@@ -32,6 +32,7 @@ export type MyServiceItem = {
 const ACTIVE_ORDER_STATUSES: readonly OrderStatus[] = [
   "payment_pending",
   "paid",
+  "pending_acceptance",
   "driver_assigned",
   "picked_up",
   "in_transit",

@@ -30,6 +30,13 @@ function bucketForStatus(status: OrderStatus): WorkQueueBucket {
       return "needs_payment";
     case "paid":
       return "ready_to_dispatch";
+    // Offered to a driver but not yet accepted (see pending_acceptance
+    // in src/lib/orders/status.ts) — its own bucket, not folded into
+    // Ready to Dispatch, since the staff action differs: nothing to do
+    // but wait (or reassign after a decline, which reverts the order to
+    // "paid" and reappears in Ready to Dispatch on its own).
+    case "pending_acceptance":
+      return "awaiting_driver_response";
     case "driver_assigned":
     case "picked_up":
     case "in_transit":

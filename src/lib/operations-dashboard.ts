@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { drivers, orders, serviceRequests } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
 
-const ACTIVE_JOB_STATUSES = ["paid", "driver_assigned", "picked_up", "in_transit"] as const;
+const ACTIVE_JOB_STATUSES = ["paid", "pending_acceptance", "driver_assigned", "picked_up", "in_transit"] as const;
 // A proxy for "probably not yet handled" — there's no acknowledgedAt/
 // resolution column on `orders` to actually tell a fresh failure from
 // one staff already resolved by phone weeks ago. Disclosed limitation,

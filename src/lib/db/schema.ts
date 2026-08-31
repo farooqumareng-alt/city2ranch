@@ -570,6 +570,13 @@ export const orderStatusEnum = pgEnum("order_status", [
   "priced",
   "payment_pending",
   "paid",
+  // A driver has been offered the job but hasn't accepted yet — sits
+  // between "paid" (needs a driver) and "driver_assigned" (accepted,
+  // actively working it). Added 2026-08-31 for the driver-facing
+  // Accept/Decline flow; declining reverts an order to "paid" rather
+  // than introducing a separate "declined" state, so it falls straight
+  // back into the same unassigned-orders pool staff already work from.
+  "pending_acceptance",
   "driver_assigned",
   "picked_up",
   "in_transit",

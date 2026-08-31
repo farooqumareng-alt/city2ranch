@@ -3,15 +3,18 @@ import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 
 type Tone = "success" | "warning" | "critical" | "neutral";
 
-// Only priced/paid are "warning" — deliberately: those are the exact two
-// stall points src/lib/operations-dashboard.ts's Needs Attention feed
-// surfaces (awaiting payment, awaiting driver), so the badge and the
-// feed reinforce the same signal rather than each inventing their own.
+// priced/paid/pending_acceptance are "warning" — deliberately: these
+// are exactly the stall points that need a response from someone
+// (awaiting payment, awaiting a driver, awaiting that driver's
+// accept/decline), so the badge reinforces the same signal
+// src/lib/operations-dashboard.ts's Needs Attention feed surfaces
+// rather than inventing its own.
 const STATUS_TONE: Record<OrderStatus, Tone> = {
   quote_pending: "neutral",
   priced: "warning",
   payment_pending: "neutral",
   paid: "warning",
+  pending_acceptance: "warning",
   driver_assigned: "neutral",
   picked_up: "neutral",
   in_transit: "neutral",

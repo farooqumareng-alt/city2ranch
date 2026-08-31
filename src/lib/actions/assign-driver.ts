@@ -31,7 +31,7 @@ export async function assignDriver(
   if (!order) return { ok: false, message: "Order not found." };
 
   try {
-    assertTransition(order.status, "driver_assigned");
+    assertTransition(order.status, "pending_acceptance");
   } catch {
     return {
       ok: false,
@@ -44,11 +44,15 @@ export async function assignDriver(
   // moment could both pass the assertTransition check above (both read
   // the pre-assignment status) and both write — the second silently
   // overwriting the first's driverId with no indication anything raced.
+  //
+  // Lands on pending_acceptance, not driver_assigned — the driver still
+  // has to accept (see driver-accept-decline.ts) before they're
+  // genuinely committed to the job.
   const updated = await db
     .update(orders)
     .set({
       driverId,
-      status: "driver_assigned",
+      status: "pending_acceptance",
       assignedAt: new Date(),
       updatedAt: new Date(),
     })
@@ -67,7 +71,7 @@ export async function assignDriver(
     actorId: user?.id ?? null,
     action: "driver_assigned",
     previousState: order.status,
-    newState: "driver_assigned",
+    newState: "pending_acceptance",
     metadata: { driverId },
   });
 

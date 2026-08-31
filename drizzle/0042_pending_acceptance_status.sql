@@ -1,0 +1,1 @@
+ALTER TYPE "public"."order_status" ADD VALUE 'pending_acceptance' BEFORE 'driver_assigned';

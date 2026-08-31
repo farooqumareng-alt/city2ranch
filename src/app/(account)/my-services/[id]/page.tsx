@@ -145,7 +145,14 @@ export default async function ServiceDetailPage({
               </p>
             ) : null}
           </div>
-          {order.driverName ? (
+          {/* Not shown at pending_acceptance — a driver has been
+              offered the job but hasn't confirmed it yet (see
+              src/lib/orders/status.ts), and could still decline and be
+              reassigned. Naming them here first would be information
+              that might change; the blueprint's own "customer sees no
+              regression" principle argues for waiting until they're
+              genuinely committed. */}
+          {order.driverName && order.status !== "pending_acceptance" ? (
             <div>
               <h3 className="font-serif text-lg text-navy-deep">Your Driver</h3>
               <p className="font-sans text-sm text-charcoal/70">{order.driverName}</p>

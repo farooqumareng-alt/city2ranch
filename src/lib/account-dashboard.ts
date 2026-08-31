@@ -2,7 +2,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { customerPlaces, householdMembers, orders, shoppingLists, stores } from "@/lib/db/schema";
 
-const ACTIVE_DELIVERY_STATUSES = ["paid", "driver_assigned", "picked_up", "in_transit"] as const;
+const ACTIVE_DELIVERY_STATUSES = ["paid", "pending_acceptance", "driver_assigned", "picked_up", "in_transit"] as const;
 const NEEDS_ATTENTION_STATUSES = ["quote_pending", "priced"] as const;
 
 /**
