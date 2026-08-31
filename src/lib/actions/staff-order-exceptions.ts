@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
@@ -31,6 +31,12 @@ async function transitionWithReason(
   const order = rows[0];
   if (!order) return { ok: false, message: "Order not found." };
 
+  // Idempotent no-op — without this, cancel/fail on an order already in
+  // that exact terminal state falls through assertTransition's
+  // from===to short-circuit and silently overwrites the original
+  // reason/timestamp with whatever was just resubmitted.
+  if (order.status === target) return { ok: true };
+
   try {
     assertTransition(order.status, target);
   } catch {
@@ -40,7 +46,7 @@ async function transitionWithReason(
     };
   }
 
-  await db
+  const updated = await db
     .update(orders)
     .set({
       status: target,
@@ -48,7 +54,14 @@ async function transitionWithReason(
       ...(timestampColumn ? { [timestampColumn]: new Date() } : {}),
       updatedAt: new Date(),
     })
-    .where(eq(orders.id, orderId));
+    .where(and(eq(orders.id, orderId), eq(orders.status, order.status)))
+    .returning({ id: orders.id });
+  if (updated.length === 0) {
+    return {
+      ok: false,
+      message: `This order can't be ${target} from its current status (${order.status}).`,
+    };
+  }
 
   await logAuditEvent({
     orderId,

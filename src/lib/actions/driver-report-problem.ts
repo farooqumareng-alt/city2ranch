@@ -39,6 +39,13 @@ export async function reportProblem(
   const order = rows[0];
   if (!order) return { ok: false, message: "Order not found." };
 
+  // Idempotent no-op — matches markPickedUp/markInTransit/confirmDelivery's
+  // own early-returns. Without this, a repeat submission (already
+  // failed, different reason text) would fall through assertTransition's
+  // from===to short-circuit and silently overwrite the original
+  // failureReason, destroying evidence relevant to a payment dispute.
+  if (order.status === "failed") return { ok: true };
+
   try {
     assertTransition(order.status, "failed");
   } catch {
@@ -48,10 +55,17 @@ export async function reportProblem(
     };
   }
 
-  await db
+  const updated = await db
     .update(orders)
     .set({ status: "failed", failureReason: reason, updatedAt: new Date() })
-    .where(eq(orders.id, order.id));
+    .where(and(eq(orders.id, order.id), eq(orders.status, order.status)))
+    .returning({ id: orders.id });
+  if (updated.length === 0) {
+    return {
+      ok: false,
+      message: `This order can't be flagged from its current status (${order.status}).`,
+    };
+  }
 
   await logAuditEvent({
     orderId: order.id,

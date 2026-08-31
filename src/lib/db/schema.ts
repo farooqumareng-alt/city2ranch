@@ -325,13 +325,21 @@ export const memberships = pgTable(
     stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
     stripePriceId: text("stripe_price_id").notNull(),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    // Stripe's own `event.created` for whichever customer.subscription.*
+    // event most recently wrote this row — Stripe doesn't guarantee
+    // delivery order and retries for up to 3 days, so without this a
+    // stale/out-of-order redelivery can silently overwrite a newer
+    // status (e.g. resurrecting a canceled membership). Null only for
+    // rows written before this column existed; the upsert treats null
+    // as "older than anything."
+    stripeEventCreatedAt: timestamp("stripe_event_created_at", { withTimezone: true }),
   },
   (table) => [unique().on(table.authUserId)]
 );
 
 /**
  * A single settings row, seeded by its own migration (see
- * drizzle/0030_membership_settings.sql) so the app never has to handle
+ * drizzle/0029_membership.sql) so the app never has to handle
  * "no row exists yet." Per the business's 2026-08-28 launch strategy:
  * membership billing must ship OFF by default and only go live once
  * staff flips it on from /internal/dispatch/settings — there is no
@@ -802,7 +810,6 @@ export const orders = pgTable("orders", {
   driverId: uuid("driver_id").references(() => drivers.id),
   assignedAt: timestamp("assigned_at", { withTimezone: true }),
 
-  deliveryPin: text("delivery_pin"),
   pinVerifiedAt: timestamp("pin_verified_at", { withTimezone: true }),
   deliveredAt: timestamp("delivered_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
@@ -810,6 +817,30 @@ export const orders = pgTable("orders", {
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   cancellationReason: text("cancellation_reason"),
   failureReason: text("failure_reason"),
+});
+
+/**
+ * The delivery PIN, split out of `orders` into its own table on
+ * purpose (security remediation, 2026-08-30): it used to live as
+ * `orders.delivery_pin`, but Postgres column-level REVOKE cannot
+ * override a broader table-level GRANT (Supabase grants `authenticated`
+ * blanket SELECT on every table by default — RLS is meant to be the
+ * real gate), so there was no way to keep it out of what an assigned
+ * driver could read directly via PostgREST while every other order
+ * column stayed readable. A sibling table with RLS enabled and
+ * *zero* policies for `authenticated` is a real default-deny — nobody
+ * going through the Data API can read or write this table at all; only
+ * the app's own privileged DATABASE_URL connection (which bypasses RLS
+ * entirely) ever touches it, exactly like every other write in this
+ * codebase already does. One row per order, created once at payment
+ * time by the Stripe webhook.
+ */
+export const orderDeliveryPins = pgTable("order_delivery_pins", {
+  orderId: uuid("order_id")
+    .primaryKey()
+    .references(() => orders.id),
+  pin: text("pin").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /**

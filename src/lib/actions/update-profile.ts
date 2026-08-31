@@ -6,7 +6,7 @@ import { customerProfiles } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { profileUpdateSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 
 export async function updateProfile(
   _prev: ActionResult | undefined,
@@ -18,7 +18,10 @@ export async function updateProfile(
   }
   // A household member (see src/lib/household.ts) edits the owner's
   // shared profile, not a separate one of their own.
-  const ownerId = await getEffectiveOwnerId(user.id);
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  if (!canPerform(role, "manage_profile")) {
+    return { ok: false, message: "You don't have permission to edit the profile on this account." };
+  }
 
   const parsed = profileUpdateSchema.safeParse({
     name: formData.get("name"),

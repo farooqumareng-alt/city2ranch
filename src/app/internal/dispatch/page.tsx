@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
 import { getOperationsDashboard } from "@/lib/operations-dashboard";
+import { requireStaff } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Operations Center" };
 
@@ -18,6 +19,10 @@ function StatTile({ label, value }: { label: string; value: string | number }) {
 }
 
 export default async function DispatchDashboardPage() {
+  // Re-checked here, not just relied on via DispatchLayout (requireStaff()
+  // only) or getOperationsDashboard()'s own gate — every page in this app
+  // re-verifies its own authorization independently of its layout.
+  await requireStaff();
   const { stats, needsAttention } = await getOperationsDashboard();
   const hasAnyAttentionItems =
     needsAttention.unassignedPaidOrders.length > 0 ||

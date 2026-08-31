@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
-import { orders } from "@/lib/db/schema";
+import { orders, orderDeliveryPins } from "@/lib/db/schema";
 import { requireDriver } from "@/lib/auth/roles";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
@@ -48,10 +48,22 @@ export async function confirmDelivery(
     };
   }
 
+  // The PIN lives in its own table now (see the doc comment on
+  // orderDeliveryPins in schema.ts) — this select runs over the
+  // privileged DATABASE_URL connection, same as every other query in
+  // this file, so it's unaffected by that table's default-deny RLS
+  // (which exists specifically to keep this value out of what a
+  // driver's own PostgREST session could ever read).
+  const pinRows = await db
+    .select({ pin: orderDeliveryPins.pin })
+    .from(orderDeliveryPins)
+    .where(eq(orderDeliveryPins.orderId, order.id));
+  const storedPin = pinRows[0]?.pin;
+
   // Wrong PIN: no state change, no audit event — just ask the customer
   // to confirm and try again. Not logged as a failed attempt to avoid
   // building an unintentional PIN-guessing oracle in the audit trail.
-  if (enteredPin !== order.deliveryPin) {
+  if (!storedPin || enteredPin !== storedPin) {
     return {
       ok: false,
       message: "That PIN doesn't match. Confirm it with the customer and try again.",
@@ -59,7 +71,7 @@ export async function confirmDelivery(
   }
 
   const now = new Date();
-  await db
+  const updated = await db
     .update(orders)
     .set({
       status: "completed",
@@ -68,7 +80,14 @@ export async function confirmDelivery(
       completedAt: now,
       updatedAt: now,
     })
-    .where(eq(orders.id, order.id));
+    .where(and(eq(orders.id, order.id), eq(orders.status, order.status)))
+    .returning({ id: orders.id });
+  if (updated.length === 0) {
+    return {
+      ok: false,
+      message: `This order can't be completed from its current status (${order.status}).`,
+    };
+  }
 
   await logAuditEvent({
     orderId: order.id,

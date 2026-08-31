@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { shoppingListItems, shoppingLists } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 import { shoppingListSaveSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
 
@@ -23,7 +23,10 @@ export async function createShoppingList(
 ): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Please sign in to save a list." };
-  const ownerId = await getEffectiveOwnerId(user.id);
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  if (!canPerform(role, "manage_lists")) {
+    return { ok: false, message: "You don't have permission to manage lists on this account." };
+  }
 
   const parsed = parseList(formData);
   if (!parsed.success) {
@@ -69,7 +72,10 @@ export async function updateShoppingList(
 ): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Please sign in to update this list." };
-  const ownerId = await getEffectiveOwnerId(user.id);
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  if (!canPerform(role, "manage_lists")) {
+    return { ok: false, message: "You don't have permission to manage lists on this account." };
+  }
 
   const parsed = parseList(formData);
   if (!parsed.success) {
@@ -119,7 +125,8 @@ export async function updateShoppingList(
 export async function deleteShoppingList(listId: string): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
-  const ownerId = await getEffectiveOwnerId(user.id);
+  const { ownerId, role } = await getEffectiveOwnerWithRole(user.id);
+  if (!canPerform(role, "manage_lists")) return;
 
   const db = getDb();
   await db.delete(shoppingLists).where(and(eq(shoppingLists.id, listId), eq(shoppingLists.authUserId, ownerId)));

@@ -12,6 +12,25 @@
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
+/**
+ * Every email in this file is a hand-assembled HTML string (a
+ * deliberate choice — see the file's own doc comment on why Outlook
+ * needs tables + inline styles, not React's JSX escaping). That means
+ * nothing here gets React's automatic escaping either, and several of
+ * these templates interpolate genuinely free-text values straight from
+ * public, unauthenticated forms (Contact, Service Request, Waitlist,
+ * Founding Member). Escape every interpolated value with no exceptions
+ * — simpler and safer than trying to classify which fields are "safe."
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // Email clients load images from a real URL, not the local /public
 // folder. public/logo-email.png is a flattened PNG rasterized from
 // public/logo.svg — email-client SVG support is inconsistent-to-
@@ -41,13 +60,14 @@ const COLORS = {
  * that varies per email.
  */
 function renderShell(title: string, bodyHtml: string): string {
+  const safeTitle = escapeHtml(title);
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
-    <title>${title}</title>
+    <title>${safeTitle}</title>
   </head>
   <body style="margin:0;padding:0;background-color:${COLORS.ivory};">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${COLORS.ivory};">
@@ -61,7 +81,7 @@ function renderShell(title: string, bodyHtml: string): string {
             </tr>
             <tr>
               <td style="padding:36px 40px;font-family:Georgia,'Times New Roman',serif;color:${COLORS.text};">
-                <h1 style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.3;color:${COLORS.navy};font-weight:normal;">${title}</h1>
+                <h1 style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.3;color:${COLORS.navy};font-weight:normal;">${safeTitle}</h1>
                 <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.65;color:${COLORS.body};">
                   ${bodyHtml}
                 </div>
@@ -105,8 +125,8 @@ function renderFields(fields: Record<string, string | null | undefined>): string
     .filter(([, value]) => value !== undefined && value !== null && value !== "")
     .map(
       ([label, value]) => `<tr>
-        <td style="padding:10px 16px 10px 0;border-bottom:1px solid ${COLORS.hairline};font-family:Arial,Helvetica,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:${COLORS.muted};vertical-align:top;white-space:nowrap;">${label}</td>
-        <td style="padding:10px 0;border-bottom:1px solid ${COLORS.hairline};font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:${COLORS.text};">${value}</td>
+        <td style="padding:10px 16px 10px 0;border-bottom:1px solid ${COLORS.hairline};font-family:Arial,Helvetica,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:${COLORS.muted};vertical-align:top;white-space:nowrap;">${escapeHtml(label)}</td>
+        <td style="padding:10px 0;border-bottom:1px solid ${COLORS.hairline};font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:${COLORS.text};">${escapeHtml(value as string)}</td>
       </tr>`
     )
     .join("");
@@ -238,7 +258,7 @@ export function orderPaymentConfirmedEmail(fields: {
 }) {
   const total = (fields.totalCents / 100).toFixed(2);
   const orderLine = fields.storeName
-    ? `Your City Pickup order from <strong>${fields.storeName}</strong> is confirmed.`
+    ? `Your City Pickup order from <strong>${escapeHtml(fields.storeName)}</strong> is confirmed.`
     : `Your City2Ranch Concierge order is confirmed.`;
   return customerWrap(
     "Payment Confirmed",
@@ -286,7 +306,7 @@ export function householdInviteEmail(fields: { ownerEmail: string; signInUrl: st
   return customerWrap(
     "You've Been Invited",
     `
-      <p style="margin:0 0 20px;"><strong>${fields.ownerEmail}</strong> has invited you to access their
+      <p style="margin:0 0 20px;"><strong>${escapeHtml(fields.ownerEmail)}</strong> has invited you to access their
       City2Ranch account — you'll be able to see and manage their requests,
       orders, and saved places.</p>
       ${ctaButton("Sign In to Accept", fields.signInUrl)}

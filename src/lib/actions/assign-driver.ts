@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
@@ -39,7 +39,12 @@ export async function assignDriver(
     };
   }
 
-  await db
+  // Compare-and-swap on status: without this, two staff members
+  // assigning different drivers to the same order at nearly the same
+  // moment could both pass the assertTransition check above (both read
+  // the pre-assignment status) and both write — the second silently
+  // overwriting the first's driverId with no indication anything raced.
+  const updated = await db
     .update(orders)
     .set({
       driverId,
@@ -47,7 +52,14 @@ export async function assignDriver(
       assignedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(orders.id, orderId));
+    .where(and(eq(orders.id, orderId), eq(orders.status, order.status)))
+    .returning({ id: orders.id });
+  if (updated.length === 0) {
+    return {
+      ok: false,
+      message: "This order changed while you were working on it. Refresh and try again.",
+    };
+  }
 
   await logAuditEvent({
     orderId,

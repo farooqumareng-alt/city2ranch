@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, desc, eq, ne, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { drivers, orders, staff } from "@/lib/db/schema";
@@ -33,23 +33,32 @@ async function findAuthUserIdByEmail(
   return rows[0]?.id;
 }
 
-/** `count(*) from staff where role = 'super_admin' and is_active = true`,
- *  optionally excluding one row — the exact query both the demote and
- *  disable safety rails below need, since they have the identical
- *  "would this bring active super-admins to zero" failure mode. */
+/**
+ * Locks every currently-active super_admin row (FOR UPDATE) and returns
+ * how many remain after optionally excluding one — the exact query both
+ * the demote and disable safety rails below need, since they have the
+ * identical "would this bring active super-admins to zero" failure
+ * mode. Must be called inside a db.transaction(); the lock is what
+ * actually closes the race, not the count by itself — a plain SELECT
+ * (even re-run) doesn't stop two concurrent transactions from both
+ * reading "1 remaining" before either writes. Can't use count(*)/
+ * .for("update") together (Postgres rejects FOR UPDATE with an
+ * aggregate), so this counts the locked rows in JS instead.
+ */
 async function activeSuperAdminCount(
-  db: ReturnType<typeof getDb>,
+  tx: Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0],
   excludeStaffId?: string
 ): Promise<number> {
-  const rows = await db
-    .select({ n: count() })
+  const rows = await tx
+    .select({ id: staff.id })
     .from(staff)
     .where(
       excludeStaffId
         ? and(eq(staff.role, "super_admin"), eq(staff.isActive, true), ne(staff.id, excludeStaffId))
         : and(eq(staff.role, "super_admin"), eq(staff.isActive, true))
-    );
-  return rows[0]?.n ?? 0;
+    )
+    .for("update");
+  return rows.length;
 }
 
 /** Used by /internal/dispatch/admin's Staff table. */
@@ -283,15 +292,25 @@ export async function setStaffRole(
   const role = formData.get("role") === "super_admin" ? "super_admin" : "staff";
   const db = getDb();
 
-  if (role === "staff") {
-    const remaining = await activeSuperAdminCount(db, staffId);
-    if (remaining === 0) {
+  try {
+    // The count-then-update used to be two separate, unlocked
+    // statements — two concurrent demotions of two different super
+    // admins could each see "someone else is still active" and both
+    // proceed, reaching zero. FOR UPDATE inside one transaction
+    // serializes them: the second transaction's lock acquisition
+    // blocks until the first commits, then re-reads the now-current
+    // state.
+    const blocked = await db.transaction(async (tx) => {
+      if (role === "staff") {
+        const remaining = await activeSuperAdminCount(tx, staffId);
+        if (remaining === 0) return true;
+      }
+      await tx.update(staff).set({ role }).where(eq(staff.id, staffId));
+      return false;
+    });
+    if (blocked) {
       return { ok: false, message: "You can't remove the last super admin. Promote someone else first." };
     }
-  }
-
-  try {
-    await db.update(staff).set({ role }).where(eq(staff.id, staffId));
   } catch (error) {
     console.error("[setStaffRole] failed", error);
     return { ok: false, message: "We couldn't update that role right now. Please try again shortly." };
@@ -315,18 +334,24 @@ export async function setStaffActive(
   const isActive = formData.get("isActive") === "true";
   const db = getDb();
 
-  if (!isActive) {
-    const target = await db.select({ role: staff.role }).from(staff).where(eq(staff.id, staffId));
-    if (target[0]?.role === "super_admin") {
-      const remaining = await activeSuperAdminCount(db, staffId);
-      if (remaining === 0) {
-        return { ok: false, message: "You can't disable the last super admin. Promote or enable someone else first." };
-      }
-    }
-  }
-
   try {
-    await db.update(staff).set({ isActive }).where(eq(staff.id, staffId));
+    // Same transaction + FOR UPDATE serialization as setStaffRole above,
+    // and for the identical reason — this is the other half of the
+    // "two concurrent operations reach zero active super admins" race.
+    const blocked = await db.transaction(async (tx) => {
+      if (!isActive) {
+        const target = await tx.select({ role: staff.role }).from(staff).where(eq(staff.id, staffId));
+        if (target[0]?.role === "super_admin") {
+          const remaining = await activeSuperAdminCount(tx, staffId);
+          if (remaining === 0) return true;
+        }
+      }
+      await tx.update(staff).set({ isActive }).where(eq(staff.id, staffId));
+      return false;
+    });
+    if (blocked) {
+      return { ok: false, message: "You can't disable the last super admin. Promote or enable someone else first." };
+    }
   } catch (error) {
     console.error("[setStaffActive] failed", error);
     return { ok: false, message: "We couldn't update that account right now. Please try again shortly." };

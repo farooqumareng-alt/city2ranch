@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { getDb } from "@/lib/db";
-import { orders, stores, memberships } from "@/lib/db/schema";
+import { orders, stores, memberships, orderDeliveryPins } from "@/lib/db/schema";
 import { getStripe } from "@/lib/stripe/server";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
@@ -21,7 +21,7 @@ function generatePin(): string {
  *  reports status "canceled" on the same Subscription, it doesn't send
  *  a fundamentally different payload), so one upsert handles all three
  *  event types identically. */
-async function upsertMembershipFromSubscription(subscription: Stripe.Subscription) {
+async function upsertMembershipFromSubscription(subscription: Stripe.Subscription, eventCreated: number) {
   const authUserId = subscription.metadata?.authUserId;
   if (!authUserId) {
     console.error(`[stripe webhook] subscription ${subscription.id} missing authUserId metadata`);
@@ -48,6 +48,7 @@ async function upsertMembershipFromSubscription(subscription: Stripe.Subscriptio
   }
 
   const db = getDb();
+  const eventCreatedAt = new Date(eventCreated * 1000);
   const values = {
     authUserId,
     tier,
@@ -55,14 +56,24 @@ async function upsertMembershipFromSubscription(subscription: Stripe.Subscriptio
     stripeSubscriptionId: subscription.id,
     stripePriceId: priceId,
     currentPeriodEnd: item.current_period_end ? new Date(item.current_period_end * 1000) : null,
+    stripeEventCreatedAt: eventCreatedAt,
   };
 
+  // Stripe doesn't guarantee delivery order and retries failed
+  // deliveries for up to 3 days — without this guard, a stale/
+  // out-of-order redelivery could silently overwrite a newer status
+  // (e.g. resurrecting a canceled membership with a late-arriving
+  // "active" event from before the cancellation). The predicate makes
+  // an older event's write a no-op instead: only overwrite when this
+  // row has never been written by an event, or the new event is
+  // strictly newer than the one that last wrote it.
   await db
     .insert(memberships)
     .values(values)
     .onConflictDoUpdate({
       target: memberships.authUserId,
       set: { ...values, updatedAt: new Date() },
+      setWhere: sql`${memberships.stripeEventCreatedAt} IS NULL OR ${memberships.stripeEventCreatedAt} < ${eventCreatedAt}`,
     });
 }
 
@@ -116,23 +127,45 @@ export async function POST(request: NextRequest) {
 
     // Idempotency: Stripe redelivers events. Only act if the order is
     // still where we left it — a second delivery of the same event (or
-    // a stale one) is a safe no-op, not a re-processing.
+    // a stale one) is a safe no-op, not a re-processing. The status
+    // predicate is repeated in the UPDATE's own WHERE (not just this
+    // `if`) so the read-then-write isn't a bare TOCTOU race: if a
+    // concurrent request already moved the order off payment_pending
+    // between the read above and this write, `updated` comes back
+    // empty and nothing further executes for this delivery.
     if (order.status === "payment_pending") {
       assertTransition(order.status, "paid");
       const deliveryPin = generatePin();
       const paymentIntentId =
         typeof session.payment_intent === "string" ? session.payment_intent : null;
 
-      await db
+      const updated = await db
         .update(orders)
         .set({
           status: "paid",
           paidAt: new Date(),
           stripePaymentIntentId: paymentIntentId,
-          deliveryPin,
           updatedAt: new Date(),
         })
-        .where(eq(orders.id, order.id));
+        .where(and(eq(orders.id, order.id), eq(orders.status, "payment_pending")))
+        .returning({ id: orders.id });
+
+      if (updated.length === 0) {
+        console.error(
+          `[stripe webhook] order ${order.id} changed status between read and write — skipping duplicate/racing completed event`
+        );
+        return NextResponse.json({ received: true });
+      }
+
+      // Delivery PIN lives in its own table, not on `orders` — see the
+      // doc comment on orderDeliveryPins in schema.ts. onConflictDoUpdate
+      // makes this safe even if a PIN somehow already exists for this
+      // order (it shouldn't, given the CAS above, but a fresh PIN is
+      // harmless either way since none has been read by a driver yet).
+      await db
+        .insert(orderDeliveryPins)
+        .values({ orderId: order.id, pin: deliveryPin })
+        .onConflictDoUpdate({ target: orderDeliveryPins.orderId, set: { pin: deliveryPin } });
 
       await logAuditEvent({
         orderId: order.id,
@@ -171,6 +204,18 @@ export async function POST(request: NextRequest) {
           console.error("[stripe webhook] confirmation email failed", error);
         }
       }
+    } else {
+      // Previously silent — a completed event arriving when the order
+      // isn't payment_pending (e.g. a stale expiry reverted it to
+      // priced underneath a still-live, later session — see the
+      // session-id check added below) meant money could be taken with
+      // zero record anywhere. This doesn't recover the order
+      // automatically (that would need its own reasoning about which
+      // session is authoritative), but it guarantees the situation is
+      // never invisible.
+      console.error(
+        `[stripe webhook] checkout.session.completed for order ${order.id} (session ${session.id}) but order status is "${order.status}", not "payment_pending" — payment may need manual reconciliation`
+      );
     }
   }
 
@@ -180,12 +225,23 @@ export async function POST(request: NextRequest) {
     if (orderId) {
       const rows = await db.select().from(orders).where(eq(orders.id, orderId));
       const order = rows[0];
-      if (order && order.status === "payment_pending") {
+      // Also require this to be the order's *current* checkout session
+      // — without it, an independently-retried expiry for an earlier,
+      // already-superseded session could revert an order that has since
+      // moved on to a new, still-live session (see the double-checkout
+      // finding in approve-and-pay.ts). The status check alone isn't
+      // enough once two sessions can exist for the same order.
+      if (order && order.status === "payment_pending" && order.stripeCheckoutSessionId === session.id) {
         assertTransition(order.status, "priced");
-        await db
+        const updated = await db
           .update(orders)
           .set({ status: "priced", updatedAt: new Date() })
-          .where(eq(orders.id, order.id));
+          .where(and(eq(orders.id, order.id), eq(orders.status, "payment_pending")))
+          .returning({ id: orders.id });
+        if (updated.length === 0) {
+          console.error(`[stripe webhook] order ${order.id} changed status before expiry could be applied — skipping`);
+          return NextResponse.json({ received: true });
+        }
 
         await logAuditEvent({
           orderId: order.id,
@@ -203,7 +259,7 @@ export async function POST(request: NextRequest) {
     event.type === "customer.subscription.updated" ||
     event.type === "customer.subscription.deleted"
   ) {
-    await upsertMembershipFromSubscription(event.data.object as Stripe.Subscription);
+    await upsertMembershipFromSubscription(event.data.object as Stripe.Subscription, event.created);
   }
 
   return NextResponse.json({ received: true });

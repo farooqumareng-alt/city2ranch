@@ -65,6 +65,22 @@ export async function subscribeMembership(tier: MembershipTier) {
 
   const db = getDb();
 
+  // Nothing previously stopped a second concurrent subscription: Stripe
+  // permits multiple active subscriptions per customer, but this app's
+  // memberships table holds one row per owner, so a second subscribe
+  // would silently overwrite the first's stripeSubscriptionId — the
+  // first keeps billing with no in-app way to reach it again. Block
+  // the second attempt outright rather than allow an orphaned
+  // subscription; switching tiers is a "cancel, then subscribe again"
+  // flow for now, not a live plan-swap.
+  const existingMembership = await db
+    .select({ status: memberships.status })
+    .from(memberships)
+    .where(eq(memberships.authUserId, owner.id));
+  if (existingMembership[0] && existingMembership[0].status !== "canceled") {
+    redirect("/membership");
+  }
+
   // Reuse an existing Stripe Customer if this account already has one
   // (e.g. from a previous subscribe attempt or a canceled membership)
   // rather than creating a duplicate — unlike approve-and-pay.ts's

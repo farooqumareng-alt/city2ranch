@@ -7,10 +7,15 @@ import { getDb } from "@/lib/db";
 import { orders, serviceRequests } from "@/lib/db/schema";
 import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import { formatPlainDate } from "@/lib/format";
+import { requireStaff } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Concierge Quotes" };
 
 export default async function ConciergeQueuePage() {
+  // Re-checked here, not just relied on via DispatchLayout — this page
+  // queries customer order/PII data directly, with no other gate of
+  // its own before this fix.
+  await requireStaff();
   const db = getDb();
 
   const [unconverted, conciergeOrders] = await Promise.all([

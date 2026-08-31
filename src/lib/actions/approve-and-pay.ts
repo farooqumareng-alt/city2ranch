@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
@@ -10,14 +10,24 @@ import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { paymentServicesConfigured } from "@/lib/env";
 import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
+import type { ActionResult } from "@/lib/actions/types";
 
 /**
  * Bound to the "Approve & Pay" form as
  * `approveAndPayOrder.bind(null, order.id)` — the extra leading arg is
- * the Next.js convention for passing data to a server action from a
- * plain <form action={...}>, not useActionState.
+ * the Next.js convention for currying data into a server action, same
+ * as markPickedUp.bind(null, order.id) elsewhere. The bound result is
+ * used with useActionState (via JobActionButton) purely so the button
+ * can disable itself while pending — a double-click used to be able to
+ * create two live Stripe Checkout Sessions for the same order, since
+ * nothing stopped a second submission from starting before the first's
+ * response landed.
  */
-export async function approveAndPayOrder(orderId: string) {
+export async function approveAndPayOrder(
+  orderId: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by useActionState's calling convention, unused here since there's no field data to round-trip
+  _prev: ActionResult | undefined
+): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
 
@@ -45,8 +55,11 @@ export async function approveAndPayOrder(orderId: string) {
   // form action must never trust that the UI alone kept someone out.
   if (!canPerform(role, "pay")) redirect(`/orders/${orderId}`);
 
-  // Already progressed (e.g. a double-click) — idempotent no-op back to
-  // the same page rather than erroring.
+  // Already progressed (e.g. a double-click, or a race with the
+  // compare-and-swap below losing) — idempotent no-op back to the same
+  // page rather than erroring. This check alone doesn't prevent the
+  // race (see the real guard on the UPDATE below); it's just the fast
+  // path for the common non-concurrent case.
   if (order.status !== "priced") redirect(`/orders/${orderId}`);
   assertTransition(order.status, "payment_pending");
 
@@ -80,14 +93,29 @@ export async function approveAndPayOrder(orderId: string) {
     throw new Error("Stripe did not return a Checkout Session URL");
   }
 
-  await db
+  // Compare-and-swap: the Stripe session above is already created by
+  // this point (Stripe has no "reserve the update" step), so a losing
+  // request here has already produced one orphaned, uncompleted
+  // Checkout Session — that's an acceptable cost, since it will simply
+  // expire unused. What this guard actually prevents is the order's own
+  // stripeCheckoutSessionId ending up pointed at whichever request
+  // happened to write last, silently orphaning the *other* session
+  // instead of ever being told two were created.
+  const updated = await db
     .update(orders)
     .set({
       status: "payment_pending",
       stripeCheckoutSessionId: session.id,
       updatedAt: new Date(),
     })
-    .where(eq(orders.id, order.id));
+    .where(and(eq(orders.id, order.id), eq(orders.status, "priced")))
+    .returning({ id: orders.id });
+  if (updated.length === 0) {
+    return {
+      ok: false,
+      message: "This order was already updated — refresh the page and try again.",
+    };
+  }
 
   await logAuditEvent({
     orderId: order.id,

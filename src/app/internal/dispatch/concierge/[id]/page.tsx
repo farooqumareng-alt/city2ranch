@@ -10,6 +10,7 @@ import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import { formatPlainDate } from "@/lib/format";
 import { getOrderMessages } from "@/lib/order-messages";
 import { OrderMessageThread } from "@/components/orders/OrderMessageThread";
+import { requireStaff } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Concierge Quote" };
 
@@ -18,6 +19,10 @@ export default async function ConciergeQuoteEditPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Re-checked here, not just relied on via DispatchLayout — this page
+  // queries one specific customer's full order record directly, with
+  // no other gate of its own before this fix.
+  await requireStaff();
   const { id } = await params;
   const db = getDb();
 

@@ -5,6 +5,7 @@ import { NewConciergeOrderForm } from "@/components/dispatch/NewConciergeOrderFo
 import { getDb } from "@/lib/db";
 import { serviceRequests } from "@/lib/db/schema";
 import { getCommonGroceryItems } from "@/lib/grocery-items";
+import { requireStaff } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "New Concierge Order" };
 
@@ -13,6 +14,10 @@ export default async function NewConciergeOrderPage({
 }: {
   searchParams: Promise<{ fromRequest?: string }>;
 }) {
+  // Re-checked here, not just relied on via DispatchLayout — this page
+  // can look up a specific customer's service request directly, with
+  // no other gate of its own before this fix.
+  await requireStaff();
   const { fromRequest } = await searchParams;
 
   let source;
