@@ -1,9 +1,19 @@
 import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db";
 import { orders, stores, serviceRequests } from "@/lib/db/schema";
+import type * as schema from "@/lib/db/schema";
 import { REQUEST_STATUS_LABELS } from "@/lib/requests";
 import { ORDER_STATUS_LABELS } from "@/lib/orders/labels";
 import type { OrderStatus } from "@/lib/orders/status";
+
+/** Satisfied by both getDb()'s pooled connection and a db.transaction()
+ *  callback's `tx` — lets a caller already inside a transaction (or a
+ *  test using transaction+rollback, like rls-security.test.ts's own
+ *  pattern) pass it through instead of opening a second connection that
+ *  can't see the first's uncommitted rows. Same convention as
+ *  src/lib/audit.ts's logAuditEvent. */
+type AnyDb = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 /**
  * The unified "My Services" query — approved blueprint §Entities: no
@@ -55,9 +65,11 @@ function bucketForOrderStatus(status: OrderStatus): MyServiceBucket {
   return "active";
 }
 
-export async function getMyServices(ownerId: string, ownerEmail: string): Promise<MyServiceItem[]> {
-  const db = getDb();
-
+export async function getMyServices(
+  ownerId: string,
+  ownerEmail: string,
+  db: AnyDb = getDb()
+): Promise<MyServiceItem[]> {
   const orderRows = await db
     .select({
       id: orders.id,

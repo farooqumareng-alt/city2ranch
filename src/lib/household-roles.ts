@@ -2,8 +2,9 @@
  * What a household member's role permits — see the `role` column's
  * comment in src/lib/db/schema.ts. Deliberately its own DB-free module
  * (like src/lib/orders/status.ts) so this pure logic can be unit tested
- * without pulling in @/lib/db — vitest has no path-alias resolution
- * configured, unlike the Next.js build.
+ * fast, without a live database — vitest.config.ts gives @/ imports
+ * real path-alias resolution now, so this split is a speed/clarity
+ * choice, not a workaround for a tooling gap.
  */
 export type HouseholdRole = "full" | "ordering" | "view_only";
 export type HouseholdAction =

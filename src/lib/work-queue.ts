@@ -1,11 +1,18 @@
 import { and, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db";
 import { orders, stores, drivers, serviceRequests } from "@/lib/db/schema";
+import type * as schema from "@/lib/db/schema";
 import type { OrderStatus } from "@/lib/orders/status";
 import type { WorkQueueBucket, WorkQueueItem } from "@/lib/work-queue-types";
 
 export type { WorkQueueBucket, WorkQueueItem } from "@/lib/work-queue-types";
 export { WORK_QUEUE_TABS } from "@/lib/work-queue-types";
+
+/** Satisfied by both getDb()'s pooled connection and a db.transaction()
+ *  callback's `tx` — same convention as my-services.ts's AnyDb / src/lib/
+ *  audit.ts's logAuditEvent. */
+type AnyDb = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 /**
  * The unified staff Work Queue — approved blueprint §Screen inventory:
@@ -54,9 +61,7 @@ function bucketForStatus(status: OrderStatus): WorkQueueBucket {
 // nothing on this page needs more than a recent look-back.
 const COMPLETED_LOOKBACK_LIMIT = 50;
 
-export async function getWorkQueue(): Promise<WorkQueueItem[]> {
-  const db = getDb();
-
+export async function getWorkQueue(db: AnyDb = getDb()): Promise<WorkQueueItem[]> {
   const [liveOrders, recentClosedOrders, unconvertedRequests] = await Promise.all([
     // Every order still in play — no limit, this is meant to be the
     // complete live working set. "failed" stays here (not archived)
