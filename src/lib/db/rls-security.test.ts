@@ -353,3 +353,35 @@ describe("order_delivery_pins — P1: default-deny for everyone via the Data API
     });
   });
 });
+
+describe("notifications — self_select scopes strictly to the owning user", () => {
+  it("a signed-in user cannot read another user's notification rows", async () => {
+    await withRollback(async (tx) => {
+      const owner = await makeAuthUser(tx, "notif-owner");
+      const other = await makeAuthUser(tx, "notif-other");
+      await tx`
+        INSERT INTO notifications (auth_user_id, type, title)
+        VALUES (${owner.id}, 'payment_confirmed', 'Payment confirmed')
+      `;
+
+      await actAs(tx, other.id);
+      const rows = await tx`SELECT id FROM notifications WHERE auth_user_id = ${owner.id}`;
+      expect(rows.length).toBe(0);
+    });
+  });
+
+  it("a signed-in user can read their own notification rows", async () => {
+    await withRollback(async (tx) => {
+      const owner = await makeAuthUser(tx, "notif-owner");
+      const [row] = await tx<{ id: string }[]>`
+        INSERT INTO notifications (auth_user_id, type, title)
+        VALUES (${owner.id}, 'payment_confirmed', 'Payment confirmed')
+        RETURNING id
+      `;
+
+      await actAs(tx, owner.id);
+      const rows = await tx`SELECT id FROM notifications WHERE id = ${row.id}`;
+      expect(rows.length).toBe(1);
+    });
+  });
+});

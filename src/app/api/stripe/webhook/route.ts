@@ -9,6 +9,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { getResend } from "@/lib/email/resend";
 import { orderPaymentConfirmedEmail } from "@/lib/email/templates";
 import { shouldNotify } from "@/lib/notifications/should-send";
+import { createNotification } from "@/lib/notifications/create";
 import { getMembershipTierForPriceId, type MembershipTier } from "@/lib/stripe/tiers";
 import { toMembershipStatus } from "@/lib/stripe/membership-status";
 
@@ -175,6 +176,21 @@ export async function POST(request: NextRequest) {
         newState: "paid",
         metadata: { stripePaymentIntentId: paymentIntentId },
       });
+
+      // The in-app bell record is unconditional — independent of the
+      // paymentReceipts email preference below, since it's a second,
+      // lower-friction channel (see the doc comment on the
+      // notifications table in schema.ts). Only skipped if authUserId
+      // is somehow absent, since the table requires an owner.
+      if (order.authUserId) {
+        await createNotification({
+          authUserId: order.authUserId,
+          type: "payment_confirmed",
+          title: "Payment confirmed",
+          body: `Your ${storeName ? `order from ${storeName}` : "Concierge order"} was charged $${(order.totalCents / 100).toFixed(2)}.`,
+          orderId: order.id,
+        });
+      }
 
       // order.authUserId should always be set by now — approveAndPayOrder
       // (the only path to payment_pending) requires it — but if it's ever
