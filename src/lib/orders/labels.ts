@@ -8,6 +8,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   priced: "Awaiting payment",
   payment_pending: "Payment processing",
   paid: "Confirmed — awaiting driver",
+  pending_acceptance: "Awaiting driver response",
   driver_assigned: "Driver assigned",
   picked_up: "Picked up",
   in_transit: "On the way",

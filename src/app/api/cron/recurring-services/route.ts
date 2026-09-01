@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
         try {
           const resend = getResend();
           const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-          const { subject, html } = recurringOrderCreatedEmail({ orderUrl: `${siteUrl}/orders/${orderId}` });
+          const { subject, html } = recurringOrderCreatedEmail({ orderUrl: `${siteUrl}/my-services/${orderId}` });
           await resend.emails.send({
             from: process.env.EMAIL_FROM ?? "notifications@city2ranch.com",
             to: plan.customerEmail,

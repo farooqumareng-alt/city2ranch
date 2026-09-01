@@ -12,6 +12,7 @@ describe("canTransition", () => {
       "priced",
       "payment_pending",
       "paid",
+      "pending_acceptance",
       "driver_assigned",
       "picked_up",
       "in_transit",
@@ -74,6 +75,24 @@ describe("canTransition", () => {
 
   it("allows cancelling a quote still being built", () => {
     expect(canTransition("quote_pending", "cancelled")).toBe(true);
+  });
+
+  // Driver Accept/Decline (2026-08-31): assigning a driver now lands on
+  // pending_acceptance, not driver_assigned directly — the driver has
+  // to accept before they're genuinely committed to the job.
+  it("requires a driver to accept before an order is truly driver_assigned", () => {
+    expect(canTransition("paid", "driver_assigned")).toBe(false);
+    expect(canTransition("paid", "pending_acceptance")).toBe(true);
+    expect(canTransition("pending_acceptance", "driver_assigned")).toBe(true);
+  });
+
+  it("lets a driver decline back to paid (unassigned), not a separate declined state", () => {
+    expect(canTransition("pending_acceptance", "paid")).toBe(true);
+  });
+
+  it("still allows staff to cancel or fail a job while a driver hasn't responded yet", () => {
+    expect(canTransition("pending_acceptance", "cancelled")).toBe(true);
+    expect(canTransition("pending_acceptance", "failed")).toBe(true);
   });
 });
 

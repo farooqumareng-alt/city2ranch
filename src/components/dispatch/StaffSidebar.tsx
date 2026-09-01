@@ -3,11 +3,10 @@ import { PanelSidebar } from "@/components/layout/PanelSidebar";
 const STAFF_LINKS = [
   // exact: true — /internal/dispatch is now the Operations Center home,
   // and a plain prefix match would otherwise also light this up on
-  // every sibling below it (queue, concierge, settings all share this
+  // every sibling below it (queue, stores, settings all share this
   // same URL prefix). See PanelSidebar.tsx's PanelLink.exact doc.
-  { href: "/internal/dispatch", label: "Dashboard", exact: true },
-  { href: "/internal/dispatch/queue", label: "Dispatch Queue" },
-  { href: "/internal/dispatch/concierge", label: "Concierge Quotes" },
+  { href: "/internal/dispatch", label: "Overview", exact: true },
+  { href: "/internal/dispatch/queue", label: "Work Queue" },
   // Operations-data screens (Step 7) — real CRUD for tables that used to
   // be SQL/seed-file-only. Staff-level, not super-admin-only, matching
   // RLS's own "any active staff" gate on all four tables.
@@ -19,9 +18,21 @@ const STAFF_LINKS = [
 ];
 
 // Only shown to a super_admin — display-only convenience, not the
-// enforcement boundary. requireSuperAdmin() in the admin page itself is
+// enforcement boundary. requireSuperAdmin() on each of these pages is
 // what actually blocks a plain staff member who guesses the URL.
-const ADMIN_LINK = { href: "/internal/dispatch/admin", label: "Admin" };
+// Two links, not one flat "Admin" — Business Overview (business health)
+// and Team (staff/driver account management) answer different
+// questions (approved UX blueprint, Phase 5's People/Business split);
+// Customers and Drivers detail pages stay link-through-only for now
+// (reached from a Work Queue row or Team's own driver list), not
+// promoted to their own nav entries until a real list/search view
+// exists for them.
+const ADMIN_LINKS = [
+  // exact: true for the same reason Overview above has it — /admin is a
+  // parent path of /admin/team.
+  { href: "/internal/dispatch/admin", label: "Business Overview", exact: true },
+  { href: "/internal/dispatch/admin/team", label: "Team" },
+];
 
 /** Same pattern as AccountSidebar/DriverSidebar. */
 export function StaffSidebar({
@@ -31,7 +42,7 @@ export function StaffSidebar({
   userEmail?: string;
   isSuperAdmin?: boolean;
 }) {
-  const links = isSuperAdmin ? [...STAFF_LINKS, ADMIN_LINK] : STAFF_LINKS;
+  const links = isSuperAdmin ? [...STAFF_LINKS, ...ADMIN_LINKS] : STAFF_LINKS;
   return (
     <PanelSidebar
       links={links}

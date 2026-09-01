@@ -42,8 +42,8 @@ export function RequestServiceForm({
   groceryItems?: GroceryItem[];
   notesPrefill?: string;
   savedLists?: SavedList[];
-  /** Only meaningful for a signed-in customer — /request-service also
-   *  works fully signed out, where none of these three are passed. */
+  /** Only meaningful for a signed-in customer — /request-service/concierge
+   *  also works fully signed out, where none of these three are passed. */
   profile?: ProfileDefaults;
   places?: Place[];
   userEmail?: string;

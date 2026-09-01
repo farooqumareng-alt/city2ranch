@@ -19,6 +19,11 @@ const FORM_FIELDS = [
   "customerName",
   "customerPhone",
   "pickupNotes",
+  "pickupAddressLine1",
+  "pickupAddressLine2",
+  "pickupCity",
+  "pickupState",
+  "pickupZip",
   "deliveryAddressLine1",
   "deliveryAddressLine2",
   "deliveryCity",
@@ -55,6 +60,11 @@ export async function submitOrder(
     customerName: formData.get("customerName"),
     customerPhone: formData.get("customerPhone"),
     pickupNotes: formData.get("pickupNotes"),
+    pickupAddressLine1: formData.get("pickupAddressLine1"),
+    pickupAddressLine2: formData.get("pickupAddressLine2"),
+    pickupCity: formData.get("pickupCity"),
+    pickupState: formData.get("pickupState"),
+    pickupZip: formData.get("pickupZip"),
     deliveryAddressLine1: formData.get("deliveryAddressLine1"),
     deliveryAddressLine2: formData.get("deliveryAddressLine2"),
     deliveryCity: formData.get("deliveryCity"),
@@ -125,6 +135,11 @@ export async function submitOrder(
         storeId: data.storeId,
         retailerOrderNumber: data.retailerOrderNumber,
         pickupNotes: data.pickupNotes,
+        pickupAddressLine1: data.pickupAddressLine1,
+        pickupAddressLine2: data.pickupAddressLine2,
+        pickupCity: data.pickupCity,
+        pickupState: data.pickupState,
+        pickupZip: data.pickupZip,
         deliveryAddressLine1: data.deliveryAddressLine1,
         deliveryAddressLine2: data.deliveryAddressLine2,
         deliveryCity: data.deliveryCity,
@@ -162,5 +177,5 @@ export async function submitOrder(
     };
   }
 
-  redirect(`/orders/${orderId}`);
+  redirect(`/my-services/${orderId}`);
 }

@@ -35,7 +35,7 @@ export async function approveAndPayOrder(
     // Nothing changed — the order stays "priced" and the customer can
     // retry once payment is configured, same honest-degradation pattern
     // as every other form action in this app.
-    redirect(`/orders/${orderId}`);
+    redirect(`/my-services/${orderId}`);
   }
 
   const db = getDb();
@@ -48,19 +48,19 @@ export async function approveAndPayOrder(
   // so it goes through the same resolver every other ownership check
   // uses, not a one-off.
   const { ownerId: effectiveOwnerId, role } = await getEffectiveOwnerWithRole(user.id);
-  if (!order || order.authUserId !== effectiveOwnerId) redirect("/orders");
+  if (!order || order.authUserId !== effectiveOwnerId) redirect("/my-services");
 
   // The order page already hides this form for a role that can't pay
-  // (see orders/[id]/page.tsx) — re-checked here regardless, since a
-  // form action must never trust that the UI alone kept someone out.
-  if (!canPerform(role, "pay")) redirect(`/orders/${orderId}`);
+  // (see my-services/[id]/page.tsx) — re-checked here regardless, since
+  // a form action must never trust that the UI alone kept someone out.
+  if (!canPerform(role, "pay")) redirect(`/my-services/${orderId}`);
 
   // Already progressed (e.g. a double-click, or a race with the
   // compare-and-swap below losing) — idempotent no-op back to the same
   // page rather than erroring. This check alone doesn't prevent the
   // race (see the real guard on the UPDATE below); it's just the fast
   // path for the common non-concurrent case.
-  if (order.status !== "priced") redirect(`/orders/${orderId}`);
+  if (order.status !== "priced") redirect(`/my-services/${orderId}`);
   assertTransition(order.status, "payment_pending");
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -85,8 +85,8 @@ export async function approveAndPayOrder(
     customer_email: user.email,
     client_reference_id: order.id,
     metadata: { orderId: order.id },
-    success_url: `${siteUrl}/orders/${order.id}?paid=1`,
-    cancel_url: `${siteUrl}/orders/${order.id}`,
+    success_url: `${siteUrl}/my-services/${order.id}?paid=1`,
+    cancel_url: `${siteUrl}/my-services/${order.id}`,
   });
 
   if (!session.url) {

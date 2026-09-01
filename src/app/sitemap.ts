@@ -6,6 +6,7 @@ const ROUTES = [
   "/how-it-works",
   "/service-area",
   "/request-service",
+  "/request-service/concierge",
   "/about",
   "/contact",
   "/privacy",

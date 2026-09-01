@@ -73,10 +73,12 @@ async function transitionWithReason(
     metadata: { reason },
   });
 
-  // Same reasoning as assign-driver.ts — both the queue and the
-  // dashboard need to reflect a cancel/fail immediately.
+  // Same reasoning as assign-driver.ts — the queue, the dashboard, and
+  // this order's own Service Record all need to reflect a cancel/fail
+  // immediately.
   revalidatePath("/internal/dispatch/queue");
   revalidatePath("/internal/dispatch");
+  revalidatePath(`/internal/dispatch/orders/${orderId}`);
   return { ok: true };
 }
 

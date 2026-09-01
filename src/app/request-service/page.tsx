@@ -1,69 +1,83 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { RequestServiceForm } from "@/components/forms/RequestServiceForm";
-import { getCommonGroceryItems } from "@/lib/grocery-items";
-import { SERVICE_TIERS } from "@/lib/constants";
-import { getCurrentUser } from "@/lib/supabase/server";
-import { getEffectiveOwnerId } from "@/lib/household";
-import { getOwnShoppingListsWithItems } from "@/lib/shopping-lists";
-import { getOwnProfile } from "@/lib/customer-profile";
-import { getOwnPlaces } from "@/lib/actions/places";
 
 export const metadata: Metadata = {
-  title: "Request Private Service",
-  description:
-    "Submit a private service request to City2Ranch — groceries, shopping, essentials and errands delivered to your ranch or rural property.",
+  title: "Request Service",
+  description: "Tell City2Ranch what you need — we'll route you to the right place.",
 };
 
-// The grocery-items quick-add list is live, editable DB data (see
-// src/lib/grocery-items.ts) — force this page to render per-request
-// rather than let Next.js try to prerender it as static at build time,
-// which would both freeze that list into the build and require a
-// database connection to be reachable during the build step itself.
-export const dynamic = "force-dynamic";
+const CHOICES = [
+  {
+    href: "/orders/new",
+    emoji: "🛒",
+    title: "Pick up my order",
+    description: "You've already ordered from a store. We'll pick it up and bring it to you.",
+  },
+  {
+    href: "/request-service/concierge",
+    emoji: "🛍️",
+    title: "Shop for me",
+    description: "Send us your list. We'll handle the shopping.",
+  },
+  {
+    href: "/recurring-services/new",
+    emoji: "🔁",
+    title: "Repeat something",
+    description: "Set up a recurring service on a schedule.",
+  },
+];
 
+/**
+ * The Request Service entry point from the approved UX blueprint —
+ * routes a customer to the right existing form without making them
+ * name "City Pickup" or "Concierge" themselves. The Concierge form
+ * itself moved to ./concierge/page.tsx; City Pickup (/orders/new) and
+ * Recurring (/recurring-services/new) were already their own pages and
+ * are unchanged.
+ *
+ * ?tier= (membership interest, from /membership and the homepage
+ * ServiceTiers section) and ?ref= (a partner referral link/QR code —
+ * see service_requests.referralSource) both always mean Concierge, so
+ * they skip the choice screen entirely rather than making a customer
+ * who already expressed clear intent pick again.
+ */
 export default async function RequestServicePage({
   searchParams,
 }: {
   searchParams: Promise<{ tier?: string; ref?: string }>;
 }) {
-  const { tier, ref } = await searchParams;
-  const user = await getCurrentUser();
-  const ownerId = user ? await getEffectiveOwnerId(user.id) : null;
-  const [groceryItems, savedLists, profile, places] = await Promise.all([
-    getCommonGroceryItems(),
-    ownerId ? getOwnShoppingListsWithItems(ownerId) : Promise.resolve([]),
-    ownerId ? getOwnProfile(ownerId) : Promise.resolve(null),
-    ownerId ? getOwnPlaces(ownerId) : Promise.resolve([]),
-  ]);
-  // Membership tiers (see the account /membership page and the homepage
-  // ServiceTiers section) aren't a real billed product yet — "requesting"
-  // one is just this form with a note tagging which tier the customer is
-  // interested in, so staff sees it in the same pipeline as every other
-  // request. No fake plan/pricing logic anywhere.
-  const matchedTier = SERVICE_TIERS.find((t) => t.key === tier);
-  const notesPrefill = matchedTier
-    ? `Membership interest: ${matchedTier.name} (${matchedTier.subtitle})`
-    : undefined;
+  const params = await searchParams;
+  if (params.tier || params.ref) {
+    const query = new URLSearchParams();
+    if (params.tier) query.set("tier", params.tier);
+    if (params.ref) query.set("ref", params.ref);
+    redirect(`/request-service/concierge?${query.toString()}`);
+  }
 
   return (
     <Container className="flex flex-col gap-10 py-16 sm:py-24">
       <SectionHeading
         eyebrow="REQUEST SERVICE"
-        title="Request Private Service"
-        description="Tell us about your household and what you need. A City2Ranch concierge will follow up with availability and pricing."
+        title="What can we help you with?"
+        description="Tell us what you need and we'll take it from there."
       />
-      <div className="max-w-2xl">
-        <RequestServiceForm
-          groceryItems={groceryItems}
-          notesPrefill={notesPrefill}
-          savedLists={savedLists}
-          profile={profile}
-          places={places}
-          userEmail={user?.email}
-          referralSource={ref}
-        />
+      <div className="grid gap-4 sm:grid-cols-3">
+        {CHOICES.map((choice) => (
+          <Link
+            key={choice.href}
+            href={choice.href}
+            className="flex flex-col gap-2 rounded-sm border border-navy/10 bg-white/60 p-6 transition-colors hover:border-gold hover:bg-white"
+          >
+            <span aria-hidden="true" className="text-2xl">
+              {choice.emoji}
+            </span>
+            <h3 className="font-serif text-lg text-navy-deep">{choice.title}</h3>
+            <p className="font-sans text-sm text-charcoal/70">{choice.description}</p>
+          </Link>
+        ))}
       </div>
     </Container>
   );

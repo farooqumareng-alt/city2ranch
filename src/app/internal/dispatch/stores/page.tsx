@@ -50,7 +50,7 @@ export default async function StoresPage() {
                 <p className="font-sans text-xs text-charcoal/60">
                   {store.addressLine1
                     ? `${store.addressLine1}, ${store.city}, ${store.state} ${store.zip}`
-                    : "Brand only — no fixed address on file"}
+                    : "Brand only — no fixed address"}
                   {store.phone ? ` · ${store.phone}` : ""}
                   {!store.isActive ? " · Disabled" : ""}
                 </p>

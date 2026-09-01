@@ -133,8 +133,8 @@ export async function finalizeConciergeQuote(
     };
   }
 
-  revalidatePath(`/internal/dispatch/concierge/${orderId}`);
-  revalidatePath("/internal/dispatch/concierge");
+  revalidatePath(`/internal/dispatch/orders/${orderId}`);
+  revalidatePath("/internal/dispatch/queue");
   return { ok: true };
 }
 
@@ -171,5 +171,6 @@ export async function reopenConciergeQuote(orderId: string) {
     newState: "quote_pending",
   });
 
-  revalidatePath(`/internal/dispatch/concierge/${orderId}`);
+  revalidatePath(`/internal/dispatch/orders/${orderId}`);
+  revalidatePath("/internal/dispatch/queue");
 }

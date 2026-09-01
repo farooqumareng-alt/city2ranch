@@ -570,6 +570,13 @@ export const orderStatusEnum = pgEnum("order_status", [
   "priced",
   "payment_pending",
   "paid",
+  // A driver has been offered the job but hasn't accepted yet — sits
+  // between "paid" (needs a driver) and "driver_assigned" (accepted,
+  // actively working it). Added 2026-08-31 for the driver-facing
+  // Accept/Decline flow; declining reverts an order to "paid" rather
+  // than introducing a separate "declined" state, so it falls straight
+  // back into the same unassigned-orders pool staff already work from.
+  "pending_acceptance",
   "driver_assigned",
   "picked_up",
   "in_transit",
@@ -615,10 +622,19 @@ export const stores = pgTable("stores", {
     .notNull()
     .defaultNow(),
   name: text("name").notNull(),
-  addressLine1: text("address_line1").notNull(),
-  city: text("city").notNull(),
-  state: text("state").notNull(),
-  zip: text("zip").notNull(),
+  // Nullable since 2026-08-31: a "store" can now be just a supported
+  // brand (Walmart, H-E-B, ...) with no fixed location — a customer
+  // picks the brand from the dropdown, and the actual physical address
+  // for that specific pickup lives on the order instead (see
+  // orders.pickupAddressLine1 and src/lib/orders/pickup-address.ts),
+  // filled in by the customer at request time or a dispatcher
+  // afterward. A store row can still carry a real fixed address when
+  // one genuinely exists (a single-location chain, say) — the resolver
+  // just prefers the order's own address when both are present.
+  addressLine1: text("address_line1"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
   phone: text("phone"),
   isActive: boolean("is_active").notNull().default(true),
   // Placeholder market slug — every row is "default" until a second
@@ -757,6 +773,21 @@ export const orders = pgTable("orders", {
   retailerOrderNumber: text("retailer_order_number"),
   pickupReadyAt: timestamp("pickup_ready_at", { withTimezone: true }),
   pickupNotes: text("pickup_notes"),
+  // The physical pickup address for THIS order — added 2026-08-31
+  // alongside stores becoming brand-only-capable. Deliberately on the
+  // order, not the store: the store dropdown picks a brand ("Walmart"),
+  // this is the specific location a driver actually needs to go to for
+  // this specific pickup. All nullable — set by the customer at request
+  // time if they know it, or filled in/edited by a dispatcher afterward
+  // (see src/lib/actions/update-pickup-address.ts); no FK to
+  // zip_mileage, since this never feeds pricing, only navigation. See
+  // src/lib/orders/pickup-address.ts for how a display value is
+  // resolved when this is set, when only the store has one, or neither.
+  pickupAddressLine1: text("pickup_address_line1"),
+  pickupAddressLine2: text("pickup_address_line2"),
+  pickupCity: text("pickup_city"),
+  pickupState: text("pickup_state"),
+  pickupZip: text("pickup_zip"),
 
   deliveryAddressLine1: text("delivery_address_line1").notNull(),
   deliveryAddressLine2: text("delivery_address_line2"),

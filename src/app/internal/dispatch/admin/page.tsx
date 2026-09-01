@@ -1,100 +1,83 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { RowList, Row } from "@/components/ui/RowList";
-import { requireSuperAdmin } from "@/lib/auth/roles";
-import { listStaff, listDrivers, setStaffActive, setDriverActive } from "@/lib/actions/team-management";
-import { AddStaffForm } from "@/components/forms/AddStaffForm";
-import { AddDriverForm } from "@/components/forms/AddDriverForm";
-import { RoleToggleButton } from "@/components/dispatch/RoleToggleButton";
-import { ActiveToggleButton } from "@/components/dispatch/ActiveToggleButton";
+import { Card } from "@/components/ui/Card";
+import { StatTile } from "@/components/ui/StatTile";
+import { getBusinessOverview } from "@/lib/business-overview";
 
-export const metadata: Metadata = { title: "Admin" };
+export const metadata: Metadata = { title: "Business Overview" };
 
-const ROLE_LABELS: Record<string, string> = {
-  staff: "Staff",
-  super_admin: "Super Admin",
+const TIER_LABELS: Record<string, string> = {
+  route: "Route",
+  private: "Private",
+  estate: "Estate",
 };
 
-export default async function TeamAdminPage() {
-  await requireSuperAdmin();
-
-  const [staffRows, driverRows] = await Promise.all([listStaff(), listDrivers()]);
+/**
+ * The Super Admin landing page (approved UX blueprint, Phase 5) —
+ * business health, not today's operations (that's the Staff Overview
+ * at /internal/dispatch, one level up). Occupies the plain /admin URL;
+ * staff/driver account management moved to /admin/team to make room.
+ */
+export default async function BusinessOverviewPage() {
+  const data = await getBusinessOverview();
+  const tierEntries = Object.entries(data.memberships.byTier);
 
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-10">
       <SectionHeading
-        eyebrow="STAFF"
-        title="Admin"
-        description="Manage who has staff and driver access to City2Ranch."
+        eyebrow="SUPER ADMIN"
+        title="Business Overview"
+        description="The health of the business, not today's to-do list — see Overview for that."
       />
 
-      <section className="flex flex-col gap-6">
-        <h3 className="font-serif text-lg text-navy-deep">Staff</h3>
-        {staffRows.length === 0 ? (
-          <EmptyState message="No staff members yet." />
-        ) : (
-          <RowList>
-            {staffRows.map((member) => (
-              <Row key={member.id}>
-                <div>
-                  <p className="font-sans text-sm text-navy-deep">{member.email ?? "(no email on file)"}</p>
-                  <p className="font-sans text-xs text-charcoal/60">
-                    {member.label ? `${member.label} · ` : ""}
-                    {ROLE_LABELS[member.role] ?? member.role}
-                    {!member.isActive ? " · Disabled" : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <RoleToggleButton staffId={member.id} currentRole={member.role} />
-                  <ActiveToggleButton
-                    action={setStaffActive.bind(null, member.id)}
-                    isActive={member.isActive}
-                  />
-                </div>
-              </Row>
-            ))}
-          </RowList>
-        )}
-        <AddStaffForm />
-      </section>
+      <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <Card padding="sm">
+          <StatTile label="Customers" value={data.customers.total} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Active Drivers" value={data.team.activeDrivers} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Active Staff" value={data.team.activeStaff} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Active Memberships" value={data.memberships.active} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Completed (lifetime)" value={data.fulfillment.lifetimeCompleted} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Failed (last 72h)" value={data.fulfillment.recentFailed} />
+        </Card>
+      </div>
 
-      <section className="flex flex-col gap-6">
-        <h3 className="font-serif text-lg text-navy-deep">Drivers</h3>
-        {driverRows.length === 0 ? (
-          <EmptyState message="No drivers yet." />
-        ) : (
-          <RowList>
-            {driverRows.map((driver) => (
-              <Row key={driver.id}>
-                <div>
-                  {/* Just the name links, not the whole row via Row's own
-                      href prop — this row also has ActiveToggleButton's
-                      <form> in it, and nesting a form inside an anchor
-                      is invalid HTML. */}
-                  <Link
-                    href={`/internal/dispatch/admin/drivers/${driver.id}`}
-                    className="font-sans text-sm text-navy-deep underline decoration-navy/20 hover:text-gold"
-                  >
-                    {driver.name}
-                  </Link>
-                  <p className="font-sans text-xs text-charcoal/60">
-                    {driver.email ?? "(no email on file)"}
-                    {driver.phone ? ` · ${driver.phone}` : ""}
-                    {!driver.isActive ? " · Disabled" : ""}
-                  </p>
-                </div>
-                <ActiveToggleButton
-                  action={setDriverActive.bind(null, driver.id)}
-                  isActive={driver.isActive}
-                />
-              </Row>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card padding="sm">
+          <StatTile label="Revenue, last 7 days" value={`$${(data.revenue.last7DaysCents / 100).toFixed(2)}`} />
+        </Card>
+        <Card padding="sm">
+          <StatTile label="Revenue, lifetime" value={`$${(data.revenue.lifetimeCents / 100).toFixed(2)}`} />
+        </Card>
+      </div>
+
+      {tierEntries.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h3 className="font-serif text-lg text-navy-deep">Active Memberships by Tier</h3>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {tierEntries.map(([tier, n]) => (
+              <Card key={tier} padding="sm">
+                <StatTile label={TIER_LABELS[tier] ?? tier} value={n} />
+              </Card>
             ))}
-          </RowList>
-        )}
-        <AddDriverForm />
-      </section>
+          </div>
+        </section>
+      ) : null}
+
+      <p className="font-sans text-xs text-charcoal/50">
+        Disabled staff/driver counts and account management live under Team. Revenue trends, driver
+        utilization, and cancellation-rate analytics aren&apos;t shown here — there&apos;s no historical
+        baseline stored anywhere yet to compare a number against, so nothing here is a fabricated chart.
+      </p>
     </div>
   );
 }

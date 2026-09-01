@@ -12,6 +12,7 @@ export const ORDER_STATUSES = [
   "priced",
   "payment_pending",
   "paid",
+  "pending_acceptance",
   "driver_assigned",
   "picked_up",
   "in_transit",
@@ -35,8 +36,17 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   // Stripe webhook confirms payment, or the Checkout session expires
   // (reverts to priced so the customer can retry).
   payment_pending: ["paid", "priced", "cancelled"],
-  // Staff assigns a driver from the dispatch queue.
-  paid: ["driver_assigned", "cancelled"],
+  // Staff assigns a driver from the dispatch queue — the driver hasn't
+  // agreed to it yet, so this lands on pending_acceptance, not
+  // driver_assigned directly.
+  paid: ["pending_acceptance", "cancelled"],
+  // Accept -> driver_assigned. Decline -> paid (reverts to unassigned,
+  // clearing driverId, so it falls straight back into the same pool
+  // staff already work an unassigned order from — no separate
+  // "declined" state to track). Staff can still directly cancel/fail
+  // while a driver request is outstanding (e.g. the customer calls to
+  // cancel).
+  pending_acceptance: ["driver_assigned", "paid", "cancelled", "failed"],
   // Driver picks up the order, or a pickup-side problem occurs (store
   // couldn't find the order, order not ready, etc.) — that's a failure,
   // not a cancellation, since the customer already paid.

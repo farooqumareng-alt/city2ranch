@@ -3,11 +3,12 @@
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
-import { orders } from "@/lib/db/schema";
+import { orders, stores } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { resolvePickupAddress } from "@/lib/orders/pickup-address";
 import type { ActionResult } from "@/lib/actions/types";
 
 export async function assignDriver(
@@ -26,12 +27,42 @@ export async function assignDriver(
   }
 
   const db = getDb();
-  const rows = await db.select().from(orders).where(eq(orders.id, orderId));
+  const rows = await db
+    .select({
+      status: orders.status,
+      serviceType: orders.serviceType,
+      pickupAddressLine1: orders.pickupAddressLine1,
+      pickupAddressLine2: orders.pickupAddressLine2,
+      pickupCity: orders.pickupCity,
+      pickupState: orders.pickupState,
+      pickupZip: orders.pickupZip,
+      storeAddressLine1: stores.addressLine1,
+      storeCity: stores.city,
+      storeState: stores.state,
+      storeZip: stores.zip,
+    })
+    .from(orders)
+    .leftJoin(stores, eq(orders.storeId, stores.id))
+    .where(eq(orders.id, orderId));
   const order = rows[0];
   if (!order) return { ok: false, message: "Order not found." };
 
+  // A driver can't be sent to a pickup with no known address — a
+  // brand-only store (see the comment on stores.addressLine1 in
+  // schema.ts) has none of its own, so this only ever blocks City
+  // Pickup, and only until a dispatcher fills one in (see
+  // update-pickup-address.ts). Never trust that the Service Record's
+  // own UI-level gate alone kept this from being submitted anyway —
+  // same discipline as every other action in this app.
+  if (order.serviceType === "pickup" && !resolvePickupAddress(order)) {
+    return {
+      ok: false,
+      message: "Add a pickup address for this order before assigning a driver.",
+    };
+  }
+
   try {
-    assertTransition(order.status, "driver_assigned");
+    assertTransition(order.status, "pending_acceptance");
   } catch {
     return {
       ok: false,
@@ -44,11 +75,15 @@ export async function assignDriver(
   // moment could both pass the assertTransition check above (both read
   // the pre-assignment status) and both write — the second silently
   // overwriting the first's driverId with no indication anything raced.
+  //
+  // Lands on pending_acceptance, not driver_assigned — the driver still
+  // has to accept (see driver-accept-decline.ts) before they're
+  // genuinely committed to the job.
   const updated = await db
     .update(orders)
     .set({
       driverId,
-      status: "driver_assigned",
+      status: "pending_acceptance",
       assignedAt: new Date(),
       updatedAt: new Date(),
     })
@@ -67,15 +102,16 @@ export async function assignDriver(
     actorId: user?.id ?? null,
     action: "driver_assigned",
     previousState: order.status,
-    newState: "driver_assigned",
+    newState: "pending_acceptance",
     metadata: { driverId },
   });
 
-  // Both paths: the queue (where this order actually lives) and the
-  // dashboard (whose stats/Needs-Attention feed this mutation affects) —
-  // without the second call the dashboard would show stale data until
-  // an unrelated navigation forced a refetch.
+  // All three: the queue (where this order actually lives), the
+  // dashboard (whose stats/Needs-Attention feed this mutation affects),
+  // and this order's own Service Record — without these an unrelated
+  // navigation would be needed to see anything refresh.
   revalidatePath("/internal/dispatch/queue");
   revalidatePath("/internal/dispatch");
+  revalidatePath(`/internal/dispatch/orders/${orderId}`);
   return { ok: true };
 }

@@ -10,6 +10,7 @@
 export function isPanelRoute(pathname: string): boolean {
   return (
     pathname.startsWith("/home") ||
+    pathname.startsWith("/my-services") ||
     pathname.startsWith("/requests") ||
     pathname.startsWith("/deliveries") ||
     pathname.startsWith("/orders") ||

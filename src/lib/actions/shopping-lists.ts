@@ -61,7 +61,7 @@ export async function createShoppingList(
   }
 
   revalidatePath("/lists");
-  revalidatePath("/request-service");
+  revalidatePath("/request-service/concierge");
   redirect("/lists");
 }
 
@@ -118,7 +118,7 @@ export async function updateShoppingList(
   }
 
   revalidatePath("/lists");
-  revalidatePath("/request-service");
+  revalidatePath("/request-service/concierge");
   redirect("/lists");
 }
 
@@ -132,5 +132,5 @@ export async function deleteShoppingList(listId: string): Promise<void> {
   await db.delete(shoppingLists).where(and(eq(shoppingLists.id, listId), eq(shoppingLists.authUserId, ownerId)));
 
   revalidatePath("/lists");
-  revalidatePath("/request-service");
+  revalidatePath("/request-service/concierge");
 }
