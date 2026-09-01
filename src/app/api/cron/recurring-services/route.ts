@@ -7,6 +7,7 @@ import { advanceNextRunAt } from "@/lib/recurring-services/schedule";
 import { getResend } from "@/lib/email/resend";
 import { recurringOrderCreatedEmail } from "@/lib/email/templates";
 import { shouldNotify } from "@/lib/notifications/should-send";
+import { createNotification } from "@/lib/notifications/create";
 
 /**
  * Invoked by Vercel Cron (see vercel.json) on a schedule, not by any
@@ -119,6 +120,17 @@ export async function GET(request: NextRequest) {
       });
 
       spawned++;
+
+      // The in-app bell record is unconditional — independent of the
+      // recurringOrderCreated email preference below, same reasoning as
+      // the payment-confirmed notification in the Stripe webhook.
+      await createNotification({
+        authUserId: plan.authUserId,
+        type: "recurring_order_created",
+        title: "New order from your recurring request",
+        body: "Review your shopping list and approve it before it's charged.",
+        orderId,
+      });
 
       // Best-effort, non-blocking — same pattern as every other
       // transactional email in this app. A failed notification never

@@ -309,6 +309,20 @@
       "when": 1788229065314,
       "tag": "0043_pickup_address_and_brand_only_stores",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1788296643058,
+      "tag": "0044_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1788296660022,
+      "tag": "0045_rls_notifications",
+      "breakpoints": true
     }
   ]
 }

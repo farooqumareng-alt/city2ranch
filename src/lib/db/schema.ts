@@ -285,6 +285,37 @@ export const notificationPreferences = pgTable(
   (table) => [unique().on(table.authUserId)]
 );
 
+// The two events that already trigger a customer email (see
+// notificationPreferences above) — this table is a second, independent
+// channel, not gated by those email preferences: a customer who opted
+// out of the payment-receipt email still gets the in-app record. Real
+// order-lifecycle notifications (driver assigned/picked up/delivered)
+// are a known, separate gap — not covered by this table yet.
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "payment_confirmed",
+  "recurring_order_created",
+]);
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  authUserId: uuid("auth_user_id")
+    .notNull()
+    .references(() => authUsers.id),
+  type: notificationTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  // Nullable: both current notification types happen to be order-scoped,
+  // but a future type might not be — the bell's UI treats a null orderId
+  // as "not clickable to an order," not an error.
+  orderId: uuid("order_id").references(() => orders.id),
+  // Null means unread — same "absence is the default state" convention
+  // as every other nullable timestamp in this schema (paidAt, deliveredAt).
+  readAt: timestamp("read_at", { withTimezone: true }),
+});
+
 // Matches src/lib/stripe/tiers.ts's MembershipTier keys, which are
 // deliberately the same strings as SERVICE_TIERS' `key` in
 // src/lib/constants.ts (the unpriced marketing-page tiers) even though
