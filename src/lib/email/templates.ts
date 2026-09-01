@@ -136,10 +136,17 @@ function renderFields(fields: Record<string, string | null | undefined>): string
  *  readable fact sheet, not a customer-facing marketing email, but
  *  still built on the same professional shell as everything else this
  *  app sends. */
-function wrap(title: string, fields: Record<string, string | null | undefined>) {
+// extraHtml (a ctaButton(), normally) is appended after the fields
+// table — optional so every existing internal-notification caller
+// (waitlist, founding member, contact) is unaffected. Added
+// 2026-09-01 (lifecycle audit issue #3) specifically so
+// serviceRequestEmail can link straight back to the request instead
+// of being a plain, unactionable data dump.
+function wrap(title: string, fields: Record<string, string | null | undefined>, extraHtml = "") {
   const bodyHtml = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
     ${renderFields(fields)}
-  </table>`;
+  </table>
+  ${extraHtml}`;
   return {
     subject: `${title} — City2Ranch`,
     html: renderShell(title, bodyHtml),
@@ -189,6 +196,10 @@ export function foundingMemberEmail(fields: {
 }
 
 export function serviceRequestEmail(fields: {
+  // Added 2026-09-01 (lifecycle audit issue #3) so this email can link
+  // straight to the "Start Quote" action for this specific request,
+  // instead of being a plain data dump with nowhere to click.
+  id: string;
   name: string;
   email: string;
   phone: string;
@@ -206,22 +217,61 @@ export function serviceRequestEmail(fields: {
   notes?: string;
   referralSource?: string;
 }) {
-  return wrap("New Private Service Request", {
-    Name: fields.name,
-    Email: fields.email,
-    Phone: fields.phone,
-    Address: [fields.addressLine1, fields.addressLine2, `${fields.city}, ${fields.state} ${fields.zip}`]
-      .filter(Boolean)
-      .join(", "),
-    "Service type": fields.serviceType,
-    "Preferred store": fields.preferredStore,
-    "Shopping list": fields.shoppingList,
-    "Estimated order value": fields.estimatedOrderValue,
-    Timing: fields.timingPreference,
-    "Requested delivery date": fields.requestedDeliveryDate,
-    Notes: fields.notes,
-    "Referred by": fields.referralSource,
-  });
+  return wrap(
+    "New Private Service Request",
+    {
+      Name: fields.name,
+      Email: fields.email,
+      Phone: fields.phone,
+      Address: [fields.addressLine1, fields.addressLine2, `${fields.city}, ${fields.state} ${fields.zip}`]
+        .filter(Boolean)
+        .join(", "),
+      "Service type": fields.serviceType,
+      "Preferred store": fields.preferredStore,
+      "Shopping list": fields.shoppingList,
+      "Estimated order value": fields.estimatedOrderValue,
+      Timing: fields.timingPreference,
+      "Requested delivery date": fields.requestedDeliveryDate,
+      Notes: fields.notes,
+      "Referred by": fields.referralSource,
+    },
+    ctaButton("Open Request", `${SITE_URL}/internal/dispatch/concierge/new?fromRequest=${fields.id}`)
+  );
+}
+
+// Added 2026-09-01 (lifecycle audit issue #2) — submitServiceRequest()
+// previously sent zero customer-facing email at all; this is that
+// transactional confirmation. customerWrap() (defined further down)
+// is used by orderPaymentConfirmedEmail/quoteReadyEmail below, all
+// three sharing the same signed shell — declared up here since
+// service_request submission is the earliest event in the lifecycle.
+export function requestReceivedEmail(fields: {
+  serviceType: string;
+  shoppingList?: string;
+  signInUrl: string;
+}) {
+  return customerWrap(
+    "We've Received Your Request",
+    `
+      <p style="margin:0 0 20px;">Thank you — we've received your ${escapeHtml(fields.serviceType)} request.</p>
+      ${
+        fields.shoppingList
+          ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border:1px solid ${COLORS.hairline};border-radius:4px;background-color:${COLORS.ivory};width:100%;">
+        <tr>
+          <td style="padding:16px 20px;">
+            <p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:${COLORS.muted};">Your list</p>
+            <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:${COLORS.text};white-space:pre-wrap;">${escapeHtml(fields.shoppingList)}</p>
+          </td>
+        </tr>
+      </table>`
+          : ""
+      }
+      <p style="margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:${COLORS.muted};">Status</p>
+      <p style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:${COLORS.navy};">Request Received</p>
+      <p style="margin:0 0 20px;">Our concierge team will review it and follow up with availability and pricing. You don't need to do anything right now.</p>
+      ${ctaButton("Sign In to Check Status", fields.signInUrl)}
+    `
+  );
 }
 
 // A closing sign-off, not a contact channel — this site publishes no
@@ -328,4 +378,33 @@ export function contactMessageEmail(fields: {
     Phone: fields.phone,
     Message: fields.message,
   });
+}
+
+// Added 2026-09-01 (lifecycle audit issue #8) — assigning a driver used
+// to send them nothing at all; they'd only find out by opening the app
+// and checking "Awaiting Response" themselves. Uses renderShell()
+// directly rather than wrap()/customerWrap() — this is an operational
+// notice to a driver, not an internal-staff data dump or a
+// customer-facing confirmation, so neither existing shape quite fits.
+export function driverJobOfferedEmail(fields: {
+  driverName: string;
+  storeName: string | null;
+  deliveryCity: string;
+  deliveryState: string;
+  jobUrl: string;
+}) {
+  const title = "New Job Offered";
+  const what = fields.storeName ? `a City Pickup from ${escapeHtml(fields.storeName)}` : "a Concierge order";
+  return {
+    subject: `${title} — City2Ranch`,
+    html: renderShell(
+      title,
+      `
+        <p style="margin:0 0 20px;">Hi ${escapeHtml(fields.driverName)}, you've been offered ${what}, delivering to
+        ${escapeHtml(fields.deliveryCity)}, ${escapeHtml(fields.deliveryState)}.</p>
+        <p style="margin:0 0 20px;">Open the job to accept or decline.</p>
+        ${ctaButton("Open Job", fields.jobUrl)}
+      `
+    ),
+  };
 }

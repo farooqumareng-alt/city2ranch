@@ -3,7 +3,7 @@
 import { getDb } from "@/lib/db";
 import { serviceRequests } from "@/lib/db/schema";
 import { getResend } from "@/lib/email/resend";
-import { serviceRequestEmail } from "@/lib/email/templates";
+import { serviceRequestEmail, requestReceivedEmail } from "@/lib/email/templates";
 import { formServicesConfigured, SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/env";
 import { serviceRequestSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
@@ -68,10 +68,16 @@ export async function submitServiceRequest(
   }
 
   const data = parsed.data;
+  let requestId: string;
 
   try {
     const db = getDb();
-    await db.insert(serviceRequests).values(data);
+    // .returning() added 2026-09-01 (lifecycle audit issues #2/#3) — the
+    // insert used to discard the new row's id entirely, so neither the
+    // admin notification nor a customer confirmation had anything to
+    // link back to.
+    const [row] = await db.insert(serviceRequests).values(data).returning({ id: serviceRequests.id });
+    requestId = row.id;
   } catch (error) {
     console.error("[submitServiceRequest] database write failed", error);
     return {
@@ -81,9 +87,11 @@ export async function submitServiceRequest(
     };
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
   try {
     const resend = getResend();
-    const { subject, html } = serviceRequestEmail(data);
+    const { subject, html } = serviceRequestEmail({ ...data, id: requestId });
     await resend.emails.send({
       from: process.env.EMAIL_FROM ?? "notifications@city2ranch.com",
       to: process.env.CONCIERGE_NOTIFY_EMAIL ?? "",
@@ -92,6 +100,27 @@ export async function submitServiceRequest(
     });
   } catch (error) {
     console.error("[submitServiceRequest] notification email failed", error);
+  }
+
+  // Customer-facing confirmation — this used to not exist at all
+  // (lifecycle audit issue #2). Best-effort, like every other email
+  // send in this codebase: never blocks the request itself from
+  // succeeding.
+  try {
+    const resend = getResend();
+    const { subject, html } = requestReceivedEmail({
+      serviceType: data.serviceType,
+      shoppingList: data.shoppingList,
+      signInUrl: `${siteUrl}/sign-in?next=/my-services`,
+    });
+    await resend.emails.send({
+      from: process.env.EMAIL_FROM ?? "notifications@city2ranch.com",
+      to: data.email,
+      subject,
+      html,
+    });
+  } catch (error) {
+    console.error("[submitServiceRequest] customer confirmation email failed", error);
   }
 
   return { ok: true };

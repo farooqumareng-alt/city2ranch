@@ -16,9 +16,11 @@ export function isPanelRoute(pathname: string): boolean {
     pathname.startsWith("/orders") ||
     pathname.startsWith("/places") ||
     pathname.startsWith("/lists") ||
+    pathname.startsWith("/recurring-services") ||
     pathname.startsWith("/household") ||
     pathname.startsWith("/membership") ||
     pathname.startsWith("/payments") ||
+    pathname.startsWith("/notifications") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/support") ||
     pathname.startsWith("/internal")

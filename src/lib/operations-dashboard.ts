@@ -1,29 +1,34 @@
-import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { count, eq, gte, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { drivers, orders, serviceRequests } from "@/lib/db/schema";
+import { drivers, orders } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
+import { getWorkQueue, type WorkQueueItem } from "@/lib/work-queue";
 
-const ACTIVE_JOB_STATUSES = ["paid", "pending_acceptance", "driver_assigned", "picked_up", "in_transit"] as const;
 // A proxy for "probably not yet handled" — there's no acknowledgedAt/
 // resolution column on `orders` to actually tell a fresh failure from
 // one staff already resolved by phone weeks ago. Disclosed limitation,
 // not a design nicety: without a recency bound this list only grows,
-// and stops being an honest "needs attention" signal.
+// and stops being an honest "needs attention" signal. Unlike the old
+// 24-hour quote filter this replaces, this bound only ever *hides old*
+// items — it never blocks a brand-new one from appearing, which is
+// exactly the distinction the 2026-09-01 lifecycle audit called out.
 const FAILED_LOOKBACK_HOURS = 72;
-const AGED_QUOTE_HOURS = 24;
+const ATTENTION_LIMIT = 10;
 
 /**
- * Everything the Operations Center dashboard (/internal/dispatch) needs,
- * in one place — mirrors src/lib/account-dashboard.ts's shape (a
- * Promise.all of narrow, purpose-built selects returning one flat
- * object), the customer-side precedent for exactly this kind of page.
+ * Everything the Operations Center dashboard (/internal/dispatch) needs.
  *
- * Every stat here is backed by a real, existing column — nothing is
- * fabricated. Notably absent, on purpose: a revenue trend/comparison
- * (no historical baseline exists anywhere to compare against), driver
- * availability (no calendar/availability schema exists), and anything
- * about "recurring requests awaiting approval" (that approval is a
- * customer-side action on their own order, not a staff to-do).
+ * Rewritten 2026-09-01 (lifecycle audit, issue #5) to derive its stats
+ * and "Needs Attention" feed from getWorkQueue() — the same source
+ * Work Queue itself already gets right — instead of a second,
+ * separately-written set of queries. The two screens disagreeing was
+ * the actual bug (a fresh request/quote showed on Work Queue
+ * immediately but took 24 hours to reach this page's Needs Attention);
+ * this closes that by having one authoritative query, not two.
+ *
+ * Still queried separately: active driver count and today's revenue —
+ * genuinely not part of "what does staff need to work on," so there's
+ * nothing to unify there.
  */
 export async function getOperationsDashboard() {
   // This data function, not just the page rendering it, is the real
@@ -38,87 +43,42 @@ export async function getOperationsDashboard() {
   // the figure resets at UTC midnight, not local midnight.
   const startOfTodayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const failedSince = new Date(now.getTime() - FAILED_LOOKBACK_HOURS * 3_600_000);
-  const agedQuoteBefore = new Date(now.getTime() - AGED_QUOTE_HOURS * 3_600_000);
 
-  const [
-    newLeadCount,
-    orderStatusCounts,
-    todaysRevenue,
-    activeDriverCount,
-    unassignedPaidOrders,
-    agedConciergeQuotes,
-    recentFailedOrders,
-  ] = await Promise.all([
-    db.select({ n: count() }).from(serviceRequests).where(eq(serviceRequests.status, "new")),
-
-    // One groupBy covers "pending quotes," "awaiting payment," and
-    // "active jobs" instead of three separate count() calls on the same
-    // table — the DB pool is small (max: 5 per instance, see
-    // src/lib/db/index.ts), so minimizing fan-out on one table matters
-    // more here than it would on a page with headroom to spare.
-    db
-      .select({ status: orders.status, n: count() })
-      .from(orders)
-      .where(inArray(orders.status, ["quote_pending", "priced", ...ACTIVE_JOB_STATUSES]))
-      .groupBy(orders.status),
-
-    // sum() returns a Postgres `numeric`, which surfaces as a string (or
-    // null on zero rows) via postgres-js — coerced with Number() below.
-    // First use of sum() in this codebase; every other aggregate here is
-    // count().
+  const [workQueue, todaysRevenue, activeDriverCount] = await Promise.all([
+    getWorkQueue(),
     db
       .select({ total: sql<string | null>`sum(${orders.totalCents})` })
       .from(orders)
       .where(gte(orders.paidAt, startOfTodayUtc)),
-
     db.select({ n: count() }).from(drivers).where(eq(drivers.isActive, true)),
-
-    // Needs attention: paid, no driver yet — oldest first (FIFO, same as
-    // the queue page itself).
-    db
-      .select({ id: orders.id, customerName: orders.customerName, createdAt: orders.createdAt })
-      .from(orders)
-      .where(eq(orders.status, "paid"))
-      .orderBy(orders.createdAt)
-      .limit(10),
-
-    // Needs attention: a concierge quote or price sitting unresolved.
-    db
-      .select({ id: orders.id, customerName: orders.customerName, status: orders.status, createdAt: orders.createdAt })
-      .from(orders)
-      .where(and(inArray(orders.status, ["quote_pending", "priced"]), lt(orders.createdAt, agedQuoteBefore)))
-      .orderBy(orders.createdAt)
-      .limit(10),
-
-    // Needs attention: recently failed — see FAILED_LOOKBACK_HOURS above.
-    db
-      .select({
-        id: orders.id,
-        customerName: orders.customerName,
-        customerPhone: orders.customerPhone,
-        updatedAt: orders.updatedAt,
-      })
-      .from(orders)
-      .where(and(eq(orders.status, "failed"), gte(orders.updatedAt, failedSince)))
-      .orderBy(sql`${orders.updatedAt} desc`)
-      .limit(10),
   ]);
 
-  const countByStatus = Object.fromEntries(orderStatusCounts.map((r) => [r.status, r.n]));
+  const byBucket = (bucket: WorkQueueItem["bucket"]) => workQueue.filter((i) => i.bucket === bucket);
+
+  const needsQuote = byBucket("needs_quote"); // requests + orders, no age filter — the actual fix
+  const newLeads = needsQuote.filter((i) => i.kind === "request");
+  const pendingConciergeQuotes = needsQuote.filter((i) => i.kind === "order");
+  const awaitingCustomer = byBucket("awaiting_customer");
+  const readyToDispatch = byBucket("ready_to_dispatch");
+  const inProgress = [...byBucket("awaiting_driver_response"), ...byBucket("in_progress")];
+  const recentFailed = byBucket("exceptions").filter((i) => i.updatedAt >= failedSince);
 
   return {
     stats: {
-      newLeads: newLeadCount[0]?.n ?? 0,
-      pendingConciergeQuotes: countByStatus.quote_pending ?? 0,
-      awaitingPayment: countByStatus.priced ?? 0,
-      activeJobs: ACTIVE_JOB_STATUSES.reduce((sum, s) => sum + (countByStatus[s] ?? 0), 0),
+      newLeads: newLeads.length,
+      pendingConciergeQuotes: pendingConciergeQuotes.length,
+      awaitingPayment: awaitingCustomer.length,
+      activeJobs: readyToDispatch.length + inProgress.length,
       activeDrivers: activeDriverCount[0]?.n ?? 0,
       todaysRevenueCents: Number(todaysRevenue[0]?.total ?? 0),
     },
     needsAttention: {
-      unassignedPaidOrders,
-      agedConciergeQuotes,
-      recentFailedOrders,
+      // Every needs-quote item (request or order), immediately — the
+      // core fix: this used to only include orders older than 24 hours.
+      needsQuote: needsQuote.slice(0, ATTENTION_LIMIT),
+      // Paid, no driver offered yet.
+      unassignedPaidOrders: readyToDispatch.slice(0, ATTENTION_LIMIT),
+      recentFailedOrders: recentFailed.slice(0, ATTENTION_LIMIT),
     },
   };
 }

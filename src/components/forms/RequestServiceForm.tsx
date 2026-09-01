@@ -98,7 +98,8 @@ export function RequestServiceForm({
         <p className="font-serif text-xl text-navy-deep">Thank you.</p>
         <p className="mt-2 font-sans text-sm text-charcoal/70">
           A City2Ranch concierge will review your request and contact you
-          with availability and pricing.
+          with availability and pricing. We&apos;ve also sent a confirmation
+          to your email.
         </p>
       </div>
     );
