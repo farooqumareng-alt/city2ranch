@@ -15,6 +15,7 @@ import { formatPlainDate } from "@/lib/format";
 import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 import { getOrderMessages } from "@/lib/order-messages";
 import { OrderMessageThread } from "@/components/orders/OrderMessageThread";
+import { resolvePickupAddress, formatPickupAddress } from "@/lib/orders/pickup-address";
 
 export const metadata: Metadata = { title: "Service Details" };
 
@@ -44,6 +45,11 @@ export default async function ServiceDetailPage({
       authUserId: orders.authUserId,
       retailerOrderNumber: orders.retailerOrderNumber,
       pickupNotes: orders.pickupNotes,
+      pickupAddressLine1: orders.pickupAddressLine1,
+      pickupAddressLine2: orders.pickupAddressLine2,
+      pickupCity: orders.pickupCity,
+      pickupState: orders.pickupState,
+      pickupZip: orders.pickupZip,
       deliveryAddressLine1: orders.deliveryAddressLine1,
       deliveryAddressLine2: orders.deliveryAddressLine2,
       deliveryCity: orders.deliveryCity,
@@ -55,7 +61,10 @@ export default async function ServiceDetailPage({
       paidAt: orders.paidAt,
       completedAt: orders.completedAt,
       storeName: stores.name,
-      storeAddress: stores.addressLine1,
+      storeAddressLine1: stores.addressLine1,
+      storeCity: stores.city,
+      storeState: stores.state,
+      storeZip: stores.zip,
       driverName: drivers.name,
     })
     .from(orders)
@@ -89,6 +98,7 @@ export default async function ServiceDetailPage({
     getOrderTimeline(order.id),
   ]);
   const deliveryPin = pinRows[0]?.pin ?? null;
+  const pickupAddress = resolvePickupAddress(order);
 
   return (
     <div className="flex flex-col gap-10">
@@ -124,8 +134,14 @@ export default async function ServiceDetailPage({
           <div>
             <h3 className="font-serif text-lg text-navy-deep">Pickup</h3>
             <p className="font-sans text-sm text-charcoal/70">
-              {order.storeName} — {order.storeAddress}
+              {order.storeName}
+              {pickupAddress ? ` — ${formatPickupAddress(pickupAddress)}` : ""}
             </p>
+            {!pickupAddress ? (
+              <p className="font-sans text-xs text-charcoal/50">
+                We&apos;ll confirm the exact pickup address with you before a driver is assigned.
+              </p>
+            ) : null}
             <p className="font-sans text-sm text-charcoal/70">
               Order #{order.retailerOrderNumber}
             </p>

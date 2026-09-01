@@ -16,4 +16,18 @@ export default defineConfig({
       "@": path.resolve(dirname, "src"),
     },
   },
+  test: {
+    // There are now three test files that open their own live
+    // connection straight to the shared Supabase pooler (transaction
+    // mode) — rls-security, lifecycle-integration, business-overview.
+    // Run concurrently (vitest's default), they intermittently produced
+    // "prepared statement does not exist" errors from pooler contention
+    // between separate `postgres` connections — a real, reproducible
+    // side effect of the pool, not a bug in any one file (each passes
+    // 100% of the time run alone). Running test *files* sequentially
+    // costs a few seconds on this small a suite and removes the
+    // flakiness at the source, rather than papering over it with
+    // retries.
+    fileParallelism: false,
+  },
 });

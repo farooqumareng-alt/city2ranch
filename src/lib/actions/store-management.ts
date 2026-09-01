@@ -85,7 +85,21 @@ export async function updateStore(
 
   try {
     const db = getDb();
-    await db.update(stores).set(parsed.data).where(eq(stores.id, storeId));
+    // Explicit `?? null` on every optional field — drizzle's .set()
+    // omits an `undefined` key entirely rather than clearing it, so
+    // without this a staff member emptying the Address field to turn a
+    // store brand-only would silently have no effect.
+    await db
+      .update(stores)
+      .set({
+        name: parsed.data.name,
+        addressLine1: parsed.data.addressLine1 ?? null,
+        city: parsed.data.city ?? null,
+        state: parsed.data.state ?? null,
+        zip: parsed.data.zip ?? null,
+        phone: parsed.data.phone ?? null,
+      })
+      .where(eq(stores.id, storeId));
   } catch (error) {
     console.error("[updateStore] failed", error);
     return {

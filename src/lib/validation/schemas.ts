@@ -109,6 +109,15 @@ export const orderSubmitSchema = z.object({
   customerName: requiredText("Full name"),
   customerPhone: phone,
   pickupNotes: optionalText,
+  // All optional — a customer may only know the store brand, not its
+  // exact address (see the comment on stores.addressLine1 in
+  // schema.ts). A dispatcher can add or correct this later via
+  // pickupAddressSchema below.
+  pickupAddressLine1: optionalText,
+  pickupAddressLine2: optionalText,
+  pickupCity: optionalText,
+  pickupState: optionalText,
+  pickupZip: optionalZip,
   deliveryAddressLine1: requiredText("Address"),
   deliveryAddressLine2: optionalText,
   deliveryCity: requiredText("City"),
@@ -118,6 +127,19 @@ export const orderSubmitSchema = z.object({
   requestedDeliveryDate: optionalDate,
 });
 export type OrderSubmitInput = z.infer<typeof orderSubmitSchema>;
+
+// The dispatcher-facing counterpart (update-pickup-address.ts) —
+// line1/city/state required here, unlike the customer form above: a
+// staff member explicitly filling this in should supply a real usable
+// address, not save a blank over one that might already be there.
+export const pickupAddressSchema = z.object({
+  pickupAddressLine1: requiredText("Pickup address"),
+  pickupAddressLine2: optionalText,
+  pickupCity: requiredText("City"),
+  pickupState: requiredText("State", 2),
+  pickupZip: optionalZip,
+});
+export type PickupAddressInput = z.infer<typeof pickupAddressSchema>;
 
 // Every field optional — a customer can save just a name and phone
 // without an address, or update one field at a time. Nothing here is
@@ -327,12 +349,16 @@ export const addDriverSchema = z.object({
 // insert (see the doc comments on stores.market/pricingRules.market/
 // zipMileage.market in schema.ts) until a second market actually exists.
 
+// Address fields are optional as of 2026-08-31 — a store can be a
+// brand only (Walmart, H-E-B, ...) with no fixed location, since the
+// actual pickup address now lives per-order instead (see the comment
+// on stores.addressLine1 in schema.ts and pickupAddressSchema above).
 export const storeSchema = z.object({
   name: requiredText("Store name"),
-  addressLine1: requiredText("Address"),
-  city: requiredText("City"),
-  state: requiredText("State", 2),
-  zip,
+  addressLine1: optionalText,
+  city: optionalText,
+  state: optionalText,
+  zip: optionalZip,
   phone: optionalText,
 });
 export type StoreInput = z.infer<typeof storeSchema>;

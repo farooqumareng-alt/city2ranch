@@ -8,7 +8,10 @@ import type { ActionResult } from "@/lib/actions/types";
 
 const initialState: ActionResult | undefined = undefined;
 
-type Store = { id: string; name: string; city: string; state: string };
+// city/state are nullable now — a store can be brand-only with no
+// fixed location (see the comment on stores.addressLine1 in
+// schema.ts); the dropdown label below falls back to the name alone.
+type Store = { id: string; name: string; city: string | null; state: string | null };
 type ProfileDefaults = {
   name: string | null;
   phone: string | null;
@@ -82,7 +85,7 @@ export function OrderPickupForm({
             defaultValue={values?.storeId}
             options={stores.map((s) => ({
               value: s.id,
-              label: `${s.name} — ${s.city}, ${s.state}`,
+              label: s.city && s.state ? `${s.name} — ${s.city}, ${s.state}` : s.name,
             }))}
             error={fieldErrors?.storeId}
           />
@@ -101,6 +104,48 @@ export function OrderPickupForm({
           defaultValue={values?.pickupNotes}
           error={fieldErrors?.pickupNotes}
         />
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-4">
+        <legend className="font-serif text-lg text-navy-deep">Pickup Location</legend>
+        <p className="font-sans text-sm text-charcoal/60">
+          Know the exact address for this pickup? Add it below — otherwise we&apos;ll
+          confirm it with you before a driver is assigned.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField
+            name="pickupAddressLine1"
+            label="Pickup address"
+            className="sm:col-span-2"
+            defaultValue={values?.pickupAddressLine1}
+            error={fieldErrors?.pickupAddressLine1}
+          />
+          <TextField
+            name="pickupAddressLine2"
+            label="Address line 2"
+            className="sm:col-span-2"
+            defaultValue={values?.pickupAddressLine2}
+            error={fieldErrors?.pickupAddressLine2}
+          />
+          <TextField
+            name="pickupCity"
+            label="City"
+            defaultValue={values?.pickupCity}
+            error={fieldErrors?.pickupCity}
+          />
+          <TextField
+            name="pickupState"
+            label="State"
+            defaultValue={values?.pickupState}
+            error={fieldErrors?.pickupState}
+          />
+          <TextField
+            name="pickupZip"
+            label="ZIP code"
+            defaultValue={values?.pickupZip}
+            error={fieldErrors?.pickupZip}
+          />
+        </div>
       </fieldset>
 
       <fieldset className="flex flex-col gap-4">

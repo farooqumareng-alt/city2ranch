@@ -3,11 +3,12 @@
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
-import { orders } from "@/lib/db/schema";
+import { orders, stores } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { resolvePickupAddress } from "@/lib/orders/pickup-address";
 import type { ActionResult } from "@/lib/actions/types";
 
 export async function assignDriver(
@@ -26,9 +27,39 @@ export async function assignDriver(
   }
 
   const db = getDb();
-  const rows = await db.select().from(orders).where(eq(orders.id, orderId));
+  const rows = await db
+    .select({
+      status: orders.status,
+      serviceType: orders.serviceType,
+      pickupAddressLine1: orders.pickupAddressLine1,
+      pickupAddressLine2: orders.pickupAddressLine2,
+      pickupCity: orders.pickupCity,
+      pickupState: orders.pickupState,
+      pickupZip: orders.pickupZip,
+      storeAddressLine1: stores.addressLine1,
+      storeCity: stores.city,
+      storeState: stores.state,
+      storeZip: stores.zip,
+    })
+    .from(orders)
+    .leftJoin(stores, eq(orders.storeId, stores.id))
+    .where(eq(orders.id, orderId));
   const order = rows[0];
   if (!order) return { ok: false, message: "Order not found." };
+
+  // A driver can't be sent to a pickup with no known address — a
+  // brand-only store (see the comment on stores.addressLine1 in
+  // schema.ts) has none of its own, so this only ever blocks City
+  // Pickup, and only until a dispatcher fills one in (see
+  // update-pickup-address.ts). Never trust that the Service Record's
+  // own UI-level gate alone kept this from being submitted anyway —
+  // same discipline as every other action in this app.
+  if (order.serviceType === "pickup" && !resolvePickupAddress(order)) {
+    return {
+      ok: false,
+      message: "Add a pickup address for this order before assigning a driver.",
+    };
+  }
 
   try {
     assertTransition(order.status, "pending_acceptance");

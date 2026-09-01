@@ -7,12 +7,15 @@ import type { ActionResult } from "@/lib/actions/types";
 
 const initialState: ActionResult | undefined = undefined;
 
+// Address fields are nullable — a store can be a brand only (Walmart,
+// H-E-B, ...) with no fixed location; the actual pickup address for a
+// given order lives on the order instead (see pickup-address.ts).
 export type StoreDefaults = {
   name: string;
-  addressLine1: string;
-  city: string;
-  state: string;
-  zip: string;
+  addressLine1: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
   phone: string | null;
 };
 
@@ -49,34 +52,34 @@ export function StoreForm({
         error={fieldErrors?.name}
       />
 
+      <p className="font-sans text-xs text-charcoal/60">
+        Address is optional — leave it blank for a brand you support at multiple locations (e.g. Walmart);
+        the actual pickup address is captured per order instead, by the customer or a dispatcher.
+      </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField
           name="addressLine1"
           label="Address"
-          required
           className="sm:col-span-2"
-          defaultValue={values?.addressLine1 ?? store?.addressLine1}
+          defaultValue={values?.addressLine1 ?? store?.addressLine1 ?? ""}
           error={fieldErrors?.addressLine1}
         />
         <TextField
           name="city"
           label="City"
-          required
-          defaultValue={values?.city ?? store?.city}
+          defaultValue={values?.city ?? store?.city ?? ""}
           error={fieldErrors?.city}
         />
         <TextField
           name="state"
           label="State"
-          required
-          defaultValue={values?.state ?? store?.state}
+          defaultValue={values?.state ?? store?.state ?? ""}
           error={fieldErrors?.state}
         />
         <TextField
           name="zip"
           label="ZIP code"
-          required
-          defaultValue={values?.zip ?? store?.zip}
+          defaultValue={values?.zip ?? store?.zip ?? ""}
           error={fieldErrors?.zip}
         />
         <TextField

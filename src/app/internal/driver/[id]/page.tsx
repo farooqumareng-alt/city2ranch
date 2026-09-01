@@ -16,6 +16,7 @@ import { markInTransit } from "@/lib/actions/driver-mark-in-transit";
 import { getOrderItems } from "@/lib/orders/concierge";
 import { formatPlainDate } from "@/lib/format";
 import { mapsUrl } from "@/lib/maps";
+import { resolvePickupAddress, formatPickupAddress } from "@/lib/orders/pickup-address";
 
 export const metadata: Metadata = { title: "Job Detail" };
 
@@ -43,6 +44,11 @@ export default async function DriverJobDetailPage({
       serviceType: orders.serviceType,
       retailerOrderNumber: orders.retailerOrderNumber,
       pickupNotes: orders.pickupNotes,
+      pickupAddressLine1: orders.pickupAddressLine1,
+      pickupAddressLine2: orders.pickupAddressLine2,
+      pickupCity: orders.pickupCity,
+      pickupState: orders.pickupState,
+      pickupZip: orders.pickupZip,
       deliveryAddressLine1: orders.deliveryAddressLine1,
       deliveryAddressLine2: orders.deliveryAddressLine2,
       deliveryCity: orders.deliveryCity,
@@ -51,9 +57,10 @@ export default async function DriverJobDetailPage({
       customerNotes: orders.customerNotes,
       requestedDeliveryDate: orders.requestedDeliveryDate,
       storeName: stores.name,
-      storeAddress: stores.addressLine1,
+      storeAddressLine1: stores.addressLine1,
       storeCity: stores.city,
       storeState: stores.state,
+      storeZip: stores.zip,
     })
     .from(orders)
     // leftJoin: a concierge order may have no store at all.
@@ -63,6 +70,7 @@ export default async function DriverJobDetailPage({
   if (!order) notFound();
 
   const items = order.serviceType === "concierge" ? await getOrderItems(order.id) : [];
+  const pickupAddress = resolvePickupAddress(order);
 
   const deliveryMapsUrl = mapsUrl(
     order.deliveryAddressLine1,
@@ -71,8 +79,8 @@ export default async function DriverJobDetailPage({
     order.deliveryZip
   );
   const pickupMapsUrl =
-    order.serviceType === "pickup" && order.storeAddress
-      ? mapsUrl(order.storeAddress, order.storeCity ?? "", order.storeState ?? "")
+    order.serviceType === "pickup" && pickupAddress
+      ? mapsUrl(pickupAddress.addressLine1, pickupAddress.city, pickupAddress.state, pickupAddress.zip)
       : null;
 
   const isTerminal = order.status === "completed" || order.status === "failed";
@@ -106,7 +114,7 @@ export default async function DriverJobDetailPage({
         <div>
           <h3 className="font-serif text-lg text-navy-deep">Pickup</h3>
           <p className="font-sans text-sm text-charcoal/70">
-            {order.storeAddress}, {order.storeCity}, {order.storeState}
+            {pickupAddress ? formatPickupAddress(pickupAddress) : "No pickup address on file — contact dispatch."}
           </p>
           {order.status === "driver_assigned" && pickupMapsUrl ? (
             <a

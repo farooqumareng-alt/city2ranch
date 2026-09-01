@@ -13,6 +13,8 @@ import { ServiceTimeline } from "@/components/services/ServiceTimeline";
 import { ConciergeQuoteForm } from "@/components/dispatch/ConciergeQuoteForm";
 import { AssignDriverForm } from "@/components/dispatch/AssignDriverForm";
 import { OrderExceptionForm } from "@/components/dispatch/OrderExceptionForm";
+import { PickupAddressForm } from "@/components/dispatch/PickupAddressForm";
+import { resolvePickupAddress, formatPickupAddress } from "@/lib/orders/pickup-address";
 import { cancelOrder, failOrder } from "@/lib/actions/staff-order-exceptions";
 import { formatPlainDate } from "@/lib/format";
 import { getOrderMessages } from "@/lib/order-messages";
@@ -57,6 +59,11 @@ export default async function ServiceRecordPage({
       customerPhone: orders.customerPhone,
       retailerOrderNumber: orders.retailerOrderNumber,
       pickupNotes: orders.pickupNotes,
+      pickupAddressLine1: orders.pickupAddressLine1,
+      pickupAddressLine2: orders.pickupAddressLine2,
+      pickupCity: orders.pickupCity,
+      pickupState: orders.pickupState,
+      pickupZip: orders.pickupZip,
       customerNotes: orders.customerNotes,
       deliveryAddressLine1: orders.deliveryAddressLine1,
       deliveryAddressLine2: orders.deliveryAddressLine2,
@@ -71,7 +78,10 @@ export default async function ServiceRecordPage({
       cancellationReason: orders.cancellationReason,
       failureReason: orders.failureReason,
       storeName: stores.name,
-      storeAddress: stores.addressLine1,
+      storeAddressLine1: stores.addressLine1,
+      storeCity: stores.city,
+      storeState: stores.state,
+      storeZip: stores.zip,
       driverName: drivers.name,
     })
     .from(orders)
@@ -93,6 +103,7 @@ export default async function ServiceRecordPage({
       : Promise.resolve([]),
   ]);
   const driverOptions = activeDrivers.map((d) => ({ value: d.id, label: d.name }));
+  const pickupAddress = resolvePickupAddress(order);
   const canCancel = canTransition(order.status, "cancelled");
   const canFail = canTransition(order.status, "failed");
 
@@ -144,7 +155,8 @@ export default async function ServiceRecordPage({
             <div>
               <h3 className="font-serif text-lg text-navy-deep">Pickup</h3>
               <p className="font-sans text-sm text-charcoal/70">
-                {order.storeName} — {order.storeAddress}
+                {order.storeName}
+                {pickupAddress ? ` — ${formatPickupAddress(pickupAddress)}` : " — no address on file yet"}
               </p>
               <p className="font-sans text-sm text-charcoal/70">Order #{order.retailerOrderNumber}</p>
               {order.pickupNotes ? (
@@ -205,10 +217,29 @@ export default async function ServiceRecordPage({
             </div>
           )}
 
+          {!isConcierge ? (
+            <PickupAddressForm
+              orderId={order.id}
+              current={{
+                pickupAddressLine1: order.pickupAddressLine1,
+                pickupAddressLine2: order.pickupAddressLine2,
+                pickupCity: order.pickupCity,
+                pickupState: order.pickupState,
+                pickupZip: order.pickupZip,
+              }}
+            />
+          ) : null}
+
           {order.status === "paid" ? (
             <div className="flex flex-col gap-3 rounded-sm border border-navy/10 bg-white/60 p-6">
               <h3 className="font-serif text-lg text-navy-deep">Assign Driver</h3>
-              <AssignDriverForm orderId={order.id} driverOptions={driverOptions} />
+              {!pickupAddress ? (
+                <p className="font-sans text-xs text-red-600">
+                  Add a pickup address above before assigning a driver.
+                </p>
+              ) : (
+                <AssignDriverForm orderId={order.id} driverOptions={driverOptions} />
+              )}
             </div>
           ) : null}
 
