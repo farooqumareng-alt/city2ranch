@@ -379,3 +379,32 @@ export function contactMessageEmail(fields: {
     Message: fields.message,
   });
 }
+
+// Added 2026-09-01 (lifecycle audit issue #8) — assigning a driver used
+// to send them nothing at all; they'd only find out by opening the app
+// and checking "Awaiting Response" themselves. Uses renderShell()
+// directly rather than wrap()/customerWrap() — this is an operational
+// notice to a driver, not an internal-staff data dump or a
+// customer-facing confirmation, so neither existing shape quite fits.
+export function driverJobOfferedEmail(fields: {
+  driverName: string;
+  storeName: string | null;
+  deliveryCity: string;
+  deliveryState: string;
+  jobUrl: string;
+}) {
+  const title = "New Job Offered";
+  const what = fields.storeName ? `a City Pickup from ${escapeHtml(fields.storeName)}` : "a Concierge order";
+  return {
+    subject: `${title} — City2Ranch`,
+    html: renderShell(
+      title,
+      `
+        <p style="margin:0 0 20px;">Hi ${escapeHtml(fields.driverName)}, you've been offered ${what}, delivering to
+        ${escapeHtml(fields.deliveryCity)}, ${escapeHtml(fields.deliveryState)}.</p>
+        <p style="margin:0 0 20px;">Open the job to accept or decline.</p>
+        ${ctaButton("Open Job", fields.jobUrl)}
+      `
+    ),
+  };
+}

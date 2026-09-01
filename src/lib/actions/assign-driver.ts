@@ -1,14 +1,16 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
-import { orders, stores } from "@/lib/db/schema";
+import { orders, stores, drivers } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { resolvePickupAddress } from "@/lib/orders/pickup-address";
+import { getResend } from "@/lib/email/resend";
+import { driverJobOfferedEmail } from "@/lib/email/templates";
 import type { ActionResult } from "@/lib/actions/types";
 
 export async function assignDriver(
@@ -31,11 +33,14 @@ export async function assignDriver(
     .select({
       status: orders.status,
       serviceType: orders.serviceType,
+      deliveryCity: orders.deliveryCity,
+      deliveryState: orders.deliveryState,
       pickupAddressLine1: orders.pickupAddressLine1,
       pickupAddressLine2: orders.pickupAddressLine2,
       pickupCity: orders.pickupCity,
       pickupState: orders.pickupState,
       pickupZip: orders.pickupZip,
+      storeName: stores.name,
       storeAddressLine1: stores.addressLine1,
       storeCity: stores.city,
       storeState: stores.state,
@@ -113,5 +118,43 @@ export async function assignDriver(
   revalidatePath("/internal/dispatch/queue");
   revalidatePath("/internal/dispatch");
   revalidatePath(`/internal/dispatch/orders/${orderId}`);
+
+  // Best-effort, like every other email send in this codebase — never
+  // blocks the assignment itself. Closes lifecycle audit issue #8's
+  // other half: a driver used to get zero notification of any kind and
+  // had to proactively check the app. drivers has no email column of
+  // its own (see schema.ts) — resolved via the same raw auth.users
+  // subquery pattern household.ts's ownerEmailSubquery already uses,
+  // for the same reason: importing the real table isn't safe (see that
+  // file's comment on why).
+  try {
+    const [driverRow] = await db
+      .select({
+        name: drivers.name,
+        email: sql<string | null>`(SELECT email FROM auth.users WHERE id = ${drivers.authUserId})`,
+      })
+      .from(drivers)
+      .where(eq(drivers.id, driverId));
+    if (driverRow?.email) {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+      const resend = getResend();
+      const { subject, html } = driverJobOfferedEmail({
+        driverName: driverRow.name,
+        storeName: order.serviceType === "pickup" ? order.storeName : null,
+        deliveryCity: order.deliveryCity,
+        deliveryState: order.deliveryState,
+        jobUrl: `${siteUrl}/internal/driver/${orderId}`,
+      });
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM ?? "notifications@city2ranch.com",
+        to: driverRow.email,
+        subject,
+        html,
+      });
+    }
+  } catch (error) {
+    console.error("[assignDriver] driver notification email failed", error);
+  }
+
   return { ok: true };
 }
