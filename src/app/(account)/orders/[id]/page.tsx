@@ -114,7 +114,8 @@ export default async function OrderDetailPage({
           <div>
             <h3 className="font-serif text-lg text-navy-deep">Pickup</h3>
             <p className="font-sans text-sm text-charcoal/70">
-              {order.storeName} — {order.storeAddress}
+              {order.storeName}
+              {order.storeAddress ? ` — ${order.storeAddress}` : ""}
             </p>
             <p className="font-sans text-sm text-charcoal/70">
               Order #{order.retailerOrderNumber}

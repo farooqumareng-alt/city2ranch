@@ -8,7 +8,10 @@ import type { ActionResult } from "@/lib/actions/types";
 
 const initialState: ActionResult | undefined = undefined;
 
-type Store = { id: string; name: string; city: string; state: string };
+// city/state can be null — a store may be a supported brand with no
+// single fixed address; the dropdown label below falls back to the
+// name alone in that case.
+type Store = { id: string; name: string; city: string | null; state: string | null };
 type ProfileDefaults = {
   name: string | null;
   phone: string | null;
@@ -82,7 +85,7 @@ export function OrderPickupForm({
             defaultValue={values?.storeId}
             options={stores.map((s) => ({
               value: s.id,
-              label: `${s.name} — ${s.city}, ${s.state}`,
+              label: s.city && s.state ? `${s.name} — ${s.city}, ${s.state}` : s.name,
             }))}
             error={fieldErrors?.storeId}
           />

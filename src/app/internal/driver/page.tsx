@@ -142,7 +142,9 @@ export default async function DriverPage() {
                       <div>
                         <p className="font-serif text-lg text-navy-deep">Pickup: {order.storeName}</p>
                         <p className="font-sans text-sm text-charcoal/70">
-                          {order.storeAddress}, {order.storeCity}, {order.storeState}
+                          {order.storeAddress
+                            ? `${order.storeAddress}, ${order.storeCity}, ${order.storeState}`
+                            : "No pickup address on file — contact dispatch"}
                         </p>
                         <p className="font-sans text-xs text-charcoal/60">
                           Order #{order.retailerOrderNumber}
