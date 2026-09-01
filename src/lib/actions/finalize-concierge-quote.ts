@@ -107,7 +107,7 @@ export async function finalizeConciergeQuote(
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
         const { subject, html } = quoteReadyEmail({
           totalCents,
-          signInUrl: `${siteUrl}/sign-in?next=/orders`,
+          signInUrl: `${siteUrl}/sign-in?next=/my-services`,
         });
         await resend.emails.send({
           from: process.env.EMAIL_FROM ?? "notifications@city2ranch.com",
