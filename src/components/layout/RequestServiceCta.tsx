@@ -1,20 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { isPanelRoute } from "@/lib/panel-routes";
 
 /**
- * The top nav's persistent "Request Service" button — hidden on
- * signed-in panel routes, where it duplicates a page-level "Request
- * Service" action that's already on screen (e.g. /home, /requests).
- * Same reasoning as AccountSidebar dropping its own "Services" entry:
- * one path to the same destination, not two competing ones.
+ * The top nav's persistent "Request Service" button — renders on every
+ * route as of 2026-09-07, panel routes included (see NavAuthControl.tsx
+ * and PanelSidebar.tsx's own comments on the same change). On a
+ * customer account page that already has its own "Request Service"
+ * action on screen (e.g. Home's own button), this is a second path to
+ * the same destination — a harmless, idempotent duplication (unlike
+ * the Sign Out case this change was made alongside), not a functional
+ * one: nothing is lost by having two ways to reach the same form.
  */
 export function RequestServiceCta({ className }: { className: string }) {
-  const pathname = usePathname();
-  if (isPanelRoute(pathname)) return null;
-
   return (
     <Link href="/request-service" className={className}>
       Request Service

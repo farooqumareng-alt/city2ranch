@@ -1,11 +1,13 @@
 /**
  * Routes where a PanelSidebar (AccountSidebar/StaffSidebar/DriverSidebar)
- * already renders its own account nav + Sign Out — the top Nav's public
- * marketing links, "Request Service" CTA, and account menu would all
- * just duplicate what the sidebar already covers there. Shared by
- * NavAuthControl, PrimaryNavLinks, RequestServiceCta, and MobileMenu so
- * they all agree on the same route list rather than drifting into
- * slightly different ones.
+ * already renders its own in-panel navigation — the top Nav's public
+ * marketing links (Home/How It Works/...) would be confusing clutter
+ * there (a "Home" link ambiguous with the account's own /home) and
+ * still hide on these routes via PrimaryNavLinks. As of 2026-09-07,
+ * NavAuthControl/RequestServiceCta/MobileMenu no longer check this —
+ * account controls (My Account, Sign Out, Request Service) moved out
+ * of PanelSidebar into the header everywhere, so they no longer need
+ * to hide anywhere. Only PrimaryNavLinks still uses this.
  */
 export function isPanelRoute(pathname: string): boolean {
   return (

@@ -2,21 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { NAV_LINKS } from "@/lib/constants";
 import { NavAuthControl } from "@/components/layout/NavAuthControl";
-import { isPanelRoute } from "@/lib/panel-routes";
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
 
-  // PanelSidebar (see AccountSidebar/StaffSidebar/DriverSidebar) already
-  // renders every link this menu would, plus Sign Out, as its own
-  // horizontal scroll row on mobile — the hamburger here would only open
-  // onto a redundant second copy of the same navigation.
-  if (isPanelRoute(pathname)) return null;
-
+  // Renders on every route as of 2026-09-07, panel routes included —
+  // this is now the only mobile path to My Account/Sign Out/Request
+  // Service (NavAuthControl's mobile variant lives inside it), since
+  // those moved out of PanelSidebar. The public marketing links above
+  // them still show too — mildly redundant with a panel's own sidebar
+  // nav, but harmless, and simpler than splitting this menu's content
+  // by route.
   return (
     <div className="md:hidden">
       <button
