@@ -18,7 +18,6 @@ const ACCOUNT_LINKS = [
   { href: "/payments", label: "Payments" },
   { href: "/notifications", label: "Notifications" },
   { href: "/support", label: "Support" },
-  { href: "/profile", label: "Profile" },
 ];
 
 /**
@@ -28,6 +27,11 @@ const ACCOUNT_LINKS = [
  * reaches /internal/dispatch automatically on their next plain
  * sign-in (see /auth/callback's defaultLandingFor) rather than via a
  * dedicated link from here — that discovery path moved, not away.
+ *
+ * Profile isn't listed here either (2026-09-07) — it moved into the
+ * header's My Account dropdown alongside Sign Out, so it's reachable
+ * from every page, not just while already inside this panel. Keeping
+ * it here too would just be the same link twice on every account page.
  */
 export function AccountSidebar({
   userEmail,
