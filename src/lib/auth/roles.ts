@@ -34,14 +34,16 @@ export async function requireStaff() {
 }
 
 /**
- * Cheap existence check, not a gate — used by the *customer* account
- * sidebar to decide whether to show a "Staff Dashboard" link at all.
- * Someone can hold both a customer account and a staff row on the same
- * auth identity (there's no separate "staff signup" — a super_admin
- * just adds an existing customer's email as staff), and nothing in the
- * customer panel pointed that out before this: a staff/super_admin
- * signing in landed on their ordinary customer Home with no way to
- * discover /internal/dispatch except already knowing the URL.
+ * Cheap existence check, not a gate. Originally used by the customer
+ * account sidebar to show a "Staff Dashboard" link when applicable;
+ * that link moved when Sign Out/account controls consolidated into
+ * the header (2026-09-07, see PanelSidebar.tsx) and AccountSidebar
+ * dropped this along with it — discovering /internal/dispatch now
+ * happens via /auth/callback's defaultLandingFor, which sends a
+ * staff/super_admin identity there automatically on a plain sign-in.
+ * Currently unused, kept for the next thing that needs a plain
+ * "is this identity staff" check without the redirect/404 a full
+ * requireStaff() call would do.
  */
 export async function isActiveStaffMember(authUserId: string): Promise<boolean> {
   const db = getDb();

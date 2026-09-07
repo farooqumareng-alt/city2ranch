@@ -5,7 +5,6 @@ import { AccountSidebar } from "@/components/account/AccountSidebar";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getEffectiveOwner } from "@/lib/household";
 import { getOwnProfile } from "@/lib/customer-profile";
-import { isActiveStaffMember } from "@/lib/auth/roles";
 
 /**
  * Shared sign-in gate + sidebar shell for every account page (/orders,
@@ -33,13 +32,7 @@ export default async function AccountLayout({
   const isDelegated = owner.id !== user.id;
   const managingEmail = isDelegated ? owner.email : undefined;
   const managingRole = isDelegated && owner.role !== "full" ? owner.role : undefined;
-  // Staff status belongs to the signed-in person, not whichever
-  // account they're viewing via household delegation — checked against
-  // user.id, never owner.id.
-  const [profile, isStaff] = await Promise.all([
-    getOwnProfile(owner.id),
-    isActiveStaffMember(user.id),
-  ]);
+  const profile = await getOwnProfile(owner.id);
 
   return (
     <Container className="flex flex-col gap-8 py-12 sm:py-16 md:flex-row md:items-start md:gap-10">
@@ -48,7 +41,6 @@ export default async function AccountLayout({
         userName={profile?.name ?? undefined}
         managingEmail={managingEmail}
         managingRole={managingRole}
-        isStaff={isStaff}
       />
       <div className="min-w-0 flex-1">{children}</div>
     </Container>

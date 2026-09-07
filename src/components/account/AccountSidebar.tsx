@@ -22,29 +22,23 @@ const ACCOUNT_LINKS = [
 ];
 
 /**
- * Replaces the top nav's "My Account" dropdown on signed-in account
- * pages (/orders/*, /profile) — NavAuthControl hides that dropdown on
- * these routes specifically so there's one account-nav surface, not
- * two competing ones.
+ * The account panel's own nav — Sign Out and "My Account"-style
+ * cross-panel links live in the header now (NavAuthControl), not here;
+ * see PanelSidebar.tsx's doc comment. A staff-also-customer identity
+ * reaches /internal/dispatch automatically on their next plain
+ * sign-in (see /auth/callback's defaultLandingFor) rather than via a
+ * dedicated link from here — that discovery path moved, not away.
  */
 export function AccountSidebar({
   userEmail,
   userName,
   managingEmail,
   managingRole,
-  isStaff,
 }: {
   userEmail?: string;
   userName?: string;
   managingEmail?: string;
   managingRole?: string;
-  /** True when the signed-in person also has an active row in `staff`
-   *  (see src/lib/auth/roles.ts's isActiveStaffMember) — there's no
-   *  separate "staff signup," so someone can hold a normal customer
-   *  account and staff access on the same identity with nothing here
-   *  otherwise indicating it. Surfaces a way into /internal/dispatch
-   *  that isn't "already know the URL." */
-  isStaff?: boolean;
 }) {
   return (
     <PanelSidebar
@@ -54,7 +48,6 @@ export function AccountSidebar({
       accountType="Customer"
       managingEmail={managingEmail}
       managingRole={managingRole}
-      crossPanelLink={isStaff ? { href: "/internal/dispatch", label: "Staff Dashboard" } : undefined}
     />
   );
 }

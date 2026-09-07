@@ -2,10 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { signOut } from "@/lib/actions/sign-out";
-import { isPanelRoute } from "@/lib/panel-routes";
 
 /**
  * The only part of the Nav that depends on the auth session — resolved
@@ -16,6 +14,12 @@ import { isPanelRoute } from "@/lib/panel-routes";
  * boundary — /orders and /internal/* always re-verify the session
  * server-side (getCurrentUser() / requireStaff() / requireDriver())
  * regardless of what this renders.
+ *
+ * Renders on every route as of 2026-09-07, panel routes included —
+ * previously hid itself there since a PanelSidebar had its own Sign
+ * Out/account nav, but two separate places to sign out (or find "My
+ * Account") was worse than one control the sidebar no longer
+ * duplicates (see PanelSidebar.tsx's own updated doc comment).
  */
 export function NavAuthControl({
   variant,
@@ -23,7 +27,6 @@ export function NavAuthControl({
   variant: "desktop" | "mobile";
 }) {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
-  const pathname = usePathname();
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -58,14 +61,6 @@ export function NavAuthControl({
         Sign In
       </Link>
     );
-  }
-
-  // On /orders/*, /profile, and /internal/*, a PanelSidebar already
-  // renders its own account nav + Sign Out — showing it again here would
-  // just be a second, redundant surface. Nothing to render; "Request a
-  // Pickup" (desktop) / the hamburger's other links (mobile) stand alone.
-  if (isPanelRoute(pathname)) {
-    return null;
   }
 
   // Desktop: account management (Orders/Profile/Sign Out) collapses into
