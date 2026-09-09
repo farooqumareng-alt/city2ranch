@@ -14,6 +14,18 @@ export type PanelLink = {
    *  link — this only matters when a link's own href is a strict prefix
    *  of another link's href on the same panel. */
   exact?: boolean;
+  /** Optional section header this link renders under, desktop only —
+   *  mobile keeps the flat horizontal-scroll row every panel already
+   *  had (a text header interspersed in a horizontal scroll doesn't
+   *  read as a group). Added 2026-09-09 (Priority 7 of the master
+   *  implementation directive) for StaffSidebar, whose flat list grew
+   *  to 9 links across genuinely different concerns (day-to-day
+   *  operations vs. configuring business rules vs. managing people).
+   *  A header renders whenever this differs from the previous link's
+   *  group — callers are responsible for keeping same-group links
+   *  adjacent; leave unset for a plain ungrouped link, same as before
+   *  this existed. */
+  group?: string;
 };
 
 /**
@@ -118,19 +130,30 @@ export function PanelSidebar({
           ) : null}
         </div>
       ) : null}
-      {links.map((link) => {
+      {links.map((link, index) => {
         const active = link.exact
           ? pathname === link.href
           : pathname === link.href || pathname.startsWith(`${link.href}/`);
+        const showGroupHeader = link.group && link.group !== links[index - 1]?.group;
         return (
-          <Link
-            key={link.href}
-            href={link.href}
-            aria-current={active ? "page" : undefined}
-            className={`${linkBase} ${active ? activeClass : inactiveClass}`}
-          >
-            {link.label}
-          </Link>
+          <div key={link.href} className="contents">
+            {showGroupHeader ? (
+              <span
+                className={`hidden font-sans text-[11px] uppercase tracking-[0.1em] text-charcoal/40 md:block ${
+                  index === 0 ? "mt-0" : "mt-3"
+                }`}
+              >
+                {link.group}
+              </span>
+            ) : null}
+            <Link
+              href={link.href}
+              aria-current={active ? "page" : undefined}
+              className={`${linkBase} ${active ? activeClass : inactiveClass}`}
+            >
+              {link.label}
+            </Link>
+          </div>
         );
       })}
     </nav>
