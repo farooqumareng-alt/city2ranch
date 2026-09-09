@@ -59,16 +59,34 @@ export async function getOperationsDashboard() {
   const newLeads = needsQuote.filter((i) => i.kind === "request");
   const pendingConciergeQuotes = needsQuote.filter((i) => i.kind === "order");
   const awaitingCustomer = byBucket("awaiting_customer");
+  const processingPayment = byBucket("needs_payment");
   const readyToDispatch = byBucket("ready_to_dispatch");
-  const inProgress = [...byBucket("awaiting_driver_response"), ...byBucket("in_progress")];
-  const recentFailed = byBucket("exceptions").filter((i) => i.updatedAt >= failedSince);
+  const awaitingDriverResponse = byBucket("awaiting_driver_response");
+  const inProgress = byBucket("in_progress");
+  const exceptions = byBucket("exceptions");
+  const recentFailed = exceptions.filter((i) => i.updatedAt >= failedSince);
+  const completed = byBucket("completed");
 
   return {
+    // Priority 4 of the master implementation directive ("Operations
+    // must become the center of the admin experience"): every one of
+    // the 8 real pipeline stages (WORK_QUEUE_TABS) gets its own count
+    // here now, not collapsed into one "Active Jobs" figure the way it
+    // was before — a stalled "awaiting driver response" job used to be
+    // invisible inside that combined number. needsPayment (mid-Stripe-
+    // checkout) is genuinely new visibility, not a rename: nothing
+    // surfaced it on this dashboard at all before, even though Work
+    // Queue itself always had the tab.
     stats: {
       newLeads: newLeads.length,
       pendingConciergeQuotes: pendingConciergeQuotes.length,
       awaitingPayment: awaitingCustomer.length,
-      activeJobs: readyToDispatch.length + inProgress.length,
+      processingPayment: processingPayment.length,
+      readyToDispatch: readyToDispatch.length,
+      awaitingDriverResponse: awaitingDriverResponse.length,
+      inProgress: inProgress.length,
+      exceptions: exceptions.length,
+      completed: completed.length,
       activeDrivers: activeDriverCount[0]?.n ?? 0,
       todaysRevenueCents: Number(todaysRevenue[0]?.total ?? 0),
     },
