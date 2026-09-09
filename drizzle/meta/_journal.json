@@ -337,6 +337,13 @@
       "when": 1788911242523,
       "tag": "0047_driver_documents_storage",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1788994393943,
+      "tag": "0048_notification_type_lifecycle_events",
+      "breakpoints": true
     }
   ]
 }

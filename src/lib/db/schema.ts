@@ -285,15 +285,21 @@ export const notificationPreferences = pgTable(
   (table) => [unique().on(table.authUserId)]
 );
 
-// The two events that already trigger a customer email (see
-// notificationPreferences above) — this table is a second, independent
-// channel, not gated by those email preferences: a customer who opted
-// out of the payment-receipt email still gets the in-app record. Real
-// order-lifecycle notifications (driver assigned/picked up/delivered)
-// are a known, separate gap — not covered by this table yet.
+// payment_confirmed/recurring_order_created also trigger a customer
+// email (see notificationPreferences above) — this table is a second,
+// independent channel, not gated by those email preferences: a
+// customer who opted out of the payment-receipt email still gets the
+// in-app record. driver_accepted/order_completed added 2026-09-09
+// (Priority 5 of the master implementation directive, "notifications
+// and operational visibility") to close the order-lifecycle gap this
+// comment used to flag — bell-only for now, no matching email exists
+// for either yet, which is a smaller, separate gap than the one just
+// closed.
 export const notificationTypeEnum = pgEnum("notification_type", [
   "payment_confirmed",
   "recurring_order_created",
+  "driver_accepted",
+  "order_completed",
 ]);
 
 export const notifications = pgTable("notifications", {

@@ -8,6 +8,7 @@ import { requireDriver } from "@/lib/auth/roles";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { createNotification } from "@/lib/notifications/create";
 import type { ActionResult } from "@/lib/actions/types";
 
 /**
@@ -97,6 +98,20 @@ export async function confirmDelivery(
     previousState: order.status,
     newState: "completed",
   });
+
+  // Bell-only for now (2026-09-09, Priority 5) — same disclosed gap as
+  // driver-accept-decline.ts's driver_accepted notification: no
+  // matching email exists yet, and skipped entirely when authUserId is
+  // null (an unclaimed Concierge order has no identity to notify).
+  if (order.authUserId) {
+    await createNotification({
+      authUserId: order.authUserId,
+      type: "order_completed",
+      title: "Delivery Complete",
+      body: "Your order has been delivered.",
+      orderId: order.id,
+    });
+  }
 
   revalidatePath("/internal/driver");
   return { ok: true };

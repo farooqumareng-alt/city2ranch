@@ -8,6 +8,7 @@ import { requireDriver } from "@/lib/auth/roles";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { createNotification } from "@/lib/notifications/create";
 import type { ActionResult } from "@/lib/actions/types";
 
 /**
@@ -64,6 +65,22 @@ export async function acceptJob(
     previousState: "pending_acceptance",
     newState: "driver_assigned",
   });
+
+  // Bell-only for now (2026-09-09, Priority 5) — no matching email
+  // exists yet, a smaller, separate gap. Skipped when authUserId is
+  // null: a Concierge order created by staff before the customer has
+  // signed in (see the doc comment on orders.authUserId) has no
+  // identity to attach an in-app notification to — never something to
+  // block the job acceptance itself over.
+  if (order.authUserId) {
+    await createNotification({
+      authUserId: order.authUserId,
+      type: "driver_accepted",
+      title: "Driver Assigned",
+      body: "A driver has accepted your order and will be in touch.",
+      orderId: order.id,
+    });
+  }
 
   revalidatePath("/internal/driver");
   revalidatePath("/internal/dispatch/queue");
