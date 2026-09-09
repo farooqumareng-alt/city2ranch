@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnSupportMessages } from "@/lib/support";
 import { getEffectiveOwner } from "@/lib/household";
+import { SITE_PHONE_DISPLAY, SITE_PHONE_TEL } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Support",
@@ -36,6 +37,12 @@ export default async function SupportPage() {
           New Message
         </Button>
       </div>
+      <p className="-mt-4 font-sans text-sm text-charcoal/70">
+        Prefer to call?{" "}
+        <a href={`tel:${SITE_PHONE_TEL}`} className="font-medium text-navy-deep underline decoration-gold/50">
+          {SITE_PHONE_DISPLAY}
+        </a>
+      </p>
 
       {messages.length === 0 ? (
         <p className="font-sans text-sm text-charcoal/70">

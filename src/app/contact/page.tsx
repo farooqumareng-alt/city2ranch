@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ContactForm } from "@/components/forms/ContactForm";
+import { SITE_PHONE_DISPLAY, SITE_PHONE_TEL } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -26,6 +27,13 @@ export default async function ContactPage({
         title="Get in Touch"
         description="Questions about service, routes, or becoming a founding member? Send us a message and a concierge will respond."
       />
+      <p className="font-sans text-sm text-charcoal/70">
+        Prefer to talk it through?{" "}
+        <a href={`tel:${SITE_PHONE_TEL}`} className="font-medium text-navy-deep underline decoration-gold/50">
+          Call {SITE_PHONE_DISPLAY}
+        </a>
+        .
+      </p>
       <div className="max-w-2xl">
         <ContactForm subjectPrefill={subjectPrefill} />
       </div>
