@@ -1,8 +1,16 @@
 import { and, eq } from "drizzle-orm";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { drivers, staff } from "@/lib/db/schema";
+import type * as schema from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
+
+/** Satisfied by both getDb()'s pooled connection and a db.transaction()
+ *  callback's `tx` — same convention as my-services.ts's AnyDb, added
+ *  here so a deep test can exercise defaultLandingFor() itself against
+ *  real, rolled-back synthetic rows instead of only its two call sites. */
+type AnyDb = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 /**
  * Where a signed-in identity with no explicit destination should land —
@@ -22,8 +30,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
  * file's own git history/the driver check below for why a disabled
  * row must not still win this priority order.
  */
-export async function defaultLandingFor(authUserId: string): Promise<string> {
-  const db = getDb();
+export async function defaultLandingFor(authUserId: string, db: AnyDb = getDb()): Promise<string> {
   const [driverRow] = await db
     .select({ id: drivers.id })
     .from(drivers)
