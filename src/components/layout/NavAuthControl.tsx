@@ -4,6 +4,36 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { signOut } from "@/lib/actions/sign-out";
+import type { SessionRole } from "@/lib/auth/roles";
+
+/**
+ * The real destinations behind the "My Account" menu, by role
+ * (2026-09-08, Priority 3 of the master implementation directive) —
+ * every href here is an existing route, not a new page: there's no
+ * self-service "Driver Profile" or "Staff Profile" page yet (hiring/
+ * compliance info lives on the admin-only Driver Profile screen
+ * instead), so those roles get their real working screens (Today's
+ * Jobs/History, Operations/Admin) rather than a link to something that
+ * doesn't exist. Before this, every role saw "My Account" -> /home and
+ * "Profile" -> /profile regardless — harmless for a customer, but a
+ * staff/driver identity landed on the ordinary customer dashboard,
+ * which is the exact confusion this priority exists to close.
+ */
+const ROLE_MENU_ITEMS: Record<SessionRole, { href: string; label: string }[]> = {
+  customer: [
+    { href: "/home", label: "My Account" },
+    { href: "/profile", label: "Profile" },
+  ],
+  driver: [
+    { href: "/internal/driver", label: "Today's Jobs" },
+    { href: "/internal/driver/history", label: "History" },
+  ],
+  staff: [{ href: "/internal/dispatch", label: "Operations" }],
+  super_admin: [
+    { href: "/internal/dispatch", label: "Operations" },
+    { href: "/internal/dispatch/admin", label: "Admin" },
+  ],
+};
 
 /**
  * The only part of the Nav that depends on the auth session — resolved
@@ -27,6 +57,13 @@ export function NavAuthControl({
   variant: "desktop" | "mobile";
 }) {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  // Defaults to "customer" — today's behavior for everyone until the
+  // real role resolves, which is the correct guess for the large
+  // majority of signed-in visitors and never wrong in a way that hides
+  // a destination (a driver/staff identity just briefly sees the
+  // customer menu for one fetch's worth of latency, same non-blocking
+  // shape as NotificationBell's unreadCount starting at 0).
+  const [role, setRole] = useState<SessionRole>("customer");
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -43,6 +80,16 @@ export function NavAuthControl({
 
     return () => subscription.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    fetch("/api/session-role")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.role) setRole(data.role);
+      })
+      .catch((error) => console.error("[NavAuthControl] role fetch failed", error));
+  }, [signedIn]);
 
   // Unknown yet (first client paint, before getUser() resolves): render
   // nothing rather than guessing, to avoid a visible flash from the
@@ -63,28 +110,25 @@ export function NavAuthControl({
     );
   }
 
-  // Desktop: account management (Orders/Profile/Sign Out) collapses into
-  // one "My Account" menu — a single control competing with "Request a
-  // Pickup" for attention, not three. Mobile: the hamburger panel is
-  // already a full expanded menu, so a nested dropdown inside it would
-  // just add friction — list the items directly, as before.
+  const items = ROLE_MENU_ITEMS[role];
+
+  // Desktop: account management collapses into one "My Account" menu —
+  // a single control competing with "Request a Pickup" for attention,
+  // not three. Mobile: the hamburger panel is already a full expanded
+  // menu, so a nested dropdown inside it would just add friction — list
+  // the items directly, as before.
   if (variant === "desktop") {
-    return <DesktopAccountMenu />;
+    return <DesktopAccountMenu items={items} />;
   }
 
-  // My Account + Profile are the two most-reached-for destinations, not
-  // every account page — once on any account page, AccountSidebar already
-  // lists everything else. A second full copy of that list here was
-  // exactly the "text-heavy navigation" to avoid.
   const mobileLinkClass = "block py-1 font-sans text-base text-navy-deep hover:text-gold";
   return (
     <>
-      <Link href="/home" className={mobileLinkClass}>
-        My Account
-      </Link>
-      <Link href="/profile" className={mobileLinkClass}>
-        Profile
-      </Link>
+      {items.map((item) => (
+        <Link key={item.href} href={item.href} className={mobileLinkClass}>
+          {item.label}
+        </Link>
+      ))}
       <form action={signOut}>
         <button
           type="submit"
@@ -97,7 +141,7 @@ export function NavAuthControl({
   );
 }
 
-function DesktopAccountMenu() {
+function DesktopAccountMenu({ items }: { items: { href: string; label: string }[] }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -149,16 +193,17 @@ function DesktopAccountMenu() {
           role="menu"
           className="absolute right-0 top-full z-50 mt-2 w-44 rounded-sm border border-navy/10 bg-white py-2 shadow-lg"
         >
-          {/* My Account + Profile, not a full copy of AccountSidebar —
-              once you're on any account page, AccountSidebar lists
-              everything else, so this dropdown doesn't need to be a
-              second copy of that list to keep in sync. */}
-          <Link href="/home" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
-            My Account
-          </Link>
-          <Link href="/profile" role="menuitem" className={menuItemClass} onClick={() => setOpen(false)}>
-            Profile
-          </Link>
+          {items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              role="menuitem"
+              className={menuItemClass}
+              onClick={() => setOpen(false)}
+            >
+              {item.label}
+            </Link>
+          ))}
           <form action={signOut}>
             <button
               type="submit"

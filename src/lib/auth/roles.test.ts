@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { drivers, staff } from "@/lib/db/schema";
-import { defaultLandingFor } from "@/lib/auth/roles";
+import { defaultLandingFor, resolveSessionRole } from "@/lib/auth/roles";
 
 if (existsSync(".env.local")) {
   process.loadEnvFile(".env.local");
@@ -120,6 +120,34 @@ describe("defaultLandingFor — the one authoritative landing decision", () => {
       // that it's still a *decision*, not an accident that regresses
       // silently alongside the isActive fix above.
       expect(await defaultLandingFor(userId, tx)).toBe("/internal/driver");
+    });
+  });
+});
+
+describe("resolveSessionRole — the discriminator defaultLandingFor() and /api/session-role both build on", () => {
+  // Not re-testing every priority-order case above (defaultLandingFor's
+  // own tests already exercise that logic thoroughly) — this only pins
+  // down the one thing defaultLandingFor() can't: staff vs. super_admin
+  // resolving to *different* roles even though they land on the same
+  // route, since that distinction is exactly what NavAuthControl's
+  // role-aware "My Account" menu (Priority 3) depends on.
+  it("distinguishes staff from super_admin, unlike the shared landing route", async () => {
+    await withRollback(async (tx) => {
+      const staffId = await makeAuthUser(tx, "plain-staff");
+      await tx.insert(staff).values({ authUserId: staffId, role: "staff", label: "Test Staff" });
+      expect(await resolveSessionRole(staffId, tx)).toBe("staff");
+    });
+    await withRollback(async (tx) => {
+      const adminId = await makeAuthUser(tx, "super-admin-role");
+      await tx.insert(staff).values({ authUserId: adminId, role: "super_admin", label: "Test Admin" });
+      expect(await resolveSessionRole(adminId, tx)).toBe("super_admin");
+    });
+  });
+
+  it("resolves a plain identity to 'customer'", async () => {
+    await withRollback(async (tx) => {
+      const userId = await makeAuthUser(tx, "plain-customer");
+      expect(await resolveSessionRole(userId, tx)).toBe("customer");
     });
   });
 });

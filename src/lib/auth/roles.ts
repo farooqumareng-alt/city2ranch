@@ -12,6 +12,42 @@ import { getCurrentUser } from "@/lib/supabase/server";
  *  real, rolled-back synthetic rows instead of only its two call sites. */
 type AnyDb = PgDatabase<PgQueryResultHKT, typeof schema>;
 
+export type SessionRole = "driver" | "super_admin" | "staff" | "customer";
+
+/**
+ * What this identity actually is, for anything that needs to branch on
+ * role rather than just gate a page — added 2026-09-08 (Priority 3 of
+ * the master implementation directive) as the shared foundation under
+ * both defaultLandingFor() (below) and the header's role-aware "My
+ * Account" menu (NavAuthControl.tsx, via /api/session-role). Same
+ * priority order and isActive discipline as defaultLandingFor() always
+ * used — this is that same lookup, just returning the role itself
+ * instead of a hardcoded path, so the two can't drift into disagreeing
+ * about what "driver" or "staff" means.
+ */
+export async function resolveSessionRole(authUserId: string, db: AnyDb = getDb()): Promise<SessionRole> {
+  const [driverRow] = await db
+    .select({ id: drivers.id })
+    .from(drivers)
+    .where(and(eq(drivers.authUserId, authUserId), eq(drivers.isActive, true)));
+  if (driverRow) return "driver";
+
+  const [staffRow] = await db
+    .select({ role: staff.role })
+    .from(staff)
+    .where(eq(staff.authUserId, authUserId));
+  if (staffRow) return staffRow.role === "super_admin" ? "super_admin" : "staff";
+
+  return "customer";
+}
+
+const LANDING_ROUTE_FOR_ROLE: Record<SessionRole, string> = {
+  driver: "/internal/driver",
+  staff: "/internal/dispatch",
+  super_admin: "/internal/dispatch",
+  customer: "/home",
+};
+
 /**
  * Where a signed-in identity with no explicit destination should land —
  * the one authoritative landing decision for the whole app. Originally
@@ -26,24 +62,12 @@ type AnyDb = PgDatabase<PgQueryResultHKT, typeof schema>;
  *
  * Driver takes priority over staff (mobile-first, single-purpose
  * panel); either can still reach the customer Home via their sidebar's
- * "My Account" link. Filters on isActive (2026-09-08) — see this
- * file's own git history/the driver check below for why a disabled
- * row must not still win this priority order.
+ * "My Account" link. Now a thin wrapper over resolveSessionRole() —
+ * the isActive discipline that used to live only here lives in exactly
+ * one place now.
  */
 export async function defaultLandingFor(authUserId: string, db: AnyDb = getDb()): Promise<string> {
-  const [driverRow] = await db
-    .select({ id: drivers.id })
-    .from(drivers)
-    .where(and(eq(drivers.authUserId, authUserId), eq(drivers.isActive, true)));
-  if (driverRow) return "/internal/driver";
-
-  const [staffRow] = await db
-    .select({ id: staff.id })
-    .from(staff)
-    .where(eq(staff.authUserId, authUserId));
-  if (staffRow) return "/internal/dispatch";
-
-  return "/home";
+  return LANDING_ROUTE_FOR_ROLE[await resolveSessionRole(authUserId, db)];
 }
 
 /**
