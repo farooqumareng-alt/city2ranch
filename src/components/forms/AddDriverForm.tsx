@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { addDriver } from "@/lib/actions/team-management";
+import { inviteDriver } from "@/lib/actions/team-management";
 import { TextField } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
 import type { ActionResult } from "@/lib/actions/types";
@@ -9,7 +9,7 @@ import type { ActionResult } from "@/lib/actions/types";
 const initialState: ActionResult | undefined = undefined;
 
 export function AddDriverForm() {
-  const [state, formAction, pending] = useActionState(addDriver, initialState);
+  const [state, formAction, pending] = useActionState(inviteDriver, initialState);
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
   const values = state && !state.ok ? state.values : undefined;
 
@@ -21,13 +21,15 @@ export function AddDriverForm() {
         </p>
       ) : null}
       {state?.ok ? (
-        <p className="font-sans text-sm text-navy-deep sm:basis-full">Driver added.</p>
+        <p className="font-sans text-sm text-navy-deep sm:basis-full">
+          Driver invited — they&apos;ll get an email with a link to sign in.
+        </p>
       ) : null}
       <TextField
         name="email"
         type="email"
         label="Email"
-        hint="They must have signed in to City2Ranch at least once already."
+        hint="They don't need an account yet — we'll email them an invite."
         required
         defaultValue={values?.email}
         error={fieldErrors?.email}
@@ -51,7 +53,7 @@ export function AddDriverForm() {
         className="sm:min-w-[180px]"
       />
       <Button type="submit" variant="navy" disabled={pending}>
-        {pending ? "Adding…" : "Add Driver"}
+        {pending ? "Inviting…" : "Invite Driver"}
       </Button>
     </form>
   );

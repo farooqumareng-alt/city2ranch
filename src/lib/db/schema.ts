@@ -678,6 +678,15 @@ export const stores = pgTable("stores", {
  * Drivers are a distinct role from `staff` (dispatchers). Deliberately
  * has no employment-status field — 1099 vs. W-2 is a real-world
  * contracting decision, not a schema one.
+ *
+ * The hiring/compliance fields below (license, vehicle, insurance) were
+ * added 2026-09-08 once the business moved past a single owner-driver —
+ * every one is nullable and filled in by staff on the Driver Profile
+ * page as paperwork comes in, not required at invite time. The three
+ * *_doc_path columns are Supabase Storage object paths in the private
+ * "driver-documents" bucket (see the storage-policy migration alongside
+ * this one), not the documents themselves — never store file bytes in
+ * Postgres.
  */
 export const drivers = pgTable(
   "drivers",
@@ -693,6 +702,18 @@ export const drivers = pgTable(
     phone: text("phone"),
     isActive: boolean("is_active").notNull().default(true),
     label: text("label"),
+    licenseNumber: text("license_number"),
+    licenseExpiresOn: date("license_expires_on"),
+    vehicleMake: text("vehicle_make"),
+    vehicleModel: text("vehicle_model"),
+    vehicleYear: integer("vehicle_year"),
+    vehiclePlate: text("vehicle_plate"),
+    insuranceCarrier: text("insurance_carrier"),
+    insurancePolicyNumber: text("insurance_policy_number"),
+    insuranceExpiresOn: date("insurance_expires_on"),
+    licenseDocPath: text("license_doc_path"),
+    insuranceDocPath: text("insurance_doc_path"),
+    registrationDocPath: text("registration_doc_path"),
   },
   (table) => [unique().on(table.authUserId)]
 );

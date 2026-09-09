@@ -6,7 +6,10 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
 import { requireSuperAdmin } from "@/lib/auth/roles";
-import { getDriverDetail } from "@/lib/actions/team-management";
+import { getDriverDetail, updateDriverHiringInfo } from "@/lib/actions/team-management";
+import { uploadDriverDocument } from "@/lib/actions/driver-documents";
+import { DriverHiringForm } from "@/components/forms/DriverHiringForm";
+import { DriverDocumentUpload } from "@/components/forms/DriverDocumentUpload";
 
 export const metadata: Metadata = { title: "Driver Profile" };
 
@@ -60,6 +63,52 @@ export default async function DriverDetailPage({ params }: { params: Promise<{ i
           {new Date(driver.createdAt).toLocaleDateString()}
         </p>
       </div>
+
+      <section className="flex flex-col gap-4">
+        <h3 className="font-serif text-lg text-navy-deep">Hiring &amp; Compliance</h3>
+        <Card padding="sm">
+          <DriverHiringForm
+            action={updateDriverHiringInfo.bind(null, driver.id)}
+            defaults={{
+              licenseNumber: driver.licenseNumber,
+              licenseExpiresOn: driver.licenseExpiresOn,
+              vehicleMake: driver.vehicleMake,
+              vehicleModel: driver.vehicleModel,
+              vehicleYear: driver.vehicleYear,
+              vehiclePlate: driver.vehiclePlate,
+              insuranceCarrier: driver.insuranceCarrier,
+              insurancePolicyNumber: driver.insurancePolicyNumber,
+              insuranceExpiresOn: driver.insuranceExpiresOn,
+            }}
+          />
+        </Card>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h3 className="font-serif text-lg text-navy-deep">Documents</h3>
+        <Card padding="sm">
+          <div className="flex flex-col gap-4">
+            <DriverDocumentUpload
+              driverId={driver.id}
+              kind="license"
+              hasFile={Boolean(driver.licenseDocPath)}
+              action={uploadDriverDocument.bind(null, driver.id, "license")}
+            />
+            <DriverDocumentUpload
+              driverId={driver.id}
+              kind="insurance"
+              hasFile={Boolean(driver.insuranceDocPath)}
+              action={uploadDriverDocument.bind(null, driver.id, "insurance")}
+            />
+            <DriverDocumentUpload
+              driverId={driver.id}
+              kind="registration"
+              hasFile={Boolean(driver.registrationDocPath)}
+              action={uploadDriverDocument.bind(null, driver.id, "registration")}
+            />
+          </div>
+        </Card>
+      </section>
 
       <section className="flex flex-col gap-4">
         <h3 className="font-serif text-lg text-navy-deep">Assignment History</h3>

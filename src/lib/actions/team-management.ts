@@ -5,7 +5,10 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { drivers, orders, staff } from "@/lib/db/schema";
 import { requireSuperAdmin } from "@/lib/auth/roles";
-import { addDriverSchema, addStaffSchema } from "@/lib/validation/schemas";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { getResend } from "@/lib/email/resend";
+import { driverAddedEmail } from "@/lib/email/templates";
+import { addDriverSchema, addStaffSchema, driverHiringInfoSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
 // Moved to /admin/team when Business Overview took over the plain
@@ -121,6 +124,18 @@ export async function getDriverDetail(driverId: string) {
         isActive: drivers.isActive,
         createdAt: drivers.createdAt,
         email: sql<string | null>`(SELECT email FROM auth.users WHERE id = ${drivers.authUserId})`,
+        licenseNumber: drivers.licenseNumber,
+        licenseExpiresOn: drivers.licenseExpiresOn,
+        vehicleMake: drivers.vehicleMake,
+        vehicleModel: drivers.vehicleModel,
+        vehicleYear: drivers.vehicleYear,
+        vehiclePlate: drivers.vehiclePlate,
+        insuranceCarrier: drivers.insuranceCarrier,
+        insurancePolicyNumber: drivers.insurancePolicyNumber,
+        insuranceExpiresOn: drivers.insuranceExpiresOn,
+        licenseDocPath: drivers.licenseDocPath,
+        insuranceDocPath: drivers.insuranceDocPath,
+        registrationDocPath: drivers.registrationDocPath,
       })
       .from(drivers)
       .where(eq(drivers.id, driverId)),
@@ -216,7 +231,23 @@ export async function addStaffMember(
   return { ok: true };
 }
 
-export async function addDriver(
+/**
+ * Invites a new driver by email — no pre-existing City2Ranch account
+ * required (2026-09-08). Two paths, both ending in the same `drivers`
+ * row:
+ *   - No account yet: supabase.auth.admin.inviteUserByEmail() creates
+ *     one and sends Supabase's own invite email in the same call — the
+ *     old "they need to sign in first, then try again" round trip this
+ *     replaced was the actual source of hiring friction, not a safety
+ *     feature worth keeping.
+ *   - Account already exists (they signed in before, maybe as a plain
+ *     customer): attach the driver row directly and send a plain
+ *     "you've been added" notice instead, since there's no invite link
+ *     to send someone who can already sign in.
+ * Named `inviteDriver`, not `addDriver`, to make that distinction
+ * visible at the call site — this is still bound to the same form/UI.
+ */
+export async function inviteDriver(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
@@ -235,16 +266,27 @@ export async function addDriver(
       values: valuesFromFormData(formData, ["email", "name", "phone"]),
     };
   }
-
+  const { email, name, phone } = parsed.data;
   const db = getDb();
+
   try {
-    const authUserId = await findAuthUserIdByEmail(db, parsed.data.email);
+    let authUserId = await findAuthUserIdByEmail(db, email);
+    const isNewAccount = !authUserId;
+
     if (!authUserId) {
-      return {
-        ok: false,
-        message: NO_ACCOUNT_MESSAGE,
-        values: valuesFromFormData(formData, ["email", "name", "phone"]),
-      };
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+      const { data, error } = await getSupabaseAdmin().auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${siteUrl}/auth/callback`,
+      });
+      if (error || !data.user) {
+        console.error("[inviteDriver] inviteUserByEmail failed", error);
+        return {
+          ok: false,
+          message: "We couldn't send that invite right now. Please try again shortly.",
+          values: valuesFromFormData(formData, ["email", "name", "phone"]),
+        };
+      }
+      authUserId = data.user.id;
     }
 
     const existing = await db.select({ id: drivers.id }).from(drivers).where(eq(drivers.authUserId, authUserId));
@@ -256,9 +298,28 @@ export async function addDriver(
       };
     }
 
-    await db.insert(drivers).values({ authUserId, name: parsed.data.name, phone: parsed.data.phone });
+    await db.insert(drivers).values({ authUserId, name, phone });
+
+    // Only when they could already sign in — a brand-new invite's own
+    // email (sent above) is already the notice; sending both would be
+    // two emails for one event. Best-effort, like every other send in
+    // this app — never blocks the driver actually being added.
+    if (!isNewAccount) {
+      try {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+        const { subject, html } = driverAddedEmail({ driverName: name, signInUrl: `${siteUrl}/sign-in` });
+        await getResend().emails.send({
+          from: process.env.EMAIL_FROM ?? "notifications@city2ranch.com",
+          to: email,
+          subject,
+          html,
+        });
+      } catch (error) {
+        console.error("[inviteDriver] driverAddedEmail send failed", error);
+      }
+    }
   } catch (error) {
-    console.error("[addDriver] failed", error);
+    console.error("[inviteDriver] failed", error);
     return {
       ok: false,
       message: "We couldn't add that driver right now. Please try again shortly.",
@@ -267,6 +328,63 @@ export async function addDriver(
   }
 
   revalidatePath(ADMIN_PATH);
+  return { ok: true };
+}
+
+/**
+ * Saves the hiring/compliance fields (license, vehicle, insurance) on
+ * an existing driver — bound as `updateDriverHiringInfo.bind(null,
+ * driverId)`. Separate from document uploads (driver-documents.ts),
+ * which need multipart FormData handling this plain text form doesn't.
+ */
+export async function updateDriverHiringInfo(
+  driverId: string,
+  _prev: ActionResult | undefined,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireSuperAdmin();
+
+  const parsed = driverHiringInfoSchema.safeParse({
+    licenseNumber: formData.get("licenseNumber"),
+    licenseExpiresOn: formData.get("licenseExpiresOn"),
+    vehicleMake: formData.get("vehicleMake"),
+    vehicleModel: formData.get("vehicleModel"),
+    vehicleYear: formData.get("vehicleYear"),
+    vehiclePlate: formData.get("vehiclePlate"),
+    insuranceCarrier: formData.get("insuranceCarrier"),
+    insurancePolicyNumber: formData.get("insurancePolicyNumber"),
+    insuranceExpiresOn: formData.get("insuranceExpiresOn"),
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Please correct the highlighted fields.",
+      fieldErrors: firstFieldErrors(parsed.error.flatten().fieldErrors),
+    };
+  }
+
+  const db = getDb();
+  try {
+    await db
+      .update(drivers)
+      .set({
+        licenseNumber: parsed.data.licenseNumber ?? null,
+        licenseExpiresOn: parsed.data.licenseExpiresOn ?? null,
+        vehicleMake: parsed.data.vehicleMake ?? null,
+        vehicleModel: parsed.data.vehicleModel ?? null,
+        vehicleYear: parsed.data.vehicleYear ?? null,
+        vehiclePlate: parsed.data.vehiclePlate ?? null,
+        insuranceCarrier: parsed.data.insuranceCarrier ?? null,
+        insurancePolicyNumber: parsed.data.insurancePolicyNumber ?? null,
+        insuranceExpiresOn: parsed.data.insuranceExpiresOn ?? null,
+      })
+      .where(eq(drivers.id, driverId));
+  } catch (error) {
+    console.error("[updateDriverHiringInfo] failed", error);
+    return { ok: false, message: "We couldn't save those details right now. Please try again shortly." };
+  }
+
+  revalidatePath(`/internal/dispatch/admin/drivers/${driverId}`);
   return { ok: true };
 }
 
