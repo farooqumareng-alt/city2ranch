@@ -4,6 +4,7 @@ import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SignInForm } from "@/components/forms/SignInForm";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { defaultLandingFor } from "@/lib/auth/roles";
 
 export const metadata: Metadata = {
   title: "Sign In",
@@ -24,9 +25,17 @@ export default async function SignInPage({
   // resubmit, but confusing. Same next-param destination the magic-link
   // callback itself uses, and the same allowlist rule (only a same-origin
   // relative path).
+  //
+  // Falls back to defaultLandingFor() (2026-09-08, Priority 2 of the
+  // master implementation directive), not a hardcoded "/home" — this
+  // used to disagree with what /auth/callback would have sent the same
+  // identity to, landing a staff/driver identity on the customer
+  // dashboard just because they revisited this page instead of clicking
+  // a fresh magic link. One shared landing decision now, not two.
   const user = await getCurrentUser();
   if (user) {
-    redirect(next && next.startsWith("/") && !next.startsWith("//") ? next : "/home");
+    const hasExplicitNext = next && next.startsWith("/") && !next.startsWith("//");
+    redirect(hasExplicitNext ? next : await defaultLandingFor(user.id));
   }
 
   return (
