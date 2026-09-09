@@ -7,7 +7,7 @@ import { markNotificationRead, markAllNotificationsRead } from "@/lib/actions/no
 
 type NotificationItem = {
   id: string;
-  type: "payment_confirmed" | "recurring_order_created";
+  type: "payment_confirmed" | "recurring_order_created" | "driver_accepted" | "order_completed";
   title: string;
   body: string | null;
   orderId: string | null;
