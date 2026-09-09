@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDb } from "@/lib/db";
@@ -15,13 +15,25 @@ import { drivers, staff } from "@/lib/db/schema";
  * even though nothing enforced it. Driver takes priority over staff
  * (mobile-first, single-purpose panel); either can still reach the
  * customer Home via their sidebar's "My Account" link.
+ *
+ * The driver check filters on isActive (2026-09-08) — it didn't
+ * originally, which meant a *disabled* driver row still won this
+ * priority order and routed straight to a 404 (requireDriver() rejects
+ * a disabled row, but this function ran before that check and never
+ * looked at isActive itself). Found via a real production account that
+ * held both an active super_admin row and a leftover, deactivated test
+ * driver row: landing always chose "driver" over "staff" purely because
+ * the row existed, regardless of whether it was usable. Same fix
+ * belongs on the staff check by the same logic, but no case has
+ * actually hit that yet — isActive there is left unfiltered until it
+ * does, rather than changed speculatively.
  */
 async function defaultLandingFor(authUserId: string): Promise<string> {
   const db = getDb();
   const [driverRow] = await db
     .select({ id: drivers.id })
     .from(drivers)
-    .where(eq(drivers.authUserId, authUserId));
+    .where(and(eq(drivers.authUserId, authUserId), eq(drivers.isActive, true)));
   if (driverRow) return "/internal/driver";
 
   const [staffRow] = await db
