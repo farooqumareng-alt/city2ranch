@@ -5,6 +5,41 @@ import { drivers, staff } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 
 /**
+ * Where a signed-in identity with no explicit destination should land —
+ * the one authoritative landing decision for the whole app. Originally
+ * lived only in src/app/auth/callback/route.ts (added 2026-09-01,
+ * lifecycle audit issue #9); moved here 2026-09-08 (Priority 2 of the
+ * master implementation directive) once /sign-in's own already-signed-in
+ * redirect turned out to hardcode "/home" instead of calling it — a
+ * second, disagreeing landing decision for the exact same moment,
+ * which is exactly the duplication this priority exists to close.
+ * Both call sites now share this one implementation; a third can't
+ * silently drift from it the way /sign-in did.
+ *
+ * Driver takes priority over staff (mobile-first, single-purpose
+ * panel); either can still reach the customer Home via their sidebar's
+ * "My Account" link. Filters on isActive (2026-09-08) — see this
+ * file's own git history/the driver check below for why a disabled
+ * row must not still win this priority order.
+ */
+export async function defaultLandingFor(authUserId: string): Promise<string> {
+  const db = getDb();
+  const [driverRow] = await db
+    .select({ id: drivers.id })
+    .from(drivers)
+    .where(and(eq(drivers.authUserId, authUserId), eq(drivers.isActive, true)));
+  if (driverRow) return "/internal/driver";
+
+  const [staffRow] = await db
+    .select({ id: staff.id })
+    .from(staff)
+    .where(eq(staff.authUserId, authUserId));
+  if (staffRow) return "/internal/dispatch";
+
+  return "/home";
+}
+
+/**
  * Gates a staff-only (dispatch) page/action. Signed-out -> /sign-in
  * (nothing to hide, just needs identity). Signed-in but not staff, or a
  * disabled staff row -> 404, not a redirect — a random customer (or a
