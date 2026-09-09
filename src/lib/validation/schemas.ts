@@ -342,6 +342,43 @@ export const addDriverSchema = z.object({
   phone,
 });
 
+// Hiring/compliance paperwork (2026-09-08) — filled in on the Driver
+// Profile page as documents come in, never required at invite time, so
+// every field here is optional. Document uploads themselves are a
+// separate schema (driverDocumentUploadSchema, below) since a file input
+// can't share this text-field shape.
+export const driverHiringInfoSchema = z.object({
+  licenseNumber: optionalText,
+  licenseExpiresOn: optionalDate,
+  vehicleMake: optionalText,
+  vehicleModel: optionalText,
+  vehicleYear: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value, ctx) => {
+      if (!value) return undefined;
+      const year = Number(value);
+      if (!Number.isInteger(year) || year < 1980 || year > new Date().getFullYear() + 1) {
+        ctx.addIssue({ code: "custom", message: "Enter a valid vehicle year." });
+        return z.NEVER;
+      }
+      return year;
+    }),
+  vehiclePlate: optionalText,
+  insuranceCarrier: optionalText,
+  insurancePolicyNumber: optionalText,
+  insuranceExpiresOn: optionalDate,
+});
+export type DriverHiringInfoInput = z.infer<typeof driverHiringInfoSchema>;
+
+// Bytes/mime type are checked against the actual File object server-side
+// (see uploadDriverDocument in driver-documents.ts) — zod validates the
+// shape of the surrounding form fields (which document slot, that a file
+// was actually chosen), not the file's content.
+export const driverDocumentKinds = ["license", "insurance", "registration"] as const;
+export type DriverDocumentKind = (typeof driverDocumentKinds)[number];
+
 // Admin operations-data screens (src/app/internal/dispatch/{stores,
 // pricing,zip-coverage,grocery-items}) — real CRUD for tables that were
 // previously SQL/seed-file-only. `market` is deliberately absent from

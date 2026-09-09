@@ -408,3 +408,25 @@ export function driverJobOfferedEmail(fields: {
     ),
   };
 }
+
+/**
+ * Sent when a super admin adds an existing City2Ranch account as a
+ * driver (2026-09-08's hiring workflow) — the account already exists,
+ * so unlike a brand-new invite (Supabase's own invite email covers
+ * that case) this is the only notice they get that anything changed.
+ * Best-effort, like every other send in this file's callers.
+ */
+export function driverAddedEmail(fields: { driverName: string; signInUrl: string }) {
+  const title = "You've Been Added as a Driver";
+  return {
+    subject: `${title} — City2Ranch`,
+    html: renderShell(
+      title,
+      `
+        <p style="margin:0 0 20px;">Hi ${escapeHtml(fields.driverName)}, you've been added as a driver on City2Ranch.</p>
+        <p style="margin:0 0 20px;">Sign in with this email to see your assigned jobs.</p>
+        ${ctaButton("Sign In", fields.signInUrl)}
+      `
+    ),
+  };
+}
