@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
-import { FOOTER_LINKS, SITE_NAME, SITE_TAGLINE } from "@/lib/constants";
+import { FOOTER_LINKS, SITE_NAME, SITE_TAGLINE, SITE_PHONE_DISPLAY, SITE_PHONE_TEL } from "@/lib/constants";
 
 export function Footer() {
   return (
@@ -15,6 +15,12 @@ export function Footer() {
             Private Rural Concierge &amp; Delivery
           </p>
           <p className="font-sans text-sm text-ivory/70">{SITE_TAGLINE}</p>
+          <a
+            href={`tel:${SITE_PHONE_TEL}`}
+            className="font-sans text-sm text-ivory/90 hover:text-gold"
+          >
+            {SITE_PHONE_DISPLAY}
+          </a>
         </div>
 
         <nav aria-label="Footer">

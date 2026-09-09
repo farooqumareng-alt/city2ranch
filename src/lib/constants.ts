@@ -7,6 +7,12 @@ export const SITE_NAME = "City2Ranch";
 export const SITE_TAGLINE = "City Convenience. Ranch Delivered.";
 export const SITE_EYEBROW = "PRIVATE RURAL CONCIERGE & DELIVERY";
 
+// The one place the phone number is written down — every tel: link and
+// every display of it (Footer, Contact, Support) reads from here, so a
+// future number change is a one-line edit, not a find-and-replace.
+export const SITE_PHONE_DISPLAY = "(318) 863-7307";
+export const SITE_PHONE_TEL = "+13188637307";
+
 export type NavLink = {
   label: string;
   href: string;
