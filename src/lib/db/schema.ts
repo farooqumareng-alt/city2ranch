@@ -1087,3 +1087,31 @@ export const blogPosts = pgTable(
   },
   (table) => [unique().on(table.slug)]
 );
+
+/**
+ * General-purpose admin audit log (2026-09-10) — deliberately separate
+ * from `auditEvents` above, which is order-scoped by design (`order_id`
+ * is NOT NULL and cascades with the order) and can't represent an
+ * action with no order at all, like editing a customer's profile or
+ * changing a staff member's role/permissions. `targetType`/`targetId`
+ * are plain text, not a real foreign key, since a single log needs to
+ * point at rows in different tables (customer_profiles today, staff
+ * for a future RBAC change) — the same "spans multiple tables" reason
+ * order_messages' authorId is a bare uuid with no FK. `before`/`after`
+ * are the full set of fields the action touched, not a computed diff —
+ * simpler to write and to read back, and cheap at this scale.
+ */
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  actorStaffId: uuid("actor_staff_id")
+    .notNull()
+    .references(() => staff.id),
+  action: text("action").notNull(),
+  targetType: text("target_type").notNull(),
+  targetId: text("target_id").notNull(),
+  before: jsonb("before"),
+  after: jsonb("after"),
+});
