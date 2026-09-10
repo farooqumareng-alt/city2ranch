@@ -1047,3 +1047,43 @@ export const orderMessages = pgTable("order_messages", {
   authorId: uuid("author_id"),
   body: text("body").notNull(),
 });
+
+export const blogPostStatusEnum = pgEnum("blog_post_status", ["draft", "published"]);
+
+/**
+ * Self-service admin blog (2026-09-09) — a super admin writes/pastes
+ * content on an admin page and publishes it straight to /blog, with no
+ * engineering involvement per post. `slug` is generated once at
+ * creation from the title and never changes on edit (same "identifier
+ * stays stable once created" discipline as zip_mileage.zip) — a
+ * published post's URL must never move under whoever linked to it.
+ * `content` is plain text, rendered as paragraphs split on blank
+ * lines, not Markdown or HTML — this app has no rich-text editor or
+ * HTML-sanitizing pipeline yet, and plain text sidesteps both an XSS
+ * surface and a "why didn't my formatting show up" support question;
+ * a real editor is a bigger, separate feature if this needs headings/
+ * bold/links later. `publishedAt` (not just status) is what the public
+ * pages actually query on, so a post's public sort order survives even
+ * if it's unpublished and republished later.
+ */
+export const blogPosts = pgTable(
+  "blog_posts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    title: text("title").notNull(),
+    slug: text("slug").notNull(),
+    excerpt: text("excerpt"),
+    content: text("content").notNull(),
+    coverImageUrl: text("cover_image_url"),
+    status: blogPostStatusEnum("status").notNull().default("draft"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    authorStaffId: uuid("author_staff_id").references(() => staff.id),
+  },
+  (table) => [unique().on(table.slug)]
+);

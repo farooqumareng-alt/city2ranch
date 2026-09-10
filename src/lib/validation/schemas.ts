@@ -470,3 +470,18 @@ export const groceryItemUpdateSchema = z.object({
   name: requiredText("Item name"),
 });
 export type GroceryItemUpdateInput = z.infer<typeof groceryItemUpdateSchema>;
+
+// Self-service admin blog (2026-09-09) — content is plain text, not
+// Markdown or HTML (see the doc comment on schema.ts's blogPosts.content
+// for why); coverImageUrl is a plain URL, not an upload, so v1 needs no
+// new Storage bucket. slug is never a form field — it's generated once
+// server-side from the title (blog-management.ts) and never re-derived
+// on edit, so a published post's URL can't shift out from under
+// whoever linked to it.
+export const blogPostSchema = z.object({
+  title: requiredText("Title"),
+  excerpt: optionalText,
+  content: requiredText("Content"),
+  coverImageUrl: optionalText,
+});
+export type BlogPostInput = z.infer<typeof blogPostSchema>;
