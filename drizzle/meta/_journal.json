@@ -358,6 +358,20 @@
       "when": 1789013968234,
       "tag": "0050_rls_blog_posts",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1789074233959,
+      "tag": "0051_admin_audit_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1789074242844,
+      "tag": "0052_rls_admin_audit_log",
+      "breakpoints": true
     }
   ]
 }

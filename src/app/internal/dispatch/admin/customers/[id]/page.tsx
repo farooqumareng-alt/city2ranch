@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
 import { requireSuperAdmin } from "@/lib/auth/roles";
 import { getCustomerDetail } from "@/lib/actions/customer-detail";
+import { getAdminAuditLogFor } from "@/lib/admin-audit";
 import { MEMBERSHIP_TIERS } from "@/lib/stripe/tiers";
 
 export const metadata: Metadata = { title: "Customer Profile" };
@@ -19,15 +21,23 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   await requireSuperAdmin();
   const { id } = await params;
 
-  const customer = await getCustomerDetail(id);
+  const [customer, editHistory] = await Promise.all([
+    getCustomerDetail(id),
+    getAdminAuditLogFor("customer_profile", id),
+  ]);
 
   return (
     <div className="flex flex-col gap-10">
-      <SectionHeading
-        eyebrow="STAFF"
-        title={customer.name ?? "Unnamed Customer"}
-        description={customer.email ?? "(no email on file)"}
-      />
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <SectionHeading
+          eyebrow="STAFF"
+          title={customer.name ?? "Unnamed Customer"}
+          description={customer.email ?? "(no email on file)"}
+        />
+        <Button href={`/internal/dispatch/admin/customers/${id}/edit`} variant="outline-dark">
+          Edit Customer
+        </Button>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Card padding="sm">
@@ -163,6 +173,27 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                   </p>
                 </div>
                 <span className="font-sans text-xs text-charcoal/60">{request.status}</span>
+              </Row>
+            ))}
+          </RowList>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h3 className="font-serif text-lg text-navy-deep">Edit History</h3>
+        {editHistory.length === 0 ? (
+          <EmptyState message="No admin edits on record." />
+        ) : (
+          <RowList>
+            {editHistory.map((entry) => (
+              <Row key={entry.id}>
+                <div>
+                  <p className="font-sans text-sm text-navy-deep">Profile updated</p>
+                  <p className="font-sans text-xs text-charcoal/60">
+                    {new Date(entry.createdAt).toLocaleString()} · by{" "}
+                    {entry.actorLabel ?? entry.actorEmail ?? "a staff member"}
+                  </p>
+                </div>
               </Row>
             ))}
           </RowList>
