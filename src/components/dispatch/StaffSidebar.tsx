@@ -48,6 +48,11 @@ const ADMIN_LINKS = [
   // parent path of /admin/team.
   { href: "/internal/dispatch/admin", label: "Business Overview", exact: true, group: "People" },
   { href: "/internal/dispatch/admin/team", label: "Team", group: "People" },
+  // Self-service admin blog (2026-09-09) — its own group, not folded
+  // into People/Business: publishing to the public site is a different
+  // kind of action from either managing staff or configuring pricing
+  // data, and "Content" names that directly.
+  { href: "/internal/dispatch/admin/blog", label: "Blog", group: "Content" },
 ];
 
 // Settings stays last regardless of role — spliced in after the
