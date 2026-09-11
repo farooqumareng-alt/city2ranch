@@ -8,6 +8,7 @@ import { requireSuperAdmin } from "@/lib/auth/roles";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getResend } from "@/lib/email/resend";
 import { driverAddedEmail } from "@/lib/email/templates";
+import { logAdminAuditEvent } from "@/lib/admin-audit";
 import { addDriverSchema, addStaffSchema, driverHiringInfoSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
@@ -409,20 +410,30 @@ export async function setStaffRole(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireSuperAdmin();
-  const role = formData.get("role") === "super_admin" ? "super_admin" : "staff";
+  const admin = await requireSuperAdmin();
+  const roleValue = formData.get("role");
+  // "manager" added 2026-09-11 — a third real value, not a fallback:
+  // anything unrecognized still collapses to "staff" (the safe
+  // default), same as before this had three options instead of two.
+  const role = roleValue === "super_admin" ? "super_admin" : roleValue === "manager" ? "manager" : "staff";
   const db = getDb();
 
   try {
+    const beforeRows = await db.select({ role: staff.role }).from(staff).where(eq(staff.id, staffId));
+    const previousRole = beforeRows[0]?.role;
+    if (!previousRole) return { ok: false, message: "Staff member not found." };
+
     // The count-then-update used to be two separate, unlocked
     // statements — two concurrent demotions of two different super
     // admins could each see "someone else is still active" and both
     // proceed, reaching zero. FOR UPDATE inside one transaction
     // serializes them: the second transaction's lock acquisition
     // blocks until the first commits, then re-reads the now-current
-    // state.
+    // state. Checked for any non-super_admin target role, not just
+    // "staff" — demoting to "manager" removes super-admin access just
+    // as completely as demoting to plain staff does.
     const blocked = await db.transaction(async (tx) => {
-      if (role === "staff") {
+      if (role !== "super_admin") {
         const remaining = await activeSuperAdminCount(tx, staffId);
         if (remaining === 0) return true;
       }
@@ -431,6 +442,17 @@ export async function setStaffRole(
     });
     if (blocked) {
       return { ok: false, message: "You can't remove the last super admin. Promote someone else first." };
+    }
+
+    if (previousRole !== role) {
+      await logAdminAuditEvent({
+        actorStaffId: admin.id,
+        action: "staff_role_changed",
+        targetType: "staff_role",
+        targetId: staffId,
+        before: { role: previousRole },
+        after: { role },
+      });
     }
   } catch (error) {
     console.error("[setStaffRole] failed", error);

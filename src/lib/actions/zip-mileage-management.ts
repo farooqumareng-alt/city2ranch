@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { zipMileage } from "@/lib/db/schema";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 import { zipMileageCreateSchema, zipMileageUpdateSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
@@ -26,10 +26,10 @@ const LIST_PATH = "/internal/dispatch/zip-coverage";
 
 /** Backs both the admin ZIP Coverage list and, indirectly, every
  *  service-zone/pricing lookup in the app (getZipMileage,
- *  getServiceZoneStatus) — this export itself is admin-only (requireStaff),
+ *  getServiceZoneStatus) — this export itself is admin-only (requireManager),
  *  those reads stay separate and public-safe. */
 export async function listZipMileage() {
-  await requireStaff();
+  await requireManager();
   const db = getDb();
   return db.select().from(zipMileage).orderBy(zipMileage.zip);
 }
@@ -38,7 +38,7 @@ export async function createZipMileage(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
 
   const parsed = zipMileageCreateSchema.safeParse({
     zip: formData.get("zip"),
@@ -87,7 +87,7 @@ export async function updateZipMileage(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
 
   const parsed = zipMileageUpdateSchema.safeParse({
     roundTripMiles: formData.get("roundTripMiles"),
@@ -131,7 +131,7 @@ export async function deleteZipMileage(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by useActionState's calling convention (via JobActionButton), unused here since there's no field data to round-trip
   _prev: ActionResult | undefined
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
 
   try {
     const db = getDb();

@@ -6,12 +6,12 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
 import { JobActionButton } from "@/components/driver/JobActionButton";
 import { listZipMileage, deleteZipMileage } from "@/lib/actions/zip-mileage-management";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "ZIP Coverage" };
 
 export default async function ZipCoveragePage() {
-  await requireStaff();
+  await requireManager();
   const entries = await listZipMileage();
 
   return (

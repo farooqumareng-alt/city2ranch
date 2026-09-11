@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ZipMileageForm } from "@/components/forms/ZipMileageForm";
 import { createZipMileage } from "@/lib/actions/zip-mileage-management";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Add ZIP" };
 
 export default async function NewZipMileagePage() {
-  await requireStaff();
+  await requireManager();
 
   return (
     <div className="flex flex-col gap-10">

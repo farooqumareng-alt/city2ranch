@@ -7,13 +7,14 @@ import { requireSuperAdmin } from "@/lib/auth/roles";
 import { listStaff, listDrivers, setStaffActive, setDriverActive } from "@/lib/actions/team-management";
 import { AddStaffForm } from "@/components/forms/AddStaffForm";
 import { AddDriverForm } from "@/components/forms/AddDriverForm";
-import { RoleToggleButton } from "@/components/dispatch/RoleToggleButton";
+import { RoleSelect } from "@/components/dispatch/RoleSelect";
 import { ActiveToggleButton } from "@/components/dispatch/ActiveToggleButton";
 
 export const metadata: Metadata = { title: "Team" };
 
 const ROLE_LABELS: Record<string, string> = {
   staff: "Staff",
+  manager: "Manager",
   super_admin: "Super Admin",
 };
 
@@ -53,7 +54,7 @@ export default async function TeamAdminPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <RoleToggleButton staffId={member.id} currentRole={member.role} />
+                  <RoleSelect staffId={member.id} currentRole={member.role} />
                   <ActiveToggleButton
                     action={setStaffActive.bind(null, member.id)}
                     isActive={member.isActive}

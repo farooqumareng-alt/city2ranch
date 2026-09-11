@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
 import { ActiveToggleButton } from "@/components/dispatch/ActiveToggleButton";
 import { listStores, setStoreActive } from "@/lib/actions/store-management";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Stores" };
 
@@ -14,7 +14,7 @@ export default async function StoresPage() {
   // Re-checked here, not just relied on via listStores()'s own gate or
   // DispatchLayout — every page in this app re-verifies its own
   // authorization independently.
-  await requireStaff();
+  await requireManager();
   const storeRows = await listStores();
 
   return (

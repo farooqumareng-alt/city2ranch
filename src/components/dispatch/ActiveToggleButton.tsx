@@ -13,10 +13,10 @@ type ToggleAction = (
 
 /**
  * Shared enable/disable button for both a staff row (setStaffActive)
- * and a driver row (setDriverActive) — same reasoning as
- * RoleToggleButton: this can meaningfully fail (the last-super-admin
- * rail, for a staff row), so it needs useActionState to actually show
- * that failure, not a bare bound-form button.
+ * and a driver row (setDriverActive) — same reasoning as RoleSelect:
+ * this can meaningfully fail (the last-super-admin rail, for a staff
+ * row), so it needs useActionState to actually show that failure, not
+ * a bare bound-form button.
  */
 export function ActiveToggleButton({
   action,

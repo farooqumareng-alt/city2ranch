@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { stores } from "@/lib/db/schema";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 import { storeSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
@@ -17,7 +17,7 @@ const LIST_PATH = "/internal/dispatch/stores";
  *  itself — this returns every row so the admin list can show disabled
  *  stores too). */
 export async function listStores() {
-  await requireStaff();
+  await requireManager();
   const db = getDb();
   return db.select().from(stores).orderBy(stores.name);
 }
@@ -37,7 +37,7 @@ export async function createStore(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
 
   const parsed = parseStore(formData);
   if (!parsed.success) {
@@ -71,7 +71,7 @@ export async function updateStore(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
 
   const parsed = parseStore(formData);
   if (!parsed.success) {
@@ -121,7 +121,7 @@ export async function setStoreActive(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
   const isActive = formData.get("isActive") === "true";
 
   try {

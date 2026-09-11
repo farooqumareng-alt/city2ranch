@@ -6,7 +6,7 @@ import { StoreForm } from "@/components/forms/StoreForm";
 import { updateStore } from "@/lib/actions/store-management";
 import { getDb } from "@/lib/db";
 import { stores } from "@/lib/db/schema";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Edit Store" };
 
@@ -15,7 +15,7 @@ export default async function EditStorePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireStaff();
+  await requireManager();
   const { id } = await params;
 
   const db = getDb();

@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
 import { listGroceryItems, deleteGroceryItem } from "@/lib/actions/grocery-item-management";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Grocery Items" };
 
 export default async function GroceryItemsPage() {
-  await requireStaff();
+  await requireManager();
   const items = await listGroceryItems();
 
   // Rows already arrive ordered so every category's items are
