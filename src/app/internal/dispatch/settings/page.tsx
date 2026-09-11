@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { MembershipSalesToggleForm } from "@/components/forms/MembershipSalesToggleForm";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 import { getMembershipSettings } from "@/lib/actions/membership-settings";
 import { membershipServicesConfigured } from "@/lib/env";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function StaffSettingsPage() {
-  await requireStaff();
+  await requireManager();
   const settings = await getMembershipSettings();
   const stripeReady = membershipServicesConfigured();
 

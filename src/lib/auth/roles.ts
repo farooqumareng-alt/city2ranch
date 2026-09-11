@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { drivers, staff } from "@/lib/db/schema";
 import type * as schema from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { canPerform } from "@/lib/staff-roles";
 
 /** Satisfied by both getDb()'s pooled connection and a db.transaction()
  *  callback's `tx` — same convention as my-services.ts's AnyDb, added
@@ -36,6 +37,15 @@ export async function resolveSessionRole(authUserId: string, db: AnyDb = getDb()
     .select({ role: staff.role })
     .from(staff)
     .where(eq(staff.authUserId, authUserId));
+  // "manager" collapses into "staff" here on purpose — this type feeds
+  // the landing route and the header's account menu (Priority 3), and
+  // a manager gets neither a different landing page nor a different
+  // header menu than plain staff (both open on Operations; the extra
+  // access a manager has — Stores/Pricing/ZIP Coverage/Grocery Items/
+  // Settings — lives in the sidebar, which reads the real staff.role
+  // directly rather than through this type). Not a strict mirror of
+  // the staff_role enum in the first place — "customer" isn't a real
+  // DB role either.
   if (staffRow) return staffRow.role === "super_admin" ? "super_admin" : "staff";
 
   return "customer";
@@ -125,10 +135,28 @@ export async function isActiveStaffMember(authUserId: string): Promise<boolean> 
  *  requireStaff() to pass first, so a disabled or non-staff account
  *  404s at that step, identically to how it fails everywhere else
  *  under /internal/dispatch — the failure here is never distinguishable
- *  from "not staff at all." */
+ *  from "not staff at all." Checks via canPerform() (src/lib/
+ *  staff-roles.ts), not a direct role string comparison — that table is
+ *  now the one place "what can each tier do" is actually decided. */
 export async function requireSuperAdmin() {
   const staffMember = await requireStaff();
-  if (staffMember.role !== "super_admin") notFound();
+  if (!canPerform(staffMember.role, "manage_team")) notFound();
+  return staffMember;
+}
+
+/**
+ * Gates a manager-or-above business-configuration page/action — Stores,
+ * Pricing, ZIP Coverage, Grocery Items, Settings. Added 2026-09-11
+ * alongside the "manager" role, splitting "operate" (Work Queue,
+ * dispatch — still plain requireStaff()) from "configure" (this) per
+ * the master implementation directive's own Priority 8 rule. A
+ * super_admin also passes: canPerform()'s super_admin row lists
+ * "configure_business" too, not because this checks role directly but
+ * because that's a real capability every super_admin has.
+ */
+export async function requireManager() {
+  const staffMember = await requireStaff();
+  if (!canPerform(staffMember.role, "configure_business")) notFound();
   return staffMember;
 }
 

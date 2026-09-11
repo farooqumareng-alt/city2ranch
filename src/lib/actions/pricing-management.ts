@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { pricingRules } from "@/lib/db/schema";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 import { pricingRuleSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
@@ -13,7 +13,7 @@ const FORM_FIELDS = ["serviceLabel", "baseFeeCents", "perMileCents", "minFeeCent
 const LIST_PATH = "/internal/dispatch/pricing";
 
 export async function listPricingRules() {
-  await requireStaff();
+  await requireManager();
   const db = getDb();
   return db.select().from(pricingRules).orderBy(pricingRules.createdAt);
 }
@@ -39,7 +39,7 @@ export async function createPricingRule(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
 
   const parsed = parsePricingRule(formData);
   if (!parsed.success) {
@@ -73,7 +73,7 @@ export async function updatePricingRule(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
 
   const parsed = parsePricingRule(formData);
   if (!parsed.success) {
@@ -114,7 +114,7 @@ export async function activatePricingRule(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by useActionState's calling convention (via JobActionButton), unused here since there's no field data to round-trip
   _prev: ActionResult | undefined
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
 
   try {
     const db = getDb();

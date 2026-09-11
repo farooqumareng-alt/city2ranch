@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PricingRuleForm } from "@/components/forms/PricingRuleForm";
 import { createPricingRule } from "@/lib/actions/pricing-management";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Add Pricing Rule" };
 
 export default async function NewPricingRulePage() {
-  await requireStaff();
+  await requireManager();
 
   return (
     <div className="flex flex-col gap-10">

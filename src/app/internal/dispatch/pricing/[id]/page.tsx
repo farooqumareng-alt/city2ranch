@@ -6,7 +6,7 @@ import { PricingRuleForm } from "@/components/forms/PricingRuleForm";
 import { updatePricingRule } from "@/lib/actions/pricing-management";
 import { getDb } from "@/lib/db";
 import { pricingRules } from "@/lib/db/schema";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Edit Pricing Rule" };
 
@@ -15,7 +15,7 @@ export default async function EditPricingRulePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireStaff();
+  await requireManager();
   const { id } = await params;
 
   const db = getDb();

@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { NewGroceryItemForm } from "@/components/forms/GroceryItemForm";
 import { createGroceryItem, listGroceryItems } from "@/lib/actions/grocery-item-management";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Add Grocery Item" };
 
 export default async function NewGroceryItemPage() {
-  await requireStaff();
+  await requireManager();
   const items = await listGroceryItems();
   const existingCategories = [...new Set(items.map((item) => item.category))].sort();
 

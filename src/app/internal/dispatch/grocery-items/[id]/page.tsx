@@ -6,7 +6,7 @@ import { EditGroceryItemForm } from "@/components/forms/GroceryItemForm";
 import { updateGroceryItem } from "@/lib/actions/grocery-item-management";
 import { getDb } from "@/lib/db";
 import { commonGroceryItems } from "@/lib/db/schema";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Edit Grocery Item" };
 
@@ -15,7 +15,7 @@ export default async function EditGroceryItemPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireStaff();
+  await requireManager();
   const { id } = await params;
 
   const db = getDb();

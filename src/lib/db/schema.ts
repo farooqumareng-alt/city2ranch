@@ -171,9 +171,10 @@ export const contactMessages = pgTable("contact_messages", {
 
 // A super_admin can manage staff/driver accounts from
 // /internal/dispatch/admin (see src/lib/actions/team-management.ts);
-// plain staff can't. Deliberately just one tier above the baseline —
-// not a speculative multi-level hierarchy — see src/lib/staff-roles.ts.
-export const staffRoleEnum = pgEnum("staff_role", ["staff", "super_admin"]);
+// plain staff can't. "manager" added 2026-09-11, between the two —
+// see src/lib/staff-roles.ts's canPerform() for exactly what each tier
+// can do; this enum is the storage, that file is the actual rule set.
+export const staffRoleEnum = pgEnum("staff_role", ["staff", "manager", "super_admin"]);
 
 /**
  * Staff/dispatcher role marker. The *first* super_admin still has no

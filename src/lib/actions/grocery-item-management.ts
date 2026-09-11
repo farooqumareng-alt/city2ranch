@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { commonGroceryItems } from "@/lib/db/schema";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 import { groceryItemCreateSchema, groceryItemUpdateSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
@@ -25,7 +25,7 @@ function pgErrorCode(error: unknown): string | undefined {
  *  separate and un-gated (it's used from the guest-open /request-service
  *  form). */
 export async function listGroceryItems() {
-  await requireStaff();
+  await requireManager();
   const db = getDb();
   return db.select().from(commonGroceryItems).orderBy(commonGroceryItems.sortOrder);
 }
@@ -43,7 +43,7 @@ export async function createGroceryItem(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
 
   const parsed = groceryItemCreateSchema.safeParse({
     name: formData.get("name"),
@@ -111,7 +111,7 @@ export async function updateGroceryItem(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireManager();
 
   const parsed = groceryItemUpdateSchema.safeParse({ name: formData.get("name") });
   if (!parsed.success) {
@@ -142,7 +142,7 @@ export async function updateGroceryItem(
 /** Plain hard delete — nothing references this table by foreign key, and
  *  a gap left in sortOrder is harmless (ORDER BY works regardless). */
 export async function deleteGroceryItem(itemId: string): Promise<void> {
-  await requireStaff();
+  await requireManager();
   const db = getDb();
   await db.delete(commonGroceryItems).where(eq(commonGroceryItems.id, itemId));
   revalidatePath(LIST_PATH);

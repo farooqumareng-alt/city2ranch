@@ -16,25 +16,32 @@ import { PanelSidebar } from "@/components/layout/PanelSidebar";
 // reached from a Work Queue row or Team's own list — see ADMIN_LINKS'
 // own comment below), and the directive is explicit that this pass
 // reuses existing routes rather than creating new ones.
+//
+// exact: true — /internal/dispatch is now the Operations Center home,
+// and a plain prefix match would otherwise also light this up on every
+// sibling below it (queue, stores, settings all share this same URL
+// prefix). See PanelSidebar.tsx's PanelLink.exact doc.
 const STAFF_LINKS = [
-  // exact: true — /internal/dispatch is now the Operations Center home,
-  // and a plain prefix match would otherwise also light this up on
-  // every sibling below it (queue, stores, settings all share this
-  // same URL prefix). See PanelSidebar.tsx's PanelLink.exact doc.
   { href: "/internal/dispatch", label: "Overview", exact: true },
   { href: "/internal/dispatch/queue", label: "Work Queue", group: "Operations" },
-  // Operations-data screens (Step 7) — real CRUD for tables that used to
-  // be SQL/seed-file-only. Staff-level, not super-admin-only, matching
-  // RLS's own "any active staff" gate on all four tables.
+];
+
+// Manager-or-above only (2026-09-11, requireManager() — see that
+// function's own doc comment in src/lib/auth/roles.ts) — plain staff no
+// longer sees these at all, matching the real gate on each page, not
+// just hidden-but-reachable. Settings lives here too now, not appended
+// separately — same "configure_business" capability gates both.
+const BUSINESS_LINKS = [
   { href: "/internal/dispatch/stores", label: "Stores", group: "Business" },
   { href: "/internal/dispatch/pricing", label: "Pricing", group: "Business" },
   { href: "/internal/dispatch/zip-coverage", label: "ZIP Coverage", group: "Business" },
   { href: "/internal/dispatch/grocery-items", label: "Grocery Items", group: "Business" },
+  { href: "/internal/dispatch/settings", label: "Settings" },
 ];
 
 // Only shown to a super_admin — display-only convenience, not the
 // enforcement boundary. requireSuperAdmin() on each of these pages is
-// what actually blocks a plain staff member who guesses the URL.
+// what actually blocks anyone else who guesses the URL.
 // Two links, not one flat "Admin" — Business Overview (business health)
 // and Team (staff/driver account management) answer different
 // questions (approved UX blueprint, Phase 5's People/Business split);
@@ -55,23 +62,22 @@ const ADMIN_LINKS = [
   { href: "/internal/dispatch/admin/blog", label: "Blog", group: "Content" },
 ];
 
-// Settings stays last regardless of role — spliced in after the
-// role-dependent groups above rather than living at the end of
-// STAFF_LINKS, so a super_admin sees Operations -> Business -> People
-// -> Settings (matching the directive's own trailing-Settings order),
-// not People appearing after it.
-const SETTINGS_LINK = { href: "/internal/dispatch/settings", label: "Settings" };
-
 /** Same pattern as AccountSidebar/DriverSidebar. */
 export function StaffSidebar({
   userEmail,
   isSuperAdmin,
+  canConfigureBusiness,
 }: {
   userEmail?: string;
   isSuperAdmin?: boolean;
+  /** canPerform(staffMember.role, "configure_business") — manager or
+   *  super_admin. Plain staff sees only Overview/Work Queue. */
+  canConfigureBusiness?: boolean;
 }) {
-  const links = isSuperAdmin
-    ? [...STAFF_LINKS, ...ADMIN_LINKS, SETTINGS_LINK]
-    : [...STAFF_LINKS, SETTINGS_LINK];
+  const links = [
+    ...STAFF_LINKS,
+    ...(canConfigureBusiness ? BUSINESS_LINKS : []),
+    ...(isSuperAdmin ? ADMIN_LINKS : []),
+  ];
   return <PanelSidebar links={links} userEmail={userEmail} accountType="Staff" />;
 }

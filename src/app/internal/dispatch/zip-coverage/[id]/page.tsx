@@ -6,7 +6,7 @@ import { ZipMileageForm } from "@/components/forms/ZipMileageForm";
 import { updateZipMileage } from "@/lib/actions/zip-mileage-management";
 import { getDb } from "@/lib/db";
 import { zipMileage } from "@/lib/db/schema";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Edit ZIP" };
 
@@ -15,7 +15,7 @@ export default async function EditZipMileagePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireStaff();
+  await requireManager();
   const { id } = await params;
 
   const db = getDb();

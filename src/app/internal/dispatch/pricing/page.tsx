@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
 import { JobActionButton } from "@/components/driver/JobActionButton";
 import { listPricingRules, activatePricingRule } from "@/lib/actions/pricing-management";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Pricing" };
 
@@ -16,7 +16,7 @@ function formatDollars(cents: number | null): string {
 }
 
 export default async function PricingPage() {
-  await requireStaff();
+  await requireManager();
   const rules = await listPricingRules();
 
   return (
