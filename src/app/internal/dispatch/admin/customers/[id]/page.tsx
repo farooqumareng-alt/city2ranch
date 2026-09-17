@@ -200,8 +200,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         )}
       </section>
 
-      <Link href="/internal/dispatch/queue" className="font-sans text-sm text-gold hover:text-gold-light">
-        ← Back to Work Queue
+      <Link href="/internal/dispatch" className="font-sans text-sm text-gold hover:text-gold-light">
+        ← Back to Orders
       </Link>
     </div>
   );

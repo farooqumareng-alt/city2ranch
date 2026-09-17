@@ -8,11 +8,12 @@ export type PanelLink = {
   label: string;
   /** Match only pathname === href, never a prefix — needed for a link
    *  whose href is itself a *parent* path of sibling routes (e.g.
-   *  "/internal/dispatch" once /internal/dispatch/queue exists alongside
-   *  it), where the default prefix match would make it show active on
-   *  every one of those siblings too. Leave unset for every ordinary
-   *  link — this only matters when a link's own href is a strict prefix
-   *  of another link's href on the same panel. */
+   *  "/internal/dispatch", which is also a prefix of "/internal/dispatch
+   *  /stores", "/settings", etc.), where the default prefix match would
+   *  make it show active on every one of those siblings too. Leave
+   *  unset for every ordinary link — this only matters when a link's
+   *  own href is a strict prefix of another link's href on the same
+   *  panel. */
   exact?: boolean;
   /** Optional section header this link renders under, desktop only —
    *  mobile keeps the flat horizontal-scroll row every panel already
