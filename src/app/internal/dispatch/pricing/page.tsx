@@ -10,6 +10,11 @@ import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Pricing" };
 
+const SERVICE_TYPE_LABELS: Record<string, string> = {
+  pickup: "City Pickup",
+  concierge: "Concierge",
+};
+
 function formatDollars(cents: number | null): string {
   if (cents === null) return "—";
   return `$${(cents / 100).toFixed(2)}`;
@@ -25,7 +30,7 @@ export default async function PricingPage() {
         <SectionHeading
           eyebrow="BUSINESS"
           title="Pricing"
-          description="City Pickup fee structure. Exactly one rule is active at a time — activating a rule deactivates whichever one currently is."
+          description="Fee structure for both services. Exactly one rule is active per service at a time — activating a rule deactivates whichever one currently is for that same service."
         />
         <Button href="/internal/dispatch/pricing/new" variant="navy">
           Add Pricing Rule
@@ -39,16 +44,22 @@ export default async function PricingPage() {
           {rules.map((rule) => (
             <Row key={rule.id}>
               <div>
-                <Link
-                  href={`/internal/dispatch/pricing/${rule.id}`}
-                  className="font-sans text-sm text-navy-deep underline decoration-navy/20 hover:text-gold"
-                >
-                  {rule.serviceLabel ?? "(no customer-facing name set)"}
-                </Link>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-navy/10 px-2 py-0.5 font-sans text-[10px] font-medium uppercase tracking-wide text-navy-deep">
+                    {SERVICE_TYPE_LABELS[rule.serviceType] ?? rule.serviceType}
+                  </span>
+                  <Link
+                    href={`/internal/dispatch/pricing/${rule.id}`}
+                    className="font-sans text-sm text-navy-deep underline decoration-navy/20 hover:text-gold"
+                  >
+                    {rule.serviceLabel ?? "(no customer-facing name set)"}
+                  </Link>
+                </div>
                 <p className="font-sans text-xs text-charcoal/60">
                   {formatDollars(rule.baseFeeCents)} base + {formatDollars(rule.perMileCents)}/mile
                   {rule.minFeeCents !== null ? `, ${formatDollars(rule.minFeeCents)} minimum` : ""}
                   {rule.isActive ? " · Active" : ""}
+                  {rule.targetMarginPercent === null ? " · Cost not configured" : ""}
                 </p>
               </div>
               {!rule.isActive ? (

@@ -413,12 +413,13 @@ function dollarsToCents(label: string) {
   });
 }
 
-export const pricingRuleSchema = z.object({
-  serviceLabel: optionalText,
-  baseFeeCents: dollarsToCents("Base fee"),
-  perMileCents: dollarsToCents("Per-mile fee"),
-  // Optional: an empty minFee field means "no minimum," not zero.
-  minFeeCents: z
+// Optional dollar-string input — blank means "not configured," never
+// $0. Used for minFeeCents below and for Pricing Engine Phase 1's cost
+// fields (2026-09-15): the whole point of those fields is that null and
+// zero must stay distinguishable all the way from this form down to
+// compute-price.ts's EconomicValue — see that file's own doc comment.
+function optionalDollarsToCents(label: string) {
+  return z
     .string()
     .trim()
     .optional()
@@ -426,14 +427,63 @@ export const pricingRuleSchema = z.object({
       if (!value) return undefined;
       const cents = Math.round(Number(value) * 100);
       if (!Number.isFinite(cents) || cents < 0) {
-        ctx.addIssue({ code: "custom", message: "Enter a valid minimum fee, or leave it blank." });
+        ctx.addIssue({ code: "custom", message: `Enter a valid ${label.toLowerCase()}, or leave it blank.` });
         return z.NEVER;
       }
       return cents;
+    });
+}
+
+// Cost/margin fields shared by both create and update — see the doc
+// comment on pricing_rules' cost columns in schema.ts. serviceLabel/
+// baseFeeCents/perMileCents/minFeeCents/note are what the CUSTOMER is
+// charged; these four are what it actually costs City2Ranch, used only
+// to evaluate a price against real economic floors.
+const pricingRuleCostFields = {
+  contractorFlatCostCents: optionalDollarsToCents("Contractor flat cost"),
+  contractorPerMileCostCents: optionalDollarsToCents("Contractor per-mile cost"),
+  sustainableCostAllowanceCents: optionalDollarsToCents("Sustainable cost allowance"),
+  // A whole-number percent (40, not 0.40) — blank means "not
+  // configured," never assumed to be the company's 40% target. Must be
+  // strictly between 0 and 100: computeTargetProfitPrice() treats 0%
+  // or ≥100% as not_configured too (no valid price at either extreme),
+  // so rejecting them here gives an actual error message instead of a
+  // silently-ignored value.
+  targetMarginPercent: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value, ctx) => {
+      if (!value) return undefined;
+      const percent = Number(value);
+      if (!Number.isFinite(percent) || percent <= 0 || percent >= 100) {
+        ctx.addIssue({ code: "custom", message: "Enter a margin percent between 0 and 100, or leave it blank." });
+        return z.NEVER;
+      }
+      return percent;
     }),
+};
+
+// serviceType is create-only — see pricingRuleUpdateSchema below for
+// why it's immutable after creation, same discipline as zip_mileage.zip.
+export const pricingRuleSchema = z.object({
+  serviceType: z.enum(["pickup", "concierge"]),
+  serviceLabel: optionalText,
+  baseFeeCents: dollarsToCents("Base fee"),
+  perMileCents: dollarsToCents("Per-mile fee"),
+  // Optional: an empty minFee field means "no minimum," not zero.
+  minFeeCents: optionalDollarsToCents("minimum fee"),
   note: optionalText,
+  ...pricingRuleCostFields,
 });
 export type PricingRuleInput = z.infer<typeof pricingRuleSchema>;
+
+// Editing an existing rule never touches its serviceType — a rule's
+// service type is part of its identity (which corridor it belongs to),
+// not an editable attribute, the same "identifier stays stable once
+// created" discipline as zip_mileage.zip and blogPosts.slug.
+export const pricingRuleUpdateSchema = pricingRuleSchema.omit({ serviceType: true });
+export type PricingRuleUpdateInput = z.infer<typeof pricingRuleUpdateSchema>;
 
 export const zipMileageCreateSchema = z.object({
   zip,

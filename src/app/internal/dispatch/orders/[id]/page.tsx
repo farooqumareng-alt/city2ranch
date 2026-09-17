@@ -11,6 +11,7 @@ import { getOrderItems, getOrderFeeLines } from "@/lib/orders/concierge";
 import { getOrderTimeline } from "@/lib/audit-timeline";
 import { ServiceTimeline } from "@/components/services/ServiceTimeline";
 import { ConciergeQuoteForm } from "@/components/dispatch/ConciergeQuoteForm";
+import { getConciergeSuggestion } from "@/lib/pricing/concierge-suggestion";
 import { AssignDriverForm } from "@/components/dispatch/AssignDriverForm";
 import { OrderExceptionForm } from "@/components/dispatch/OrderExceptionForm";
 import { PickupAddressForm } from "@/components/dispatch/PickupAddressForm";
@@ -93,7 +94,13 @@ export default async function ServiceRecordPage({
   if (!order) notFound();
 
   const isConcierge = order.serviceType === "concierge";
-  const [items, feeLines, messages, timeline, activeDrivers] = await Promise.all([
+  // Only fetched while there's still something to suggest a price for —
+  // an already-priced/paid order's quote is locked, so recomputing a
+  // suggestion for it would be pointless work with nothing to show it
+  // in (ConciergeQuoteForm only renders the editable form, suggestion
+  // included, when status === "quote_pending").
+  const needsSuggestion = isConcierge && order.status === "quote_pending";
+  const [items, feeLines, messages, timeline, activeDrivers, conciergeSuggestion] = await Promise.all([
     isConcierge ? getOrderItems(order.id) : Promise.resolve([]),
     isConcierge ? getOrderFeeLines(order.id) : Promise.resolve([]),
     getOrderMessages(order.id),
@@ -101,6 +108,7 @@ export default async function ServiceRecordPage({
     order.status === "paid"
       ? db.select({ id: drivers.id, name: drivers.name }).from(drivers).where(eq(drivers.isActive, true))
       : Promise.resolve([]),
+    needsSuggestion ? getConciergeSuggestion(order.deliveryZip) : Promise.resolve(null),
   ]);
   const driverOptions = activeDrivers.map((d) => ({ value: d.id, label: d.name }));
   const pickupAddress = resolvePickupAddress(order);
@@ -205,6 +213,7 @@ export default async function ServiceRecordPage({
               orderId={order.id}
               status={order.status}
               existingFeeLines={feeLines.map((l) => ({ label: l.label, amountCents: l.amountCents }))}
+              suggestion={conciergeSuggestion}
             />
           ) : (
             <div className="flex flex-col gap-2 rounded-sm border border-navy/10 bg-white/60 p-6">

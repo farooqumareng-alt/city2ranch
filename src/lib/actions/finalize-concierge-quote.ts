@@ -8,9 +8,11 @@ import { requireStaff } from "@/lib/auth/roles";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { assertTransition } from "@/lib/orders/status";
 import { sumFeeLines } from "@/lib/pricing/fee-lines";
+import { getConciergeSuggestion } from "@/lib/pricing/concierge-suggestion";
 import { conciergeQuoteFinalizeSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
 import { logAuditEvent } from "@/lib/audit";
+import { logAdminAuditEvent } from "@/lib/admin-audit";
 import { getResend } from "@/lib/email/resend";
 import { quoteReadyEmail } from "@/lib/email/templates";
 
@@ -29,7 +31,7 @@ export async function finalizeConciergeQuote(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  const staffMember = await requireStaff();
   const staffUser = await getCurrentUser();
 
   const orderId = String(formData.get("orderId") ?? "");
@@ -65,6 +67,16 @@ export async function finalizeConciergeQuote(
 
   const totalCents = sumFeeLines(feeLines);
 
+  // Recomputed here, server-side, at the moment of finalizing — never
+  // trusts whatever the client last rendered (same discipline as every
+  // other server action in this app re-verifying its own authorization;
+  // this is the pricing equivalent). Null when no Concierge pricing
+  // rule/mileage data exists, in which case the snapshot fields below
+  // all stay null too — "no evaluation ran" is the honest answer, not
+  // a fabricated one.
+  const suggestion = await getConciergeSuggestion(order.deliveryZip);
+  const overrideReason = String(formData.get("overrideReason") ?? "").trim() || undefined;
+
   try {
     await db.transaction(async (tx) => {
       await tx.delete(orderFeeLines).where(eq(orderFeeLines.orderId, orderId));
@@ -78,7 +90,22 @@ export async function finalizeConciergeQuote(
       );
       const updated = await tx
         .update(orders)
-        .set({ status: "priced", totalCents, updatedAt: new Date() })
+        .set({
+          status: "priced",
+          totalCents,
+          updatedAt: new Date(),
+          // Snapshotted once, here, alongside totalCents — never
+          // recomputed or backfilled later if pricing_rules changes
+          // (see the doc comment on these columns in schema.ts).
+          pricingRuleId: suggestion?.pricingRuleId ?? null,
+          roundTripMiles: suggestion ? String(suggestion.roundTripMiles) : null,
+          hardCostCents: suggestion?.hardCost.status === "available" ? suggestion.hardCost.cents : null,
+          sustainableFloorCents:
+            suggestion?.sustainableFloor.status === "available" ? suggestion.sustainableFloor.cents : null,
+          targetProfitPriceCents:
+            suggestion?.targetProfitPrice.status === "available" ? suggestion.targetProfitPrice.cents : null,
+          pricingOutcome: suggestion?.outcome ?? null,
+        })
         .where(and(eq(orders.id, orderId), eq(orders.status, order.status)))
         .returning({ id: orders.id });
       // Throwing (not just flagging) rolls back the fee-line replacement
@@ -86,6 +113,22 @@ export async function finalizeConciergeQuote(
       // an order whose status update didn't actually apply.
       if (updated.length === 0) throw new ConciergeQuoteRaceError();
     });
+
+    // Staff override capture (§14 of the approved pricing spec) — only
+    // when there was a real suggestion to diverge from, and the final
+    // total actually differs from it. Reuses admin_audit_log exactly as
+    // planned when that table was built for Edit Customer, not a
+    // second audit mechanism.
+    if (suggestion && totalCents !== suggestion.suggestedTotalCents) {
+      await logAdminAuditEvent({
+        actorStaffId: staffMember.id,
+        action: "concierge_quote_price_overridden",
+        targetType: "order",
+        targetId: orderId,
+        before: { suggestedTotalCents: suggestion.suggestedTotalCents, pricingRuleId: suggestion.pricingRuleId },
+        after: { finalTotalCents: totalCents, reason: overrideReason ?? null },
+      });
+    }
 
     await logAuditEvent({
       orderId,
