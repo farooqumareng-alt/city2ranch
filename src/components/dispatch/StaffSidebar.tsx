@@ -24,6 +24,10 @@ import { PanelSidebar } from "@/components/layout/PanelSidebar";
 const STAFF_LINKS = [
   { href: "/internal/dispatch", label: "Overview", exact: true },
   { href: "/internal/dispatch/queue", label: "Work Queue", group: "Operations" },
+  // 2026-09-16 — the guest-facing pipeline upstream of Work Queue
+  // (waitlist/founding-member/contact signups) had no admin view at
+  // all before this; see listInboxEntries()'s own doc comment.
+  { href: "/internal/dispatch/inbox", label: "Inbox", group: "Operations" },
 ];
 
 // Manager-or-above only (2026-09-11, requireManager() — see that

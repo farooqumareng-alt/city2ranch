@@ -1,6 +1,6 @@
 import { count, eq, gte, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { drivers, orders } from "@/lib/db/schema";
+import { drivers, orders, serviceAreaLeads, foundingMembers, contactMessages } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
 import { getWorkQueue, type WorkQueueItem } from "@/lib/work-queue";
 
@@ -44,13 +44,23 @@ export async function getOperationsDashboard() {
   const startOfTodayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const failedSince = new Date(now.getTime() - FAILED_LOOKBACK_HOURS * 3_600_000);
 
-  const [workQueue, todaysRevenue, activeDriverCount] = await Promise.all([
+  const [workQueue, todaysRevenue, activeDriverCount, newInboxCounts] = await Promise.all([
     getWorkQueue(),
     db
       .select({ total: sql<string | null>`sum(${orders.totalCents})` })
       .from(orders)
       .where(gte(orders.paidAt, startOfTodayUtc)),
     db.select({ n: count() }).from(drivers).where(eq(drivers.isActive, true)),
+    // Counts only — the actual entries live on /internal/dispatch/inbox
+    // (listInboxEntries()). Added 2026-09-16 alongside that page, closing
+    // the exact gap that prompted it: a new waitlist/founding-member/
+    // contact entry used to be visible nowhere but the notification
+    // email it triggered.
+    Promise.all([
+      db.select({ n: count() }).from(serviceAreaLeads).where(eq(serviceAreaLeads.status, "new")),
+      db.select({ n: count() }).from(foundingMembers).where(eq(foundingMembers.status, "new")),
+      db.select({ n: count() }).from(contactMessages).where(eq(contactMessages.status, "new")),
+    ]),
   ]);
 
   const byBucket = (bucket: WorkQueueItem["bucket"]) => workQueue.filter((i) => i.bucket === bucket);
@@ -89,6 +99,7 @@ export async function getOperationsDashboard() {
       completed: completed.length,
       activeDrivers: activeDriverCount[0]?.n ?? 0,
       todaysRevenueCents: Number(todaysRevenue[0]?.total ?? 0),
+      newInboxEntries: newInboxCounts.reduce((sum, rows) => sum + (rows[0]?.n ?? 0), 0),
     },
     needsAttention: {
       // Every needs-quote item (request or order), immediately — the

@@ -86,7 +86,19 @@ export default async function DispatchDashboardPage() {
         <h3 className="font-sans text-[11px] uppercase tracking-[0.1em] text-charcoal/50">
           Business
         </h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:w-1/2">
+        <div className="grid gap-4 sm:grid-cols-3 lg:w-3/4">
+          {/* Not part of the order pipeline (no Work Queue tab to link
+              to) — the guest-facing signups/messages upstream of it.
+              See listInboxEntries()'s own doc comment on why this exists. */}
+          <Link href="/internal/dispatch/inbox">
+            <Card padding="sm" className="transition-colors hover:border-gold">
+              <StatTile
+                label="New in Inbox"
+                value={stats.newInboxEntries}
+                tone={stats.newInboxEntries > 0 ? "critical" : "neutral"}
+              />
+            </Card>
+          </Link>
           <Link href="/internal/dispatch/admin/team">
             <Card padding="sm" className="transition-colors hover:border-gold">
               <StatTile label="Active Drivers" value={stats.activeDrivers} />
