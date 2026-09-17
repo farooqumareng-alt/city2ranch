@@ -1,8 +1,14 @@
-import { count, eq, gte, sql } from "drizzle-orm";
+import { count, countDistinct, eq, gte, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { drivers, orders, serviceAreaLeads, foundingMembers, contactMessages } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
 import { getWorkQueue, type WorkQueueItem } from "@/lib/work-queue";
+
+// Orders where a driver is actually out working right now — driver_assigned
+// (accepted, not yet picked up) through in_transit. Deliberately not
+// "route activity" in any literal sense (there's no routing/GPS system
+// behind this) — just an honest count of real, current order states.
+const ACTIVE_DRIVING_STATUSES = ["driver_assigned", "picked_up", "in_transit"] as const;
 
 // A proxy for "probably not yet handled" — there's no acknowledgedAt/
 // resolution column on `orders` to actually tell a fresh failure from
@@ -44,24 +50,34 @@ export async function getOperationsDashboard() {
   const startOfTodayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const failedSince = new Date(now.getTime() - FAILED_LOOKBACK_HOURS * 3_600_000);
 
-  const [workQueue, todaysRevenue, activeDriverCount, newInboxCounts] = await Promise.all([
-    getWorkQueue(),
-    db
-      .select({ total: sql<string | null>`sum(${orders.totalCents})` })
-      .from(orders)
-      .where(gte(orders.paidAt, startOfTodayUtc)),
-    db.select({ n: count() }).from(drivers).where(eq(drivers.isActive, true)),
-    // Counts only — the actual entries live on /internal/dispatch/inbox
-    // (listInboxEntries()). Added 2026-09-16 alongside that page, closing
-    // the exact gap that prompted it: a new waitlist/founding-member/
-    // contact entry used to be visible nowhere but the notification
-    // email it triggered.
-    Promise.all([
-      db.select({ n: count() }).from(serviceAreaLeads).where(eq(serviceAreaLeads.status, "new")),
-      db.select({ n: count() }).from(foundingMembers).where(eq(foundingMembers.status, "new")),
-      db.select({ n: count() }).from(contactMessages).where(eq(contactMessages.status, "new")),
-    ]),
-  ]);
+  const [workQueue, todaysRevenue, activeDriverCount, driversOutNowRows, pickupPendingRows, newInboxCounts] =
+    await Promise.all([
+      getWorkQueue(),
+      db
+        .select({ total: sql<string | null>`sum(${orders.totalCents})` })
+        .from(orders)
+        .where(gte(orders.paidAt, startOfTodayUtc)),
+      db.select({ n: count() }).from(drivers).where(eq(drivers.isActive, true)),
+      // Distinct, not a plain row count — one driver can hold more than
+      // one active job in principle, and this answers "how many drivers
+      // are out," not "how many jobs are in flight" (that's inProgress,
+      // already covered by the pipeline stats below).
+      db
+        .select({ n: countDistinct(orders.driverId) })
+        .from(orders)
+        .where(inArray(orders.status, ACTIVE_DRIVING_STATUSES)),
+      db.select({ n: count() }).from(orders).where(eq(orders.status, "driver_assigned")),
+      // Counts only — the actual entries live on /internal/dispatch/inbox
+      // (listInboxEntries()). Added 2026-09-16 alongside that page, closing
+      // the exact gap that prompted it: a new waitlist/founding-member/
+      // contact entry used to be visible nowhere but the notification
+      // email it triggered.
+      Promise.all([
+        db.select({ n: count() }).from(serviceAreaLeads).where(eq(serviceAreaLeads.status, "new")),
+        db.select({ n: count() }).from(foundingMembers).where(eq(foundingMembers.status, "new")),
+        db.select({ n: count() }).from(contactMessages).where(eq(contactMessages.status, "new")),
+      ]),
+    ]);
 
   const byBucket = (bucket: WorkQueueItem["bucket"]) => workQueue.filter((i) => i.bucket === bucket);
 
@@ -100,6 +116,12 @@ export async function getOperationsDashboard() {
       activeDrivers: activeDriverCount[0]?.n ?? 0,
       todaysRevenueCents: Number(todaysRevenue[0]?.total ?? 0),
       newInboxEntries: newInboxCounts.reduce((sum, rows) => sum + (rows[0]?.n ?? 0), 0),
+      // "Route activity" in the honest sense available today — real
+      // counts of real order states, not literal route/GPS metrics
+      // (this app has no routing system — see ACTIVE_DRIVING_STATUSES'
+      // own comment).
+      driversOutNow: driversOutNowRows[0]?.n ?? 0,
+      pickupPending: pickupPendingRows[0]?.n ?? 0,
     },
     needsAttention: {
       // Every needs-quote item (request or order), immediately — the
@@ -109,5 +131,10 @@ export async function getOperationsDashboard() {
       unassignedPaidOrders: readyToDispatch.slice(0, ATTENTION_LIMIT),
       recentFailedOrders: recentFailed.slice(0, ATTENTION_LIMIT),
     },
+    // Returned raw, not just summarized into stats above, so the merged
+    // Orders page (/internal/dispatch) can embed the full Work Queue
+    // board directly below the summary without a second getWorkQueue()
+    // call — 2026-09-16, when Overview and Work Queue became one screen.
+    workQueue,
   };
 }

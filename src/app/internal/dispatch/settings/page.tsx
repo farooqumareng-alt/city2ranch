@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { MembershipSalesToggleForm } from "@/components/forms/MembershipSalesToggleForm";
-import { requireManager } from "@/lib/auth/roles";
+import { requireSuperAdmin } from "@/lib/auth/roles";
 import { getMembershipSettings } from "@/lib/actions/membership-settings";
 import { membershipServicesConfigured } from "@/lib/env";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function StaffSettingsPage() {
-  await requireManager();
+  // super_admin only as of 2026-09-16 (business-first navigation
+  // redesign) — was requireManager(); system-level settings is a
+  // different trust boundary from Business's day-to-day pricing/stores
+  // tuning, which a Manager still has.
+  await requireSuperAdmin();
   const settings = await getMembershipSettings();
   const stripeReady = membershipServicesConfigured();
 

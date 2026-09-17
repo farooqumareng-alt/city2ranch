@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { membershipSettings } from "@/lib/db/schema";
-import { requireStaff } from "@/lib/auth/roles";
+import { requireSuperAdmin } from "@/lib/auth/roles";
 import type { ActionResult } from "@/lib/actions/types";
 
 /** Used by both the customer-facing /membership page and the staff
@@ -19,14 +19,16 @@ export async function getMembershipSettings() {
   return rows[0] ?? { id: null, salesEnabled: false, updatedAt: null };
 }
 
-/** Staff-only toggle for whether customers can subscribe at all — see
+/** Super-admin-only toggle (was plain staff, tightened 2026-09-16
+ *  alongside Settings moving to super_admin-only in the sidebar — see
  *  the doc comment on membershipSettings in src/lib/db/schema.ts for
- *  why this exists and defaults to off. */
+ *  why this exists and defaults to off) for whether customers can
+ *  subscribe at all. */
 export async function setMembershipSalesEnabled(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireStaff();
+  await requireSuperAdmin();
 
   const salesEnabled = formData.get("salesEnabled") === "on";
 

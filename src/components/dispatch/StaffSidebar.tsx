@@ -17,30 +17,33 @@ import { PanelSidebar } from "@/components/layout/PanelSidebar";
 // own comment below), and the directive is explicit that this pass
 // reuses existing routes rather than creating new ones.
 //
-// exact: true — /internal/dispatch is now the Operations Center home,
-// and a plain prefix match would otherwise also light this up on every
-// sibling below it (queue, stores, settings all share this same URL
-// prefix). See PanelSidebar.tsx's PanelLink.exact doc.
+// exact: true — /internal/dispatch is now the Orders home (formerly
+// "Overview", separate from Work Queue — the two merged into one
+// screen 2026-09-16, business-first navigation redesign), and a plain
+// prefix match would otherwise also light this up on every sibling
+// below it (stores, settings all share this same URL prefix). See
+// PanelSidebar.tsx's PanelLink.exact doc.
 const STAFF_LINKS = [
-  { href: "/internal/dispatch", label: "Overview", exact: true },
-  { href: "/internal/dispatch/queue", label: "Work Queue", group: "Operations" },
-  // 2026-09-16 — the guest-facing pipeline upstream of Work Queue
-  // (waitlist/founding-member/contact signups) had no admin view at
-  // all before this; see listInboxEntries()'s own doc comment.
+  { href: "/internal/dispatch", label: "Orders", exact: true },
+  // The guest-facing pipeline upstream of Orders (waitlist/founding-
+  // member/contact signups) had no admin view at all before this; see
+  // listInboxEntries()'s own doc comment.
   { href: "/internal/dispatch/inbox", label: "Inbox", group: "Operations" },
 ];
 
 // Manager-or-above only (2026-09-11, requireManager() — see that
 // function's own doc comment in src/lib/auth/roles.ts) — plain staff no
 // longer sees these at all, matching the real gate on each page, not
-// just hidden-but-reachable. Settings lives here too now, not appended
-// separately — same "configure_business" capability gates both.
+// just hidden-but-reachable. Settings moved out of this group
+// (2026-09-16, business-first navigation redesign) to super_admin-only
+// — see SETTINGS_LINK below; day-to-day business tuning (pricing,
+// stores) stays Manager+, but system-level settings is Super Admin
+// only now, matching that redesign's explicit ask.
 const BUSINESS_LINKS = [
   { href: "/internal/dispatch/stores", label: "Stores", group: "Business" },
   { href: "/internal/dispatch/pricing", label: "Pricing", group: "Business" },
   { href: "/internal/dispatch/zip-coverage", label: "ZIP Coverage", group: "Business" },
   { href: "/internal/dispatch/grocery-items", label: "Grocery Items", group: "Business" },
-  { href: "/internal/dispatch/settings", label: "Settings" },
 ];
 
 // Only shown to a super_admin — display-only convenience, not the
@@ -66,6 +69,13 @@ const ADMIN_LINKS = [
   { href: "/internal/dispatch/admin/blog", label: "Blog", group: "Content" },
 ];
 
+// Super_admin only, ungrouped and trailing (2026-09-16) — same
+// reasoning as the master implementation directive's original
+// Priority 8 rule this echoes: system-level configuration is a
+// different trust boundary from Business's day-to-day pricing/stores
+// tuning, which a Manager can still reach on their own.
+const SETTINGS_LINK = { href: "/internal/dispatch/settings", label: "Settings" };
+
 /** Same pattern as AccountSidebar/DriverSidebar. */
 export function StaffSidebar({
   userEmail,
@@ -75,13 +85,13 @@ export function StaffSidebar({
   userEmail?: string;
   isSuperAdmin?: boolean;
   /** canPerform(staffMember.role, "configure_business") — manager or
-   *  super_admin. Plain staff sees only Overview/Work Queue. */
+   *  super_admin. Plain staff sees only Orders/Inbox. */
   canConfigureBusiness?: boolean;
 }) {
   const links = [
     ...STAFF_LINKS,
     ...(canConfigureBusiness ? BUSINESS_LINKS : []),
-    ...(isSuperAdmin ? ADMIN_LINKS : []),
+    ...(isSuperAdmin ? [...ADMIN_LINKS, SETTINGS_LINK] : []),
   ];
   return <PanelSidebar links={links} userEmail={userEmail} accountType="Staff" />;
 }
