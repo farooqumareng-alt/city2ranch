@@ -464,9 +464,78 @@ const pricingRuleCostFields = {
     }),
 };
 
+// Optional round-trip-mileage string input, same "blank means not
+// configured" transform shape as optionalDollarsToCents above, just
+// without the cents conversion.
+function optionalMiles(label: string) {
+  return z
+    .string()
+    .trim()
+    .optional()
+    .transform((value, ctx) => {
+      if (!value) return undefined;
+      const miles = Number(value);
+      if (!Number.isFinite(miles) || miles < 0) {
+        ctx.addIssue({ code: "custom", message: `Enter a valid ${label.toLowerCase()}, or leave it blank.` });
+        return z.NEVER;
+      }
+      return miles;
+    });
+}
+
+// Pricing Engine Phase 2 zone fields (see schema.ts's own doc comment
+// on pricingRules.zoneKey) — all optional, and all four blank together
+// is the plain flat-rate shape every existing rule uses. zoneKey/Label
+// are free text (no fixed enum — see schema.ts), not dollar/percent
+// fields, so they get no numeric transform.
+const pricingRuleZoneFields = {
+  zoneKey: optionalText,
+  zoneLabel: optionalText,
+  zoneMinMiles: optionalMiles("zone minimum miles"),
+  zoneMaxMiles: optionalMiles("zone maximum miles"),
+};
+
+// Shared by both the create and update schema below — zod's `.omit()`
+// only works on a plain ZodObject, not one already wrapped by
+// `.superRefine()`, so this cross-field zone check is defined once and
+// applied to each schema separately rather than refining before omitting.
+function validateZoneFields(
+  data: { zoneKey?: string; zoneLabel?: string; zoneMinMiles?: number; zoneMaxMiles?: number },
+  ctx: z.RefinementCtx
+) {
+  const anyZoneFieldSet =
+    data.zoneKey != null || data.zoneLabel != null || data.zoneMinMiles != null || data.zoneMaxMiles != null;
+  if (!anyZoneFieldSet) return;
+
+  if (data.zoneKey == null) {
+    ctx.addIssue({ code: "custom", path: ["zoneKey"], message: "Zone key is required once any zone field is set." });
+  }
+  if (data.zoneLabel == null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["zoneLabel"],
+      message: "Zone label is required once any zone field is set.",
+    });
+  }
+  if (data.zoneMinMiles == null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["zoneMinMiles"],
+      message: "Zone minimum miles is required once any zone field is set — zone maximum may stay blank for an open-ended top zone.",
+    });
+  }
+  if (data.zoneMinMiles != null && data.zoneMaxMiles != null && data.zoneMinMiles >= data.zoneMaxMiles) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["zoneMaxMiles"],
+      message: "Zone maximum miles must be greater than zone minimum miles.",
+    });
+  }
+}
+
 // serviceType is create-only — see pricingRuleUpdateSchema below for
 // why it's immutable after creation, same discipline as zip_mileage.zip.
-export const pricingRuleSchema = z.object({
+const pricingRuleBaseFields = {
   serviceType: z.enum(["pickup", "concierge"]),
   serviceLabel: optionalText,
   baseFeeCents: dollarsToCents("Base fee"),
@@ -475,14 +544,18 @@ export const pricingRuleSchema = z.object({
   minFeeCents: optionalDollarsToCents("minimum fee"),
   note: optionalText,
   ...pricingRuleCostFields,
-});
+  ...pricingRuleZoneFields,
+};
+
+const pricingRuleObject = z.object(pricingRuleBaseFields);
+export const pricingRuleSchema = pricingRuleObject.superRefine(validateZoneFields);
 export type PricingRuleInput = z.infer<typeof pricingRuleSchema>;
 
 // Editing an existing rule never touches its serviceType — a rule's
 // service type is part of its identity (which corridor it belongs to),
 // not an editable attribute, the same "identifier stays stable once
 // created" discipline as zip_mileage.zip and blogPosts.slug.
-export const pricingRuleUpdateSchema = pricingRuleSchema.omit({ serviceType: true });
+export const pricingRuleUpdateSchema = pricingRuleObject.omit({ serviceType: true }).superRefine(validateZoneFields);
 export type PricingRuleUpdateInput = z.infer<typeof pricingRuleUpdateSchema>;
 
 export const zipMileageCreateSchema = z.object({

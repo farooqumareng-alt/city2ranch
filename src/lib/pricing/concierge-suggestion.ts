@@ -1,4 +1,4 @@
-import { getActivePricingRuleOrNull, getZipMileage } from "@/lib/pricing/repository";
+import { getActivePricingRuleForZone, getZipMileage } from "@/lib/pricing/repository";
 import {
   computePrice,
   computeHardCost,
@@ -21,6 +21,12 @@ export type ConciergeSuggestion = {
   targetProfitPrice: EconomicValue;
   outcome: PricingOutcome;
   belowTargetProfit: boolean | null;
+  // Phase 2 — set only when the matched rule is zoned (see
+  // pricingRules.zoneLabel). This is the CUSTOMER-facing name the
+  // quote should show instead of a mileage breakdown (see
+  // ConciergeQuoteForm.tsx's fee-line pre-fill). Null for a plain
+  // flat-rate rule, where today's base+mileage split is unchanged.
+  zoneLabel: string | null;
 };
 
 /**
@@ -31,18 +37,24 @@ export type ConciergeSuggestion = {
  * order, recomputed server-side at the moment of finalizing rather
  * than trusting whatever the client last rendered).
  *
- * Returns null when there's no active Concierge pricing rule or no
- * mileage data for this ZIP — the caller's job is to fall back to
- * today's plain manual quote workflow in that case (see
+ * Returns null when there's no active Concierge pricing rule matching
+ * this ZIP's mileage (nothing configured at all, or the mileage falls
+ * outside every configured zone — e.g. past the farthest zone's upper
+ * bound) or no mileage data for this ZIP — the caller's job is to fall
+ * back to today's plain manual quote workflow in that case (see
  * ConciergeQuoteForm.tsx), never to fabricate a suggestion from
  * incomplete configuration.
+ *
+ * Mileage is resolved before rule selection (Phase 2) — which rule
+ * applies now depends on the ZIP's distance, not just the service
+ * type, since a service can have several active zoned rules at once.
  */
 export async function getConciergeSuggestion(deliveryZip: string): Promise<ConciergeSuggestion | null> {
-  const [rule, roundTripMiles] = await Promise.all([
-    getActivePricingRuleOrNull("concierge"),
-    getZipMileage(deliveryZip),
-  ]);
-  if (!rule || roundTripMiles == null) return null;
+  const roundTripMiles = await getZipMileage(deliveryZip);
+  if (roundTripMiles == null) return null;
+
+  const rule = await getActivePricingRuleForZone("concierge", roundTripMiles);
+  if (!rule) return null;
 
   const price = computePrice(rule, roundTripMiles);
   const hardCost = computeHardCost(rule, roundTripMiles);
@@ -67,5 +79,6 @@ export async function getConciergeSuggestion(deliveryZip: string): Promise<Conci
     targetProfitPrice,
     outcome,
     belowTargetProfit,
+    zoneLabel: rule.zoneLabel,
   };
 }

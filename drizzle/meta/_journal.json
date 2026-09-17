@@ -393,6 +393,20 @@
       "when": 1789449252148,
       "tag": "0055_pricing_rules_one_active_per_service",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1789681384955,
+      "tag": "0056_pricing_engine_phase2_zones",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1789681384956,
+      "tag": "0057_pricing_rules_one_active_per_zone",
+      "breakpoints": true
     }
   ]
 }

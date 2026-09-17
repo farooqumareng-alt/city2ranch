@@ -37,11 +37,16 @@ export default async function EditPricingRulePage({
       <div className="max-w-2xl">
         <PricingRuleForm
           action={updatePricingRule.bind(null, rule.id)}
-          // Drizzle/postgres-js returns the numeric(5,2) targetMarginPercent
-          // column as a string — same conversion as pricing/repository.ts's
-          // mapRow(), needed here too since this page reads the raw row
-          // directly rather than through that function.
-          rule={{ ...rule, targetMarginPercent: rule.targetMarginPercent == null ? null : Number(rule.targetMarginPercent) }}
+          // Drizzle/postgres-js returns numeric columns as strings — same
+          // conversion as pricing/repository.ts's mapRow(), needed here too
+          // since this page reads the raw row directly rather than through
+          // that function.
+          rule={{
+            ...rule,
+            targetMarginPercent: rule.targetMarginPercent == null ? null : Number(rule.targetMarginPercent),
+            zoneMinMiles: rule.zoneMinMiles == null ? null : Number(rule.zoneMinMiles),
+            zoneMaxMiles: rule.zoneMaxMiles == null ? null : Number(rule.zoneMaxMiles),
+          }}
           submitLabel="Save Changes"
         />
       </div>
