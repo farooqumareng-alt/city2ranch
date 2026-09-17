@@ -623,6 +623,20 @@ export const orderStatusEnum = pgEnum("order_status", [
   "failed",
 ]);
 
+/**
+ * The Pricing Engine's evaluation of a price against real configured
+ * cost floors (see src/lib/pricing/compute-price.ts's
+ * evaluatePricingOutcome) — null on orders.pricingOutcome means no
+ * evaluation was ever run (every order before Phase 1, or a
+ * service/market with no cost config at all), not "standard." Never
+ * recomputed after the fact — see orders.pricingOutcome's own comment.
+ */
+export const pricingOutcomeEnum = pgEnum("pricing_outcome", [
+  "STANDARD_PRICE",
+  "STAFF_REVIEW",
+  "NOT_ECONOMICALLY_VIABLE",
+]);
+
 export const auditActorTypeEnum = pgEnum("audit_actor_type", [
   "customer",
   "staff",
@@ -754,6 +768,30 @@ export const pricingRules = pgTable("pricing_rules", {
   // getActivePricingRule()) becomes "exactly one active row per market"
   // once a second market exists; no functional effect while there's one.
   market: text("market").notNull().default("default"),
+  // serviceType added 2026-09-15 (Pricing Engine Phase 1) — reuses
+  // orderServiceTypeEnum rather than a new duplicate enum. Backfilled
+  // "pickup" on the one existing row (its real, existing classification,
+  // not an invented default) so City Pickup's live row and behavior are
+  // completely unaffected; every future insert sets this explicitly
+  // (pricing-management.ts). The "one active row" uniqueness index was
+  // widened to (market, service_type) alongside this column — see
+  // migration 0055's own comment — so a Concierge rule can be active at
+  // the same time as City Pickup's, not instead of it.
+  serviceType: orderServiceTypeEnum("service_type").notNull().default("pickup"),
+  // The four cost/margin fields below are the Phase 1 cost side of the
+  // pricing engine (see src/lib/pricing/compute-price.ts's
+  // computeHardCost/computeSustainableFloor/computeTargetProfitPrice) —
+  // deliberately separate from baseFeeCents/perMileCents above, which
+  // are what the CUSTOMER is charged. These are what it actually COSTS
+  // City2Ranch to fulfill, used only to evaluate whether a price clears
+  // real economic floors. All nullable, and NULL means "not configured"
+  // — never treated as $0 or 0% by any pricing function. Left blank
+  // (NULL) for every existing row until the business supplies real
+  // numbers; nothing in this schema change fabricates a value.
+  contractorFlatCostCents: integer("contractor_flat_cost_cents"),
+  contractorPerMileCostCents: integer("contractor_per_mile_cost_cents"),
+  sustainableCostAllowanceCents: integer("sustainable_cost_allowance_cents"),
+  targetMarginPercent: numeric("target_margin_percent", { precision: 5, scale: 2 }),
 });
 
 /**
@@ -866,10 +904,18 @@ export const orders = pgTable("orders", {
   // insert sets this explicitly.
   status: orderStatusEnum("status").notNull().default("priced"),
 
-  // pricingRuleId/roundTripMiles/baseFeeCents/mileageFeeCents: City
-  // Pickup only — its automated base+mileage calculation. Null for
-  // concierge orders, whose price comes entirely from staff-entered
-  // orderFeeLines instead; there is no automated Concierge pricing yet.
+  // pricingRuleId/roundTripMiles/baseFeeCents/mileageFeeCents: originally
+  // City Pickup only. Since Pricing Engine Phase 1 (2026-09-15), a
+  // Concierge order that had a configured suggestion available also sets
+  // pricingRuleId (to whichever pricing_rules row generated that
+  // suggestion) and roundTripMiles — the actual customer-facing fee
+  // lines still come entirely from staff-entered orderFeeLines either
+  // way, this is only "which rule/version informed the suggestion staff
+  // started from," per pricingRuleId's existing role as this app's
+  // de facto pricing-version reference (rules are versioned by row, never
+  // mutated — see pricingRules' own doc comment). Null for a Concierge
+  // order quoted with no configuration available (today's plain manual
+  // workflow, unchanged).
   pricingRuleId: uuid("pricing_rule_id").references(() => pricingRules.id),
   // Snapshotted from pricingRules.serviceLabel (City Pickup) or set
   // directly by staff (Concierge) at request/quote time — the
@@ -892,6 +938,22 @@ export const orders = pgTable("orders", {
   // once when staff finalizes the quote — never derived at read time.
   totalCents: integer("total_cents").notNull(),
   currency: text("currency").notNull().default("usd"),
+
+  // Pricing Engine Phase 1 (2026-09-15) — the economic evaluation that
+  // existed at the moment this order's price was set, snapshotted here
+  // so a historical order can always show what it was actually judged
+  // against, even after pricing_rules configuration changes later (see
+  // computeHardCost/computeSustainableFloor/computeTargetProfitPrice/
+  // evaluatePricingOutcome in src/lib/pricing/compute-price.ts). All
+  // four null together means no evaluation ran at all — either the
+  // order predates Phase 1, or its service/market had no cost
+  // configuration at the time; never backfilled or recomputed
+  // retroactively when configuration is added later. Set once, at
+  // quote/acceptance time, alongside totalCents — never updated after.
+  hardCostCents: integer("hard_cost_cents"),
+  sustainableFloorCents: integer("sustainable_floor_cents"),
+  targetProfitPriceCents: integer("target_profit_price_cents"),
+  pricingOutcome: pricingOutcomeEnum("pricing_outcome"),
 
   stripeCheckoutSessionId: text("stripe_checkout_session_id").unique(),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
