@@ -743,7 +743,12 @@ export const drivers = pgTable(
  * Configurable pricing, versioned by row rather than mutated in place —
  * every order snapshots its computed price at request time, so a later
  * pricing change never alters a historical order. Only one row should
- * have `isActive = true` at a time (enforced by the app, not the DB).
+ * have `isActive = true` at a time per (market, service_type, zone_key)
+ * — a plain flat-rate service (zone_key NULL) still means exactly one
+ * active row overall, same as always; a zoned service (see zoneKey
+ * below) can have several active rows at once, one per zone. Enforced
+ * by the app (activatePricingRule()) and backed by a real partial
+ * unique index, not just app discipline.
  *
  * baseFeeCents/perMileCents/minFeeCents remain the internal formula used
  * to derive a price from distance (useful for route economics, driver
@@ -792,6 +797,22 @@ export const pricingRules = pgTable("pricing_rules", {
   contractorPerMileCostCents: integer("contractor_per_mile_cost_cents"),
   sustainableCostAllowanceCents: integer("sustainable_cost_allowance_cents"),
   targetMarginPercent: numeric("target_margin_percent", { precision: 5, scale: 2 }),
+  // Zone fields added 2026-09-17 (Pricing Engine Phase 2) — let a
+  // service type have several active rules at once, one per distance
+  // band, instead of exactly one flat per-mile rule. All four nullable
+  // and NULL across all four means "unzoned" — City Pickup's row (and
+  // any future flat-rate rule) keeps them all NULL and is completely
+  // unaffected; see getActivePricingRuleForZone() in repository.ts for
+  // how a zoned vs. unzoned rule is resolved. zoneKey is free text, not
+  // an enum, so the business can rename/add zones without a migration.
+  // zoneLabel is the CUSTOMER-facing name (e.g. "Remote Service") shown
+  // on the quote instead of a mileage figure — see ConciergeQuoteForm's
+  // own comment on why the fee-line pre-fill never exposes mileage for
+  // a zoned rule. zoneMaxMiles = NULL means open-ended (the top zone).
+  zoneKey: text("zone_key"),
+  zoneLabel: text("zone_label"),
+  zoneMinMiles: numeric("zone_min_miles", { precision: 6, scale: 1 }),
+  zoneMaxMiles: numeric("zone_max_miles", { precision: 6, scale: 1 }),
 });
 
 /**

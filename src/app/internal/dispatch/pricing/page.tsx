@@ -20,6 +20,14 @@ function formatDollars(cents: number | null): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+/** rule.zoneMinMiles/zoneMaxMiles are numeric columns, returned as
+ *  strings by drizzle-orm/postgres-js — same convention noted throughout
+ *  pricing/repository.ts. */
+function formatZoneMiles(min: string | null, max: string | null): string {
+  if (min === null) return "";
+  return max === null ? `${Number(min)}+ mi round trip` : `${Number(min)}–${Number(max)} mi round trip`;
+}
+
 export default async function PricingPage() {
   await requireManager();
   const rules = await listPricingRules();
@@ -30,7 +38,7 @@ export default async function PricingPage() {
         <SectionHeading
           eyebrow="BUSINESS"
           title="Pricing"
-          description="Fee structure for both services. Exactly one rule is active per service at a time — activating a rule deactivates whichever one currently is for that same service."
+          description="Fee structure for both services. A plain (non-zoned) service has exactly one active rule; a zoned service can have several active at once, one per distance zone — activating a rule only ever deactivates whichever rule previously held that same zone."
         />
         <Button href="/internal/dispatch/pricing/new" variant="navy">
           Add Pricing Rule
@@ -48,6 +56,11 @@ export default async function PricingPage() {
                   <span className="rounded-full bg-navy/10 px-2 py-0.5 font-sans text-[10px] font-medium uppercase tracking-wide text-navy-deep">
                     {SERVICE_TYPE_LABELS[rule.serviceType] ?? rule.serviceType}
                   </span>
+                  {rule.zoneKey ? (
+                    <span className="rounded-full bg-gold/20 px-2 py-0.5 font-sans text-[10px] font-medium uppercase tracking-wide text-navy-deep">
+                      Zone: {rule.zoneKey}
+                    </span>
+                  ) : null}
                   <Link
                     href={`/internal/dispatch/pricing/${rule.id}`}
                     className="font-sans text-sm text-navy-deep underline decoration-navy/20 hover:text-gold"
@@ -58,6 +71,7 @@ export default async function PricingPage() {
                 <p className="font-sans text-xs text-charcoal/60">
                   {formatDollars(rule.baseFeeCents)} base + {formatDollars(rule.perMileCents)}/mile
                   {rule.minFeeCents !== null ? `, ${formatDollars(rule.minFeeCents)} minimum` : ""}
+                  {rule.zoneKey !== null ? ` · ${formatZoneMiles(rule.zoneMinMiles, rule.zoneMaxMiles)}` : ""}
                   {rule.isActive ? " · Active" : ""}
                   {rule.targetMarginPercent === null ? " · Cost not configured" : ""}
                 </p>

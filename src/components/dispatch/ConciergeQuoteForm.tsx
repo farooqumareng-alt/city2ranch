@@ -26,6 +26,10 @@ export type ConciergeQuoteSuggestion = {
   targetProfitPrice: EconomicValue;
   outcome: PricingOutcome;
   belowTargetProfit: boolean | null;
+  // Phase 2 — set only when the matched pricing rule is zoned. See the
+  // fee-line pre-fill below for why this changes what the customer
+  // actually sees on their quote.
+  zoneLabel: string | null;
 };
 
 function formatEconomicValue(value: EconomicValue): string {
@@ -51,10 +55,20 @@ function SuggestionPanel({ suggestion }: { suggestion: ConciergeQuoteSuggestion 
   return (
     <div className="flex flex-col gap-2 rounded-sm border border-gold/40 bg-gold/10 p-4">
       <p className="font-sans text-xs uppercase tracking-[0.1em] text-charcoal/50">Pricing Engine Suggestion</p>
-      <p className="font-sans text-sm text-navy-deep">
-        {suggestion.serviceLabel}: ${(suggestion.baseFeeCents / 100).toFixed(2)} base + $
-        {(suggestion.mileageFeeCents / 100).toFixed(2)} mileage ({suggestion.roundTripMiles} mi round trip) = $
-        {(suggestion.suggestedTotalCents / 100).toFixed(2)}
+      {suggestion.zoneLabel ? (
+        <p className="font-sans text-sm text-navy-deep">
+          Zone: {suggestion.zoneLabel} ({suggestion.roundTripMiles} mi round trip) = $
+          {(suggestion.suggestedTotalCents / 100).toFixed(2)}
+        </p>
+      ) : (
+        <p className="font-sans text-sm text-navy-deep">
+          {suggestion.serviceLabel}: ${(suggestion.baseFeeCents / 100).toFixed(2)} base + $
+          {(suggestion.mileageFeeCents / 100).toFixed(2)} mileage ({suggestion.roundTripMiles} mi round trip) = $
+          {(suggestion.suggestedTotalCents / 100).toFixed(2)}
+        </p>
+      )}
+      <p className="font-sans text-[10px] text-charcoal/50">
+        Internal math shown here for staff context only — never exposed to the customer (see the fee line below).
       </p>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 font-sans text-xs text-charcoal/70 sm:grid-cols-4">
         <div>
@@ -107,6 +121,12 @@ export function ConciergeQuoteForm({
   const [lines, setLines] = useState<FeeLineRow[]>(() => {
     if (existingFeeLines.length > 0) {
       return existingFeeLines.map((l) => ({ label: l.label, amount: (l.amountCents / 100).toFixed(2) }));
+    }
+    if (suggestion?.zoneLabel) {
+      // Zoned rule (Phase 2) — one all-inclusive line, no mileage shown.
+      // The customer sees a service fee, never mileage × rate — see
+      // schema.ts's doc comment on pricingRules.zoneLabel.
+      return [{ label: suggestion.zoneLabel, amount: (suggestion.suggestedTotalCents / 100).toFixed(2) }];
     }
     if (suggestion) {
       return [

@@ -23,6 +23,10 @@ export type PricingRuleDefaults = {
   contractorPerMileCostCents: number | null;
   sustainableCostAllowanceCents: number | null;
   targetMarginPercent: number | null;
+  zoneKey: string | null;
+  zoneLabel: string | null;
+  zoneMinMiles: number | null;
+  zoneMaxMiles: number | null;
 };
 
 /** Cents -> a plain dollar string for a text input's defaultValue — the
@@ -33,6 +37,13 @@ export type PricingRuleDefaults = {
 function centsToDollarString(cents: number | null | undefined): string {
   if (cents === null || cents === undefined) return "";
   return (cents / 100).toFixed(2);
+}
+
+/** Same "blank means not set" convention as centsToDollarString, for
+ *  the zone mileage fields — plain miles, no cents conversion. */
+function milesToString(miles: number | null | undefined): string {
+  if (miles === null || miles === undefined) return "";
+  return String(miles);
 }
 
 /**
@@ -141,6 +152,49 @@ export function PricingRuleForm({
             hint="Leave blank for no minimum."
             defaultValue={values?.minFeeCents ?? centsToDollarString(rule?.minFeeCents)}
             error={fieldErrors?.minFeeCents}
+          />
+        </div>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-4 rounded-sm border border-navy/10 bg-ivory/60 p-5">
+        <legend className="font-serif text-lg text-navy-deep">Zone (optional)</legend>
+        <p className="font-sans text-xs text-charcoal/60">
+          Leave all four blank for a plain flat-rate rule (City Pickup&apos;s shape today). Fill all four in to
+          make this rule apply only within a distance band — a service type can have several active zone rules
+          at once, one per band, selected automatically by the delivery ZIP&apos;s round-trip mileage. The zone
+          label is shown to the customer as the whole service fee — never a mileage or per-mile figure.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField
+            name="zoneKey"
+            label="Zone key"
+            placeholder="e.g. remote"
+            hint="A short internal slug — not shown to customers."
+            defaultValue={values?.zoneKey ?? rule?.zoneKey ?? ""}
+            error={fieldErrors?.zoneKey}
+          />
+          <TextField
+            name="zoneLabel"
+            label="Zone label (customer-facing)"
+            placeholder="e.g. Remote Service"
+            hint="Shown to the customer as the entire service fee — never mileage or a rate."
+            defaultValue={values?.zoneLabel ?? rule?.zoneLabel ?? ""}
+            error={fieldErrors?.zoneLabel}
+          />
+          <TextField
+            name="zoneMinMiles"
+            label="Zone minimum miles (round trip)"
+            placeholder="e.g. 60"
+            defaultValue={values?.zoneMinMiles ?? milesToString(rule?.zoneMinMiles)}
+            error={fieldErrors?.zoneMinMiles}
+          />
+          <TextField
+            name="zoneMaxMiles"
+            label="Zone maximum miles (round trip)"
+            placeholder="e.g. 80"
+            hint="Leave blank for an open-ended top zone (no upper limit)."
+            defaultValue={values?.zoneMaxMiles ?? milesToString(rule?.zoneMaxMiles)}
+            error={fieldErrors?.zoneMaxMiles}
           />
         </div>
       </fieldset>
