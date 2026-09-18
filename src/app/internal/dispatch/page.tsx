@@ -9,7 +9,7 @@ import { RowList, Row } from "@/components/ui/RowList";
 import { StatTile } from "@/components/ui/StatTile";
 import { WorkQueueBoard } from "@/components/dispatch/WorkQueueBoard";
 import { getOperationsDashboard } from "@/lib/operations-dashboard";
-import { WORK_QUEUE_TABS, type WorkQueueBucket } from "@/lib/work-queue-types";
+import { BOARD_TABS, type BoardTabKey } from "@/lib/work-queue-types";
 import { getDb } from "@/lib/db";
 import { drivers } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
@@ -32,13 +32,17 @@ export const metadata: Metadata = { title: "Orders" };
  * this change and still matters: a lead needs a quote built from
  * scratch, an order just needs its quote finalized.
  *
- * tab always points at the exact Work Queue tab that shows this same
- * count — since Overview and Work Queue became one screen (2026-09-16),
- * that's a same-page tab switch, not a navigation at all.
+ * tab values are BoardTabKeys (work-queue-types.ts), not raw buckets —
+ * as of 2026-09-18 the board's own tab bar uses the same plain-noun
+ * labels these tiles always have, so New Leads/Pending Quotes now each
+ * land on their own tab instead of sharing one. tab always points at
+ * the exact Orders tab that shows this same count — since Overview and
+ * Work Queue became one screen (2026-09-16), that's a same-page tab
+ * switch, not a navigation at all.
  */
 const PIPELINE_TILES = [
-  { key: "newLeads", label: "New Leads", tab: "needs_quote" },
-  { key: "pendingConciergeQuotes", label: "Pending Quotes", tab: "needs_quote" },
+  { key: "newLeads", label: "New Leads", tab: "new_leads" },
+  { key: "pendingConciergeQuotes", label: "Pending Quotes", tab: "pending_quotes" },
   { key: "awaitingPayment", label: "Awaiting Payment", tab: "awaiting_customer" },
   { key: "processingPayment", label: "Processing Payment", tab: "needs_payment" },
   { key: "readyToDispatch", label: "Ready to Dispatch", tab: "ready_to_dispatch" },
@@ -46,7 +50,7 @@ const PIPELINE_TILES = [
   { key: "inProgress", label: "In Progress", tab: "in_progress" },
   { key: "exceptions", label: "Exceptions", tab: "exceptions" },
   { key: "completed", label: "Completed", tab: "completed" },
-] as const;
+] as const satisfies readonly { key: string; label: string; tab: BoardTabKey }[];
 
 /**
  * Orders — formerly two separate screens (Overview + Work Queue),
@@ -69,7 +73,7 @@ export default async function OrdersPage({
   // re-verifies its own authorization independently of its layout.
   await requireStaff();
   const { tab } = await searchParams;
-  const initialTab = WORK_QUEUE_TABS.some((t) => t.key === tab) ? (tab as WorkQueueBucket) : undefined;
+  const initialTab = BOARD_TABS.some((t) => t.key === tab) ? (tab as BoardTabKey) : undefined;
 
   const db = getDb();
   const [{ stats, needsAttention, workQueue }, activeDrivers] = await Promise.all([

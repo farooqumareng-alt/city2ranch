@@ -11,7 +11,7 @@ import { cancelOrder, failOrder } from "@/lib/actions/staff-order-exceptions";
 import { AssignDriverForm } from "@/components/dispatch/AssignDriverForm";
 import { OrderExceptionForm } from "@/components/dispatch/OrderExceptionForm";
 import { formatPlainDate } from "@/lib/format";
-import { WORK_QUEUE_TABS, type WorkQueueItem, type WorkQueueBucket } from "@/lib/work-queue-types";
+import { BOARD_TABS, type WorkQueueItem, type BoardTabKey } from "@/lib/work-queue-types";
 
 function matchesSearch(item: WorkQueueItem, query: string): boolean {
   if (!query) return true;
@@ -25,11 +25,17 @@ function matchesSearch(item: WorkQueueItem, query: string): boolean {
 }
 
 /**
- * The unified Work Queue UI — approved blueprint: one board, tabbed by
+ * The unified Orders board UI — approved blueprint: one board, tabbed by
  * what staff needs to do next, replacing separate Dispatch Queue and
  * Concierge Quotes pages. Client-side search/tab filtering over an
  * already-fetched, still-small dataset — same scoping note as the old
  * QueueBoard this replaces (src/lib/work-queue.ts's own doc comment).
+ *
+ * Tabs are BOARD_TABS (work-queue-types.ts), not a raw WorkQueueBucket
+ * list — matches the plain-noun labels the Operations dashboard's own
+ * Pipeline tiles already use (2026-09-18, panel redesign), and lets one
+ * bucket (needs_quote) present as two tabs by kind, plus an "All" tab
+ * that isn't a real bucket at all.
  */
 export function WorkQueueBoard({
   items,
@@ -38,26 +44,28 @@ export function WorkQueueBoard({
 }: {
   items: WorkQueueItem[];
   driverOptions: { value: string; label: string }[];
-  initialTab?: WorkQueueBucket;
+  initialTab?: BoardTabKey;
 }) {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<WorkQueueBucket>(initialTab ?? "needs_quote");
+  const [tab, setTab] = useState<BoardTabKey>(initialTab ?? "new_leads");
+
+  const activeTab = BOARD_TABS.find((t) => t.key === tab) ?? BOARD_TABS[0];
 
   const counts = useMemo(() => {
-    const map = new Map<WorkQueueBucket, number>();
-    for (const item of items) map.set(item.bucket, (map.get(item.bucket) ?? 0) + 1);
+    const map = new Map<BoardTabKey, number>();
+    for (const t of BOARD_TABS) map.set(t.key, items.filter(t.match).length);
     return map;
   }, [items]);
 
   const visible = useMemo(
-    () => items.filter((item) => item.bucket === tab && matchesSearch(item, query.trim())),
-    [items, tab, query]
+    () => items.filter((item) => activeTab.match(item) && matchesSearch(item, query.trim())),
+    [items, activeTab, query]
   );
 
   return (
     <div className="flex flex-col gap-6">
-      <nav aria-label="Work Queue tabs" className="flex flex-wrap gap-2">
-        {WORK_QUEUE_TABS.map((t) => (
+      <nav aria-label="Orders tabs" className="flex flex-wrap gap-2">
+        {BOARD_TABS.map((t) => (
           <button
             key={t.key}
             type="button"

@@ -2,6 +2,7 @@
 
 import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { drivers, orders, staff } from "@/lib/db/schema";
 import { requireStaff, requireSuperAdmin } from "@/lib/auth/roles";
@@ -68,7 +69,13 @@ async function activeSuperAdminCount(
   return rows.length;
 }
 
-/** Used by /internal/dispatch/admin's Staff table. */
+/**
+ * Used by /internal/dispatch/admin/team's Staff table. lastSignInAt
+ * (2026-09-18, panel redesign) added for the simplified table's "Last
+ * Login" column — same raw auth.users subquery convention already used
+ * for email everywhere in this codebase (auth.users isn't a Drizzle-
+ * exported table).
+ */
 export async function listStaff() {
   await requireSuperAdmin();
   const db = getDb();
@@ -80,6 +87,7 @@ export async function listStaff() {
       isActive: staff.isActive,
       createdAt: staff.createdAt,
       email: sql<string | null>`(SELECT email FROM auth.users WHERE id = ${staff.authUserId})`,
+      lastSignInAt: sql<string | null>`(SELECT last_sign_in_at FROM auth.users WHERE id = ${staff.authUserId})`,
     })
     .from(staff)
     .orderBy(staff.createdAt);
@@ -406,118 +414,76 @@ export async function updateDriverHiringInfo(
 }
 
 /**
- * Bound to a role-toggle form as `setStaffRole.bind(null, staffId)` —
- * the leading-bound-id convention used everywhere in this codebase
- * (approveAndPayOrder.bind(null, order.id), etc.), extended just enough
- * to still compose with useActionState: the target role travels in
- * FormData (a hidden input), not as a second positional bound arg,
- * since useActionState always calls a bound action as
- * (prevState, formData) — a second bound literal would shift those
- * arguments by one and silently break.
+ * Replaces the old separate setStaffRole()/setStaffActive() (2026-09-18,
+ * panel redesign — the Team page's inline dropdown + two buttons per
+ * row collapsed into one Edit page, see admin/team/[id]/edit/page.tsx)
+ * — one form, one submit, Role and Status applied together in a single
+ * transaction rather than as two separately-racing operations. No other
+ * caller of the old two functions existed (confirmed), so they're
+ * removed outright rather than kept alongside this.
  *
- * Demoting a super_admin to plain staff is blocked if it would leave
- * zero active super_admins — this is also, incidentally, self-lockout
- * prevention: a solo super_admin demoting themselves hits the exact
- * same "would this hit zero" check as demoting anyone else. No
- * separate "is this me" special case needed or wanted.
+ * The last-super-admin safety rail now checks the *combined resulting
+ * state* — demoting away from super_admin, disabling the account, or
+ * both at once in the same submit are all covered by one condition
+ * ("would this staff id still count as an active super_admin
+ * afterward?") instead of two separate checks that could each pass on
+ * their own while the combination still shouldn't. Same FOR UPDATE
+ * transaction pattern as before for the same reason: two concurrent
+ * edits to two different super admins must serialize, not both see
+ * "someone else is still active" and both proceed to zero.
  */
-export async function setStaffRole(
+export async function updateStaffAccount(
   staffId: string,
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
   const admin = await requireSuperAdmin();
   const roleValue = formData.get("role");
-  // "manager" added 2026-09-11 — a third real value, not a fallback:
-  // anything unrecognized still collapses to "staff" (the safe
-  // default), same as before this had three options instead of two.
   const role = roleValue === "super_admin" ? "super_admin" : roleValue === "manager" ? "manager" : "staff";
-  const db = getDb();
-
-  try {
-    const beforeRows = await db.select({ role: staff.role }).from(staff).where(eq(staff.id, staffId));
-    const previousRole = beforeRows[0]?.role;
-    if (!previousRole) return { ok: false, message: "Staff member not found." };
-
-    // The count-then-update used to be two separate, unlocked
-    // statements — two concurrent demotions of two different super
-    // admins could each see "someone else is still active" and both
-    // proceed, reaching zero. FOR UPDATE inside one transaction
-    // serializes them: the second transaction's lock acquisition
-    // blocks until the first commits, then re-reads the now-current
-    // state. Checked for any non-super_admin target role, not just
-    // "staff" — demoting to "manager" removes super-admin access just
-    // as completely as demoting to plain staff does.
-    const blocked = await db.transaction(async (tx) => {
-      if (role !== "super_admin") {
-        const remaining = await activeSuperAdminCount(tx, staffId);
-        if (remaining === 0) return true;
-      }
-      await tx.update(staff).set({ role }).where(eq(staff.id, staffId));
-      return false;
-    });
-    if (blocked) {
-      return { ok: false, message: "You can't remove the last super admin. Promote someone else first." };
-    }
-
-    if (previousRole !== role) {
-      await logAdminAuditEvent({
-        actorStaffId: admin.id,
-        action: "staff_role_changed",
-        targetType: "staff_role",
-        targetId: staffId,
-        before: { role: previousRole },
-        after: { role },
-      });
-    }
-  } catch (error) {
-    console.error("[setStaffRole] failed", error);
-    return { ok: false, message: "We couldn't update that role right now. Please try again shortly." };
-  }
-
-  revalidatePath(ADMIN_PATH);
-  return { ok: true };
-}
-
-/** Bound to an active-toggle form as `setStaffActive.bind(null, staffId)`
- *  — same leading-bound-id + FormData-carried-value shape as
- *  setStaffRole above, and the same last-super-admin rail: disabling a
- *  super_admin has the identical "would this hit zero" failure mode as
- *  demoting one. */
-export async function setStaffActive(
-  staffId: string,
-  _prev: ActionResult | undefined,
-  formData: FormData
-): Promise<ActionResult> {
-  await requireSuperAdmin();
   const isActive = formData.get("isActive") === "true";
   const db = getDb();
 
   try {
-    // Same transaction + FOR UPDATE serialization as setStaffRole above,
-    // and for the identical reason — this is the other half of the
-    // "two concurrent operations reach zero active super admins" race.
+    const beforeRows = await db
+      .select({ role: staff.role, isActive: staff.isActive })
+      .from(staff)
+      .where(eq(staff.id, staffId));
+    const before = beforeRows[0];
+    if (!before) return { ok: false, message: "Staff member not found." };
+
     const blocked = await db.transaction(async (tx) => {
-      if (!isActive) {
-        const target = await tx.select({ role: staff.role }).from(staff).where(eq(staff.id, staffId));
-        if (target[0]?.role === "super_admin") {
-          const remaining = await activeSuperAdminCount(tx, staffId);
-          if (remaining === 0) return true;
-        }
+      const wouldStayActiveSuperAdmin = role === "super_admin" && isActive;
+      if (!wouldStayActiveSuperAdmin) {
+        const remaining = await activeSuperAdminCount(tx, staffId);
+        if (remaining === 0) return true;
       }
-      await tx.update(staff).set({ isActive }).where(eq(staff.id, staffId));
+      await tx.update(staff).set({ role, isActive }).where(eq(staff.id, staffId));
       return false;
     });
     if (blocked) {
-      return { ok: false, message: "You can't disable the last super admin. Promote or enable someone else first." };
+      return {
+        ok: false,
+        message: "You can't remove or disable the last super admin. Promote or enable someone else first.",
+      };
+    }
+
+    if (before.role !== role || before.isActive !== isActive) {
+      await logAdminAuditEvent({
+        actorStaffId: admin.id,
+        action: "staff_account_updated",
+        targetType: "staff_role",
+        targetId: staffId,
+        before: { role: before.role, isActive: before.isActive },
+        after: { role, isActive },
+      });
     }
   } catch (error) {
-    console.error("[setStaffActive] failed", error);
+    console.error("[updateStaffAccount] failed", error);
     return { ok: false, message: "We couldn't update that account right now. Please try again shortly." };
   }
 
   revalidatePath(ADMIN_PATH);
-  return { ok: true };
+  redirect(ADMIN_PATH);
 }
 
 /** Bound to an active-toggle form as `setDriverActive.bind(null, driverId)`. */

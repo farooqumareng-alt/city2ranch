@@ -18,7 +18,7 @@ const REDIRECTS: { file: string; mustContain: string }[] = [
   { file: "src/app/(account)/deliveries/page.tsx", mustContain: `redirect("/my-services?filter=active")` },
   {
     file: "src/app/internal/dispatch/concierge/page.tsx",
-    mustContain: `redirect("/internal/dispatch?tab=needs_quote")`,
+    mustContain: `redirect("/internal/dispatch?tab=pending_quotes")`,
   },
   {
     file: "src/app/internal/dispatch/concierge/[id]/page.tsx",
