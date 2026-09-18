@@ -235,10 +235,10 @@ describe("household_members — P2: at most one active membership per member", (
 });
 
 describe("staff — P1: self_select requires is_active, and staff_all inherits the fix transitively", () => {
-  async function makeStaff(tx: postgres.TransactionSql, isActive: boolean) {
+  async function makeStaff(tx: postgres.TransactionSql, isActive: boolean, role: string = "staff") {
     const user = await makeAuthUser(tx, "staff");
     const [row] = await tx<{ id: string }[]>`
-      INSERT INTO staff (auth_user_id, role, is_active) VALUES (${user.id}, 'staff', ${isActive}) RETURNING id
+      INSERT INTO staff (auth_user_id, role, is_active) VALUES (${user.id}, ${role}, ${isActive}) RETURNING id
     `;
     return { user, staffId: row.id };
   }
@@ -261,23 +261,45 @@ describe("staff — P1: self_select requires is_active, and staff_all inherits t
     });
   });
 
-  // End-to-end propagation proof: staff_all on a real, unrelated table
-  // (pricing_rules — known to have exactly one real row in production,
-  // per src/lib/pricing/repository.ts's own invariant) never mentions
-  // is_active itself; it inherits the fix purely through staff's own
-  // self_select being referenced inside staff_all's EXISTS subquery.
-  it("a disabled staff account loses staff_all access on pricing_rules (transitively, no direct fix on that policy)", async () => {
+  // End-to-end propagation proof: a disabled account of any role loses
+  // pricing_rules access transitively through staff's own self_select
+  // (is_active-gated), never a direct fix on pricing_rules' own policy.
+  it("a disabled manager account loses manager_all access on pricing_rules (transitively, no direct fix on that policy)", async () => {
     await withRollback(async (tx) => {
-      const { user } = await makeStaff(tx, false);
+      const { user } = await makeStaff(tx, false, "manager");
       await actAs(tx, user.id);
       const rows = await tx`SELECT id FROM pricing_rules`;
       expect(rows.length).toBe(0);
     });
   });
 
-  it("an active staff account keeps staff_all access on pricing_rules", async () => {
+  // Tightened 2026-09-18 (migration 0059) — pricing_rules' RLS used to
+  // be "any active staff row" (staff_all), predating the granular RBAC
+  // pass; the app-level gate (requireManager()) has been manager-only
+  // for a while, and this closes the same boundary at the database
+  // level. A plain "staff" role now genuinely has no direct DB access
+  // to pricing_rules, matching what the app already enforced.
+  it("an active plain-staff account (not manager+) no longer has access to pricing_rules", async () => {
     await withRollback(async (tx) => {
-      const { user } = await makeStaff(tx, true);
+      const { user } = await makeStaff(tx, true, "staff");
+      await actAs(tx, user.id);
+      const rows = await tx`SELECT id FROM pricing_rules`;
+      expect(rows.length).toBe(0);
+    });
+  });
+
+  it("an active manager account keeps access to pricing_rules", async () => {
+    await withRollback(async (tx) => {
+      const { user } = await makeStaff(tx, true, "manager");
+      await actAs(tx, user.id);
+      const rows = await tx`SELECT id FROM pricing_rules`;
+      expect(rows.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("an active super_admin account keeps access to pricing_rules", async () => {
+    await withRollback(async (tx) => {
+      const { user } = await makeStaff(tx, true, "super_admin");
       await actAs(tx, user.id);
       const rows = await tx`SELECT id FROM pricing_rules`;
       expect(rows.length).toBeGreaterThan(0);

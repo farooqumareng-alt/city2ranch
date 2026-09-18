@@ -414,6 +414,13 @@
       "when": 1789698517899,
       "tag": "0058_pricing_rules_updated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1789698517900,
+      "tag": "0059_pricing_rules_manager_rls",
+      "breakpoints": true
     }
   ]
 }
