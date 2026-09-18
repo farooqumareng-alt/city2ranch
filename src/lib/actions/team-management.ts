@@ -4,7 +4,7 @@ import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { drivers, orders, staff } from "@/lib/db/schema";
-import { requireSuperAdmin } from "@/lib/auth/roles";
+import { requireStaff, requireSuperAdmin } from "@/lib/auth/roles";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getResend } from "@/lib/email/resend";
 import { driverAddedEmail } from "@/lib/email/templates";
@@ -85,9 +85,16 @@ export async function listStaff() {
     .orderBy(staff.createdAt);
 }
 
-/** Used by /internal/dispatch/admin's Drivers table. */
+/**
+ * Used by the Team page's Drivers table (super_admin, with account
+ * management) and, since 2026-09-18, the plain-staff Drivers lookup
+ * page (/internal/dispatch/drivers) too — widened from requireSuperAdmin()
+ * to requireStaff() because this shape (name/phone/isActive/createdAt/
+ * email) has always been free of HR/compliance data; the Team page's
+ * own page-level requireSuperAdmin() gate is unaffected by this change.
+ */
 export async function listDrivers() {
-  await requireSuperAdmin();
+  await requireStaff();
   const db = getDb();
   return db
     .select({
@@ -106,13 +113,22 @@ export async function listDrivers() {
  * Used by /internal/dispatch/admin/drivers/[id] — everything listDrivers()
  * doesn't have: the driver's full assignment history (every order ever
  * assigned to them, any status — not just the active ones their own
- * /internal/driver page shows) and honest performance stats. No ratings,
- * no on-time %, no availability — nothing in this schema collects any
- * of that; only what's actually computable from real columns
- * (assignedAt/completedAt) is included.
+ * /internal/driver page shows), honest performance stats, and hiring/
+ * compliance fields. No ratings, no on-time %, no availability — nothing
+ * in this schema collects any of that; only what's actually computable
+ * from real columns (assignedAt/completedAt) is included.
+ *
+ * Widened from requireSuperAdmin() to requireStaff() 2026-09-18 — the
+ * page itself now decides what a plain staff viewer sees (stats/history,
+ * yes; hiring/compliance/documents, no) rather than the function
+ * blocking staff entirely. The license/insurance fields below are still
+ * only ever rendered for a super_admin viewer (see the page's own
+ * isSuperAdmin check) — a Server Component never sends a field to the
+ * browser unless it's actually interpolated into the returned JSX, so
+ * fetching them here doesn't leak them to a staff viewer's browser.
  */
 export async function getDriverDetail(driverId: string) {
-  await requireSuperAdmin();
+  await requireStaff();
   const db = getDb();
 
   const [driverRows, assignmentHistory, statsRows] = await Promise.all([

@@ -1,10 +1,10 @@
 "use server";
 
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, isNotNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { customerPlaces, customerProfiles, memberships, orders, serviceRequests } from "@/lib/db/schema";
-import { requireSuperAdmin } from "@/lib/auth/roles";
+import { requireStaff, requireSuperAdmin } from "@/lib/auth/roles";
 import { getHouseholdData } from "@/lib/household";
 import { profileUpdateSchema } from "@/lib/validation/schemas";
 import { logAdminAuditEvent } from "@/lib/admin-audit";
@@ -24,9 +24,49 @@ import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
  * src/lib/customer-profile.ts's doc comment). Name/email/phone fall
  * back through: profile -> the most recent order's own snapshot fields
  * -> a raw auth.users lookup, in that order.
+ *
+ * Widened from requireSuperAdmin() to requireStaff() 2026-09-18 — the
+ * page itself now decides what to show a plain staff viewer (everything
+ * except the Edit control and Edit History, both still super_admin-only
+ * — see the page's own isSuperAdmin check and
+ * updateCustomerProfileAsAdmin's independent gate below).
  */
+/**
+ * Used by the new /internal/dispatch/customers lookup page — one row
+ * per distinct customer who has ever placed a real order (a signed-up
+ * customer with zero orders has nothing here to look up yet, so isn't
+ * included). Name/phone resolve through the same profile -> order-
+ * snapshot fallback getCustomerDetail() uses, just aggregated with
+ * COALESCE(MAX(...)) across a customer's own orders instead of the
+ * detail page's per-order fallback chain — this is a list, not a
+ * profile, so one best-available value per field is enough. Ordered by
+ * most recent activity, no pagination yet — same "client-side search
+ * over an already-fetched, still-small dataset" scoping as
+ * WorkQueueBoard.tsx, a real limitation to revisit if the customer
+ * count grows large, not built around preemptively.
+ */
+export async function listCustomersForLookup() {
+  await requireStaff();
+  const db = getDb();
+
+  return db
+    .select({
+      authUserId: orders.authUserId,
+      name: sql<string | null>`coalesce(max(${customerProfiles.name}), max(${orders.customerName}))`,
+      email: sql<string | null>`coalesce((select email from auth.users where id = ${orders.authUserId}), max(${orders.customerEmail}))`,
+      phone: sql<string | null>`coalesce(max(${customerProfiles.phone}), max(${orders.customerPhone}))`,
+      orderCount: sql<number>`count(*)`,
+      lastOrderAt: sql<Date>`max(${orders.createdAt})`,
+    })
+    .from(orders)
+    .leftJoin(customerProfiles, eq(customerProfiles.authUserId, orders.authUserId))
+    .where(isNotNull(orders.authUserId))
+    .groupBy(orders.authUserId)
+    .orderBy(desc(sql`max(${orders.createdAt})`));
+}
+
 export async function getCustomerDetail(authUserId: string) {
-  await requireSuperAdmin();
+  await requireStaff();
   const db = getDb();
 
   const [profileRows, orderHistory, places] = await Promise.all([
