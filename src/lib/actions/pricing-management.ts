@@ -8,6 +8,8 @@ import { pricingRules } from "@/lib/db/schema";
 import { requireManager } from "@/lib/auth/roles";
 import { pricingRuleSchema, pricingRuleUpdateSchema } from "@/lib/validation/schemas";
 import { occupiesSameZoneSlot } from "@/lib/pricing/zone-scope";
+import { getZoneReadiness } from "@/lib/pricing/zone-readiness";
+import { logAdminAuditEvent } from "@/lib/admin-audit";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
 const CREATE_FORM_FIELDS = [
@@ -120,7 +122,7 @@ export async function createPricingRule(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireManager();
+  const staffMember = await requireManager();
 
   const parsed = pricingRuleSchema.safeParse({
     serviceType: formData.get("serviceType"),
@@ -150,14 +152,26 @@ export async function createPricingRule(
       return { ok: false, message: zoneError, values: valuesFromFormData(formData, CREATE_FORM_FIELDS) };
     }
 
-    await db.insert(pricingRules).values({
-      ...parsed.data,
-      isActive: false,
-      // numeric columns round-trip as strings for drizzle-orm/postgres-js
-      // (same convention as zip_mileage.roundTripMiles elsewhere).
-      targetMarginPercent: parsed.data.targetMarginPercent == null ? null : String(parsed.data.targetMarginPercent),
-      zoneMinMiles: parsed.data.zoneMinMiles == null ? null : String(parsed.data.zoneMinMiles),
-      zoneMaxMiles: parsed.data.zoneMaxMiles == null ? null : String(parsed.data.zoneMaxMiles),
+    const inserted = await db
+      .insert(pricingRules)
+      .values({
+        ...parsed.data,
+        isActive: false,
+        // numeric columns round-trip as strings for drizzle-orm/postgres-js
+        // (same convention as zip_mileage.roundTripMiles elsewhere).
+        targetMarginPercent: parsed.data.targetMarginPercent == null ? null : String(parsed.data.targetMarginPercent),
+        zoneMinMiles: parsed.data.zoneMinMiles == null ? null : String(parsed.data.zoneMinMiles),
+        zoneMaxMiles: parsed.data.zoneMaxMiles == null ? null : String(parsed.data.zoneMaxMiles),
+      })
+      .returning({ id: pricingRules.id });
+
+    await logAdminAuditEvent({
+      actorStaffId: staffMember.id,
+      action: "pricing_rule_created",
+      targetType: "pricing_rule",
+      targetId: inserted[0].id,
+      before: null,
+      after: { ...parsed.data, isActive: false },
     });
   } catch (error) {
     console.error("[createPricingRule] failed", error);
@@ -179,7 +193,7 @@ export async function updatePricingRule(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireManager();
+  const staffMember = await requireManager();
 
   const parsed = pricingRuleUpdateSchema.safeParse({
     serviceLabel: formData.get("serviceLabel"),
@@ -201,10 +215,10 @@ export async function updatePricingRule(
 
   try {
     const db = getDb();
-    const existingRows = await db
-      .select({ market: pricingRules.market, serviceType: pricingRules.serviceType })
-      .from(pricingRules)
-      .where(eq(pricingRules.id, ruleId));
+    // Full row, not just market/serviceType — also the "before" audit
+    // snapshot below, and the zone-overlap check still only needs the
+    // two fields it always did.
+    const existingRows = await db.select().from(pricingRules).where(eq(pricingRules.id, ruleId));
     const existing = existingRows[0];
     if (!existing) {
       return { ok: false, message: "Pricing rule not found.", values: valuesFromFormData(formData, UPDATE_FORM_FIELDS) };
@@ -225,11 +239,21 @@ export async function updatePricingRule(
       .update(pricingRules)
       .set({
         ...parsed.data,
+        updatedAt: new Date(),
         targetMarginPercent: parsed.data.targetMarginPercent == null ? null : String(parsed.data.targetMarginPercent),
         zoneMinMiles: parsed.data.zoneMinMiles == null ? null : String(parsed.data.zoneMinMiles),
         zoneMaxMiles: parsed.data.zoneMaxMiles == null ? null : String(parsed.data.zoneMaxMiles),
       })
       .where(eq(pricingRules.id, ruleId));
+
+    await logAdminAuditEvent({
+      actorStaffId: staffMember.id,
+      action: "pricing_rule_updated",
+      targetType: "pricing_rule",
+      targetId: ruleId,
+      before: existing,
+      after: parsed.data,
+    });
   } catch (error) {
     console.error("[updatePricingRule] failed", error);
     return {
@@ -274,34 +298,69 @@ export async function updatePricingRule(
  * deactivates the other unzoned row in its market+service type, exactly
  * like before this change — zone-scoping is purely additive for a
  * service that never configures zones.
+ *
+ * Gated by getZoneReadiness() as of 2026-09-18 — before this, nothing
+ * stopped a manager from activating a still-placeholder row (e.g. one
+ * of the 4 seeded Concierge zones, $0.01 base fee, every cost field
+ * null) straight to production. A row already active is exempt (see
+ * that function's own isActive-wins rule) — this only judges the
+ * inactive → active transition itself, never retroactively.
  */
 export async function activatePricingRule(
   ruleId: string,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by useActionState's calling convention (via JobActionButton), unused here since there's no field data to round-trip
   _prev: ActionResult | undefined
 ): Promise<ActionResult> {
-  await requireManager();
+  const staffMember = await requireManager();
+
+  const db = getDb();
+  const rows = await db.select().from(pricingRules).where(eq(pricingRules.id, ruleId));
+  const rule = rows[0];
+  if (!rule) return { ok: false, message: "Pricing rule not found." };
+
+  // targetMarginPercent round-trips as a string for drizzle-orm/
+  // postgres-js (numeric column) — same conversion as repository.ts's
+  // mapRow(); getZoneReadiness only null-checks it, but its type is
+  // the honest number|null shape every other consumer expects.
+  const readiness = getZoneReadiness({
+    ...rule,
+    targetMarginPercent: rule.targetMarginPercent == null ? null : Number(rule.targetMarginPercent),
+  });
+  if (readiness.status !== "ready_for_review") {
+    return {
+      ok: false,
+      message:
+        readiness.status === "active"
+          ? "This rule is already active."
+          : `This rule isn't ready to activate yet — missing: ${readiness.missing.join(", ")}.`,
+    };
+  }
 
   try {
-    const db = getDb();
+    let deactivatedIds: string[] = [];
     await db.transaction(async (tx) => {
-      const rows = await tx
-        .select({ id: pricingRules.id, market: pricingRules.market, serviceType: pricingRules.serviceType, zoneKey: pricingRules.zoneKey })
-        .from(pricingRules)
-        .where(eq(pricingRules.id, ruleId));
-      const rule = rows[0];
-      if (!rule) throw new Error("Pricing rule not found.");
-
       const candidates = await tx
         .select({ id: pricingRules.id, market: pricingRules.market, serviceType: pricingRules.serviceType, zoneKey: pricingRules.zoneKey })
         .from(pricingRules)
         .where(and(eq(pricingRules.market, rule.market), eq(pricingRules.serviceType, rule.serviceType), ne(pricingRules.id, ruleId)));
-      const toDeactivate = candidates.filter((c) => occupiesSameZoneSlot(rule, c)).map((c) => c.id);
+      deactivatedIds = candidates.filter((c) => occupiesSameZoneSlot(rule, c)).map((c) => c.id);
 
-      if (toDeactivate.length > 0) {
-        await tx.update(pricingRules).set({ isActive: false }).where(inArray(pricingRules.id, toDeactivate));
+      if (deactivatedIds.length > 0) {
+        await tx
+          .update(pricingRules)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(inArray(pricingRules.id, deactivatedIds));
       }
-      await tx.update(pricingRules).set({ isActive: true }).where(eq(pricingRules.id, ruleId));
+      await tx.update(pricingRules).set({ isActive: true, updatedAt: new Date() }).where(eq(pricingRules.id, ruleId));
+    });
+
+    await logAdminAuditEvent({
+      actorStaffId: staffMember.id,
+      action: "pricing_rule_activated",
+      targetType: "pricing_rule",
+      targetId: ruleId,
+      before: { isActive: false },
+      after: { isActive: true, deactivatedRuleIds: deactivatedIds },
     });
   } catch (error) {
     console.error("[activatePricingRule] failed", error);

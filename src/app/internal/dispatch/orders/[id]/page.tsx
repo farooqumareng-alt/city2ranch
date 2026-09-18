@@ -12,6 +12,7 @@ import { getOrderTimeline } from "@/lib/audit-timeline";
 import { ServiceTimeline } from "@/components/services/ServiceTimeline";
 import { ConciergeQuoteForm } from "@/components/dispatch/ConciergeQuoteForm";
 import { getConciergeSuggestion } from "@/lib/pricing/concierge-suggestion";
+import { getActiveZonedRulesForService } from "@/lib/pricing/repository";
 import { AssignDriverForm } from "@/components/dispatch/AssignDriverForm";
 import { OrderExceptionForm } from "@/components/dispatch/OrderExceptionForm";
 import { PickupAddressForm } from "@/components/dispatch/PickupAddressForm";
@@ -39,13 +40,16 @@ export const metadata: Metadata = { title: "Service Record" };
  */
 export default async function ServiceRecordPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ overrideZone?: string }>;
 }) {
   // Re-checked here, not just relied on via DispatchLayout — this page
   // queries one specific customer's full order record directly.
   await requireStaff();
   const { id } = await params;
+  const { overrideZone } = await searchParams;
   const db = getDb();
 
   const rows = await db
@@ -100,7 +104,7 @@ export default async function ServiceRecordPage({
   // in (ConciergeQuoteForm only renders the editable form, suggestion
   // included, when status === "quote_pending").
   const needsSuggestion = isConcierge && order.status === "quote_pending";
-  const [items, feeLines, messages, timeline, activeDrivers, conciergeSuggestion] = await Promise.all([
+  const [items, feeLines, messages, timeline, activeDrivers, conciergeSuggestion, zoneOptions] = await Promise.all([
     isConcierge ? getOrderItems(order.id) : Promise.resolve([]),
     isConcierge ? getOrderFeeLines(order.id) : Promise.resolve([]),
     getOrderMessages(order.id),
@@ -108,7 +112,13 @@ export default async function ServiceRecordPage({
     order.status === "paid"
       ? db.select({ id: drivers.id, name: drivers.name }).from(drivers).where(eq(drivers.isActive, true))
       : Promise.resolve([]),
-    needsSuggestion ? getConciergeSuggestion(order.deliveryZip) : Promise.resolve(null),
+    // ?overrideZone lets staff preview the suggestion under a different
+    // active zone than the one mileage would auto-match — re-verified
+    // server-side inside getConciergeSuggestion itself, never trusted
+    // as a real price just because it's in the URL.
+    needsSuggestion ? getConciergeSuggestion(order.deliveryZip, overrideZone) : Promise.resolve(null),
+    // Only worth fetching when there's actually a choice to offer.
+    needsSuggestion ? getActiveZonedRulesForService("concierge") : Promise.resolve([]),
   ]);
   const driverOptions = activeDrivers.map((d) => ({ value: d.id, label: d.name }));
   const pickupAddress = resolvePickupAddress(order);
@@ -210,10 +220,17 @@ export default async function ServiceRecordPage({
         <div className="flex flex-col gap-6">
           {isConcierge ? (
             <ConciergeQuoteForm
+              // Remounts on zone-override changes so the fee-line draft
+              // resets to the newly chosen zone's suggestion — a plain
+              // prop update wouldn't re-run the lines useState
+              // initializer (see ConciergeQuoteForm's own comment).
+              key={overrideZone ?? "auto"}
               orderId={order.id}
               status={order.status}
               existingFeeLines={feeLines.map((l) => ({ label: l.label, amountCents: l.amountCents }))}
               suggestion={conciergeSuggestion}
+              zoneOptions={zoneOptions.map((r) => ({ id: r.id, zoneLabel: r.zoneLabel ?? r.zoneKey ?? r.id }))}
+              selectedZoneRuleId={overrideZone}
             />
           ) : (
             <div className="flex flex-col gap-2 rounded-sm border border-navy/10 bg-white/60 p-6">

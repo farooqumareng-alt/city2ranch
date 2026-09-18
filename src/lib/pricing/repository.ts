@@ -10,6 +10,8 @@ export type ServiceType = "pickup" | "concierge";
  *  baseFeeCents/perMileCents/minFeeCents/serviceLabel is unaffected. */
 export type PricingRuleRow = PricingRule & {
   id: string;
+  isActive: boolean;
+  updatedAt: Date;
   contractorFlatCostCents: number | null;
   contractorPerMileCostCents: number | null;
   sustainableCostAllowanceCents: number | null;
@@ -25,6 +27,8 @@ export type PricingRuleRow = PricingRule & {
 function mapRow(rule: typeof pricingRules.$inferSelect): PricingRuleRow {
   return {
     id: rule.id,
+    isActive: rule.isActive,
+    updatedAt: rule.updatedAt,
     baseFeeCents: rule.baseFeeCents,
     perMileCents: rule.perMileCents,
     minFeeCents: rule.minFeeCents,
@@ -163,6 +167,39 @@ export function selectZoneMatch(
   }
 
   return matches.length === 1 ? matches[0] : null;
+}
+
+/**
+ * Every currently-active zoned rule for a service type, for a manual
+ * zone-override selector (see getConciergeSuggestion's overrideRuleId
+ * param) — staff choosing among real, currently-live zones, never an
+ * arbitrary or inactive one. Empty array whenever nothing is zoned yet
+ * (today's real state for "concierge") or nothing is active at all.
+ * Unzoned rules are never candidates for an override selector — there's
+ * only ever one of those anyway, and it's already what auto-match falls
+ * back to with no override.
+ */
+export async function getActiveZonedRulesForService(serviceType: ServiceType): Promise<PricingRuleRow[]> {
+  const rows = await findActiveRows(serviceType);
+  return rows.filter((r) => r.zoneKey != null).map(mapRow);
+}
+
+/**
+ * Fetches one specific rule by id, but only returns it if it's
+ * genuinely active and belongs to the given service type — the
+ * server-side check behind a manual zone override (a client can submit
+ * any id; this is what actually verifies it's a real, live, correctly-
+ * scoped rule before it's ever used to compute a price). Null for a
+ * missing, inactive, or wrong-service-type id — the caller's job is to
+ * fall back to auto-matching, never to trust the id blindly.
+ */
+export async function getActivePricingRuleById(id: string, serviceType: ServiceType): Promise<PricingRuleRow | null> {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(pricingRules)
+    .where(and(eq(pricingRules.id, id), eq(pricingRules.isActive, true), eq(pricingRules.serviceType, serviceType)));
+  return rows.length === 1 ? mapRow(rows[0]) : null;
 }
 
 /**

@@ -67,6 +67,13 @@ export async function finalizeConciergeQuote(
 
   const totalCents = sumFeeLines(feeLines);
 
+  // A staff-chosen zone override (see ConciergeQuoteForm's zone
+  // selector) — re-verified inside getConciergeSuggestion itself
+  // (getActivePricingRuleById checks it's real, active, and Concierge)
+  // before ever affecting the snapshot below. Absent/invalid just means
+  // "no override," never an error.
+  const overrideZoneRuleId = String(formData.get("pricingRuleId") ?? "").trim() || undefined;
+
   // Recomputed here, server-side, at the moment of finalizing — never
   // trusts whatever the client last rendered (same discipline as every
   // other server action in this app re-verifying its own authorization;
@@ -74,8 +81,14 @@ export async function finalizeConciergeQuote(
   // rule/mileage data exists, in which case the snapshot fields below
   // all stay null too — "no evaluation ran" is the honest answer, not
   // a fabricated one.
-  const suggestion = await getConciergeSuggestion(order.deliveryZip);
+  const suggestion = await getConciergeSuggestion(order.deliveryZip, overrideZoneRuleId);
   const overrideReason = String(formData.get("overrideReason") ?? "").trim() || undefined;
+
+  // Only worth a second query when an override was actually submitted
+  // AND honored (suggestion really did resolve to that exact rule, not
+  // a silent fallback to auto-match because the id was stale/invalid).
+  const zoneWasOverridden = Boolean(overrideZoneRuleId) && suggestion?.pricingRuleId === overrideZoneRuleId;
+  const autoMatchedSuggestion = zoneWasOverridden ? await getConciergeSuggestion(order.deliveryZip) : null;
 
   try {
     await db.transaction(async (tx) => {
@@ -127,6 +140,23 @@ export async function finalizeConciergeQuote(
         targetId: orderId,
         before: { suggestedTotalCents: suggestion.suggestedTotalCents, pricingRuleId: suggestion.pricingRuleId },
         after: { finalTotalCents: totalCents, reason: overrideReason ?? null },
+      });
+    }
+
+    // Manual zone override (only logged when it actually changed which
+    // rule priced the order — not every override submission necessarily
+    // differs from what auto-match would have picked anyway).
+    if (zoneWasOverridden && autoMatchedSuggestion?.pricingRuleId !== overrideZoneRuleId) {
+      await logAdminAuditEvent({
+        actorStaffId: staffMember.id,
+        action: "concierge_quote_zone_overridden",
+        targetType: "order",
+        targetId: orderId,
+        before: {
+          autoMatchedRuleId: autoMatchedSuggestion?.pricingRuleId ?? null,
+          autoMatchedZoneLabel: autoMatchedSuggestion?.zoneLabel ?? null,
+        },
+        after: { chosenRuleId: overrideZoneRuleId, chosenZoneLabel: suggestion?.zoneLabel ?? null },
       });
     }
 

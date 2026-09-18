@@ -1,4 +1,4 @@
-import { getActivePricingRuleForZone, getZipMileage } from "@/lib/pricing/repository";
+import { getActivePricingRuleById, getActivePricingRuleForZone, getZipMileage } from "@/lib/pricing/repository";
 import {
   computePrice,
   computeHardCost,
@@ -48,12 +48,30 @@ export type ConciergeSuggestion = {
  * Mileage is resolved before rule selection (Phase 2) — which rule
  * applies now depends on the ZIP's distance, not just the service
  * type, since a service can have several active zoned rules at once.
+ *
+ * `overrideRuleId` (optional, staff-facing manual zone override) lets
+ * a caller ask for a *specific* active Concierge rule instead of the
+ * mileage auto-match — e.g. a gated ranch property that's mileage-Near
+ * but needs Estate-Rural handling. It's re-verified here server-side
+ * (getActivePricingRuleById checks it's real, active, and Concierge)
+ * before ever being used, exactly like every other pricing input in
+ * this codebase — a submitted id is never trusted blindly. An override
+ * id that turns out invalid (deactivated since the page loaded, wrong
+ * service type, doesn't exist) silently falls back to auto-matching
+ * rather than erroring, the same "never fabricate, degrade to the safe
+ * default" posture as a missing rule or missing mileage.
  */
-export async function getConciergeSuggestion(deliveryZip: string): Promise<ConciergeSuggestion | null> {
+export async function getConciergeSuggestion(
+  deliveryZip: string,
+  overrideRuleId?: string
+): Promise<ConciergeSuggestion | null> {
   const roundTripMiles = await getZipMileage(deliveryZip);
   if (roundTripMiles == null) return null;
 
-  const rule = await getActivePricingRuleForZone("concierge", roundTripMiles);
+  const rule = overrideRuleId
+    ? (await getActivePricingRuleById(overrideRuleId, "concierge")) ??
+      (await getActivePricingRuleForZone("concierge", roundTripMiles))
+    : await getActivePricingRuleForZone("concierge", roundTripMiles);
   if (!rule) return null;
 
   const price = computePrice(rule, roundTripMiles);
