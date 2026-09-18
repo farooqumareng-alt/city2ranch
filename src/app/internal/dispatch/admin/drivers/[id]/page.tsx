@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
-import { requireSuperAdmin } from "@/lib/auth/roles";
+import { requireStaff } from "@/lib/auth/roles";
 import { getDriverDetail, updateDriverHiringInfo } from "@/lib/actions/team-management";
 import { uploadDriverDocument } from "@/lib/actions/driver-documents";
 import { DriverHiringForm } from "@/components/forms/DriverHiringForm";
@@ -13,12 +13,21 @@ import { DriverDocumentUpload } from "@/components/forms/DriverDocumentUpload";
 
 export const metadata: Metadata = { title: "Driver Profile" };
 
+/**
+ * Staff-visible since 2026-09-18 (was requireSuperAdmin()) — this page
+ * is now the click-through target for both the super_admin-only Team
+ * page and the any-staff Drivers lookup page
+ * (/internal/dispatch/drivers). isSuperAdmin gates the two genuinely
+ * sensitive/edit-capable sections (Hiring & Compliance, Documents) —
+ * stats, basic info, and Assignment History are useful to any
+ * dispatcher and stay visible to everyone. The two mutating actions
+ * below (updateDriverHiringInfo, uploadDriverDocument) still
+ * independently require super_admin — this UI hiding is a real
+ * simplification on top of an existing gate, not the only protection.
+ */
 export default async function DriverDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  // requireSuperAdmin() called directly here, not just relied on via
-  // DispatchLayout (requireStaff() only) or even admin/page.tsx's own
-  // gate — matches every admin sub-page's discipline of re-checking
-  // itself rather than trusting the layout above it.
-  await requireSuperAdmin();
+  const staffMember = await requireStaff();
+  const isSuperAdmin = staffMember.role === "super_admin";
   const { id } = await params;
 
   const detail = await getDriverDetail(id);
@@ -64,51 +73,55 @@ export default async function DriverDetailPage({ params }: { params: Promise<{ i
         </p>
       </div>
 
-      <section className="flex flex-col gap-4">
-        <h3 className="font-serif text-lg text-navy-deep">Hiring &amp; Compliance</h3>
-        <Card padding="sm">
-          <DriverHiringForm
-            action={updateDriverHiringInfo.bind(null, driver.id)}
-            defaults={{
-              licenseNumber: driver.licenseNumber,
-              licenseExpiresOn: driver.licenseExpiresOn,
-              vehicleMake: driver.vehicleMake,
-              vehicleModel: driver.vehicleModel,
-              vehicleYear: driver.vehicleYear,
-              vehiclePlate: driver.vehiclePlate,
-              insuranceCarrier: driver.insuranceCarrier,
-              insurancePolicyNumber: driver.insurancePolicyNumber,
-              insuranceExpiresOn: driver.insuranceExpiresOn,
-            }}
-          />
-        </Card>
-      </section>
+      {isSuperAdmin ? (
+        <section className="flex flex-col gap-4">
+          <h3 className="font-serif text-lg text-navy-deep">Hiring &amp; Compliance</h3>
+          <Card padding="sm">
+            <DriverHiringForm
+              action={updateDriverHiringInfo.bind(null, driver.id)}
+              defaults={{
+                licenseNumber: driver.licenseNumber,
+                licenseExpiresOn: driver.licenseExpiresOn,
+                vehicleMake: driver.vehicleMake,
+                vehicleModel: driver.vehicleModel,
+                vehicleYear: driver.vehicleYear,
+                vehiclePlate: driver.vehiclePlate,
+                insuranceCarrier: driver.insuranceCarrier,
+                insurancePolicyNumber: driver.insurancePolicyNumber,
+                insuranceExpiresOn: driver.insuranceExpiresOn,
+              }}
+            />
+          </Card>
+        </section>
+      ) : null}
 
-      <section className="flex flex-col gap-4">
-        <h3 className="font-serif text-lg text-navy-deep">Documents</h3>
-        <Card padding="sm">
-          <div className="flex flex-col gap-4">
-            <DriverDocumentUpload
-              driverId={driver.id}
-              kind="license"
-              hasFile={Boolean(driver.licenseDocPath)}
-              action={uploadDriverDocument.bind(null, driver.id, "license")}
-            />
-            <DriverDocumentUpload
-              driverId={driver.id}
-              kind="insurance"
-              hasFile={Boolean(driver.insuranceDocPath)}
-              action={uploadDriverDocument.bind(null, driver.id, "insurance")}
-            />
-            <DriverDocumentUpload
-              driverId={driver.id}
-              kind="registration"
-              hasFile={Boolean(driver.registrationDocPath)}
-              action={uploadDriverDocument.bind(null, driver.id, "registration")}
-            />
-          </div>
-        </Card>
-      </section>
+      {isSuperAdmin ? (
+        <section className="flex flex-col gap-4">
+          <h3 className="font-serif text-lg text-navy-deep">Documents</h3>
+          <Card padding="sm">
+            <div className="flex flex-col gap-4">
+              <DriverDocumentUpload
+                driverId={driver.id}
+                kind="license"
+                hasFile={Boolean(driver.licenseDocPath)}
+                action={uploadDriverDocument.bind(null, driver.id, "license")}
+              />
+              <DriverDocumentUpload
+                driverId={driver.id}
+                kind="insurance"
+                hasFile={Boolean(driver.insuranceDocPath)}
+                action={uploadDriverDocument.bind(null, driver.id, "insurance")}
+              />
+              <DriverDocumentUpload
+                driverId={driver.id}
+                kind="registration"
+                hasFile={Boolean(driver.registrationDocPath)}
+                action={uploadDriverDocument.bind(null, driver.id, "registration")}
+              />
+            </div>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-4">
         <h3 className="font-serif text-lg text-navy-deep">Assignment History</h3>

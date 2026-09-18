@@ -10,12 +10,13 @@ import { PanelSidebar } from "@/components/layout/PanelSidebar";
 // directive's "Service Areas" — that page's own title/heading already
 // says "ZIP Coverage" everywhere, and a link reading "Service Areas"
 // landing on a page that says something else would be a new
-// inconsistency, not a fix for one. "Customers"/"Orders"/"Payments"
-// aren't included as their own group — none of those exist as
-// top-level pages yet (Customers/Drivers are link-through-only,
-// reached from a Work Queue row or Team's own list — see ADMIN_LINKS'
-// own comment below), and the directive is explicit that this pass
-// reuses existing routes rather than creating new ones.
+// inconsistency, not a fix for one. "Payments" isn't included as its
+// own group — it doesn't exist as a top-level page. Drivers/Customers
+// DO now (2026-09-18, any-staff read-only lookup pages — see
+// DriversLookupList.tsx/CustomersLookupList.tsx's own comments), which
+// is what the original redesign actually asked for; the detail pages
+// they link to (and Team's own driver management) stay
+// super_admin-only, unaffected — see ADMIN_LINKS' own comment below.
 //
 // exact: true — /internal/dispatch is now the Orders home (formerly
 // "Overview", separate from Work Queue — the two merged into one
@@ -29,6 +30,8 @@ const STAFF_LINKS = [
   // member/contact signups) had no admin view at all before this; see
   // listInboxEntries()'s own doc comment.
   { href: "/internal/dispatch/inbox", label: "Inbox", group: "Operations" },
+  { href: "/internal/dispatch/drivers", label: "Drivers", group: "Operations" },
+  { href: "/internal/dispatch/customers", label: "Customers", group: "Operations" },
 ];
 
 // Manager-or-above only (2026-09-11, requireManager() — see that
@@ -50,13 +53,11 @@ const BUSINESS_LINKS = [
 // enforcement boundary. requireSuperAdmin() on each of these pages is
 // what actually blocks anyone else who guesses the URL.
 // Two links, not one flat "Admin" — Business Overview (business health)
-// and Team (staff/driver account management) answer different
-// questions (approved UX blueprint, Phase 5's People/Business split);
-// Customers and Drivers detail pages stay link-through-only for now
-// (reached from a Work Queue row or Team's own driver list), not
-// promoted to their own nav entries until a real list/search view
-// exists for them. Grouped under "People" to match the directive's own
-// outline, even though it's only two links today.
+// and Team (staff/driver account management — adding drivers, toggling
+// active, role changes) answer different questions from the plain-staff
+// Drivers/Customers lookup pages above (approved UX blueprint, Phase
+// 5's People/Business split). Grouped under "People" to match the
+// directive's own outline, even though it's only two links today.
 const ADMIN_LINKS = [
   // exact: true for the same reason Overview above has it — /admin is a
   // parent path of /admin/team.

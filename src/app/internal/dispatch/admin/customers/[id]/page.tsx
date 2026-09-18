@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
-import { requireSuperAdmin } from "@/lib/auth/roles";
+import { requireStaff } from "@/lib/auth/roles";
 import { getCustomerDetail } from "@/lib/actions/customer-detail";
 import { getAdminAuditLogFor } from "@/lib/admin-audit";
 import { MEMBERSHIP_TIERS } from "@/lib/stripe/tiers";
@@ -15,15 +15,28 @@ export const metadata: Metadata = { title: "Customer Profile" };
 
 const MEMBERSHIP_TIER_NAMES = Object.fromEntries(MEMBERSHIP_TIERS.map((t) => [t.tier, t.name]));
 
+/**
+ * Staff-visible since 2026-09-18 (was requireSuperAdmin()) — this page
+ * is now the click-through target for both the new any-staff Customers
+ * lookup page (/internal/dispatch/customers) and any order's "View
+ * Customer" link. Orders/Places/Household/Membership/Service Requests
+ * are exactly what a dispatcher needs to help a customer and stay
+ * visible to everyone; only the Edit control and Edit History are
+ * super_admin-only, matching updateCustomerProfileAsAdmin's own
+ * independent gate (this UI hiding is a real simplification on top of
+ * that, not the only protection).
+ */
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   // Called directly here, not just relied on via the shared layout —
   // same discipline as every other admin sub-page in this codebase.
-  await requireSuperAdmin();
+  const staffMember = await requireStaff();
+  const isSuperAdmin = staffMember.role === "super_admin";
   const { id } = await params;
 
   const [customer, editHistory] = await Promise.all([
     getCustomerDetail(id),
-    getAdminAuditLogFor("customer_profile", id),
+    // No point fetching this for a viewer who'll never see it rendered.
+    isSuperAdmin ? getAdminAuditLogFor("customer_profile", id) : Promise.resolve([]),
   ]);
 
   return (
@@ -34,9 +47,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           title={customer.name ?? "Unnamed Customer"}
           description={customer.email ?? "(no email on file)"}
         />
-        <Button href={`/internal/dispatch/admin/customers/${id}/edit`} variant="outline-dark">
-          Edit Customer
-        </Button>
+        {isSuperAdmin ? (
+          <Button href={`/internal/dispatch/admin/customers/${id}/edit`} variant="outline-dark">
+            Edit Customer
+          </Button>
+        ) : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
@@ -179,26 +194,28 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         )}
       </section>
 
-      <section className="flex flex-col gap-4">
-        <h3 className="font-serif text-lg text-navy-deep">Edit History</h3>
-        {editHistory.length === 0 ? (
-          <EmptyState message="No admin edits on record." />
-        ) : (
-          <RowList>
-            {editHistory.map((entry) => (
-              <Row key={entry.id}>
-                <div>
-                  <p className="font-sans text-sm text-navy-deep">Profile updated</p>
-                  <p className="font-sans text-xs text-charcoal/60">
-                    {new Date(entry.createdAt).toLocaleString()} · by{" "}
-                    {entry.actorLabel ?? entry.actorEmail ?? "a staff member"}
-                  </p>
-                </div>
-              </Row>
-            ))}
-          </RowList>
-        )}
-      </section>
+      {isSuperAdmin ? (
+        <section className="flex flex-col gap-4">
+          <h3 className="font-serif text-lg text-navy-deep">Edit History</h3>
+          {editHistory.length === 0 ? (
+            <EmptyState message="No admin edits on record." />
+          ) : (
+            <RowList>
+              {editHistory.map((entry) => (
+                <Row key={entry.id}>
+                  <div>
+                    <p className="font-sans text-sm text-navy-deep">Profile updated</p>
+                    <p className="font-sans text-xs text-charcoal/60">
+                      {new Date(entry.createdAt).toLocaleString()} · by{" "}
+                      {entry.actorLabel ?? entry.actorEmail ?? "a staff member"}
+                    </p>
+                  </div>
+                </Row>
+              ))}
+            </RowList>
+          )}
+        </section>
+      ) : null}
 
       <Link href="/internal/dispatch" className="font-sans text-sm text-gold hover:text-gold-light">
         ← Back to Orders
