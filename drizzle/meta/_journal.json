@@ -407,6 +407,13 @@
       "when": 1789681384956,
       "tag": "0057_pricing_rules_one_active_per_zone",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1789698517899,
+      "tag": "0058_pricing_rules_updated_at",
+      "breakpoints": true
     }
   ]
 }

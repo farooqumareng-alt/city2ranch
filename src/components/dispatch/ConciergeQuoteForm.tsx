@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
 import { finalizeConciergeQuote, reopenConciergeQuote } from "@/lib/actions/finalize-concierge-quote";
 import { TextField } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +17,7 @@ const emptyRow = (): FeeLineRow => ({ label: "", amount: "" });
 /** Matches ConciergeSuggestion (src/lib/pricing/concierge-suggestion.ts)
  *  minus the fields this form doesn't need to display. */
 export type ConciergeQuoteSuggestion = {
+  pricingRuleId: string;
   serviceLabel: string;
   baseFeeCents: number;
   mileageFeeCents: number;
@@ -31,6 +33,11 @@ export type ConciergeQuoteSuggestion = {
   // actually sees on their quote.
   zoneLabel: string | null;
 };
+
+/** One selectable option for the manual zone-override control — every
+ *  currently active zoned Concierge rule, so staff can preview the
+ *  suggestion under a zone other than the mileage auto-match. */
+export type ZoneOverrideOption = { id: string; zoneLabel: string };
 
 function formatEconomicValue(value: EconomicValue): string {
   return value.status === "available" ? `$${(value.cents / 100).toFixed(2)}` : "Not configured";
@@ -105,6 +112,8 @@ export function ConciergeQuoteForm({
   status,
   existingFeeLines,
   suggestion,
+  zoneOptions = [],
+  selectedZoneRuleId,
 }: {
   orderId: string;
   status: string;
@@ -116,8 +125,21 @@ export function ConciergeQuoteForm({
    *  fabricated suggestion, is the correct answer when configuration
    *  is incomplete). */
   suggestion?: ConciergeQuoteSuggestion | null;
+  /** Every currently active zoned Concierge rule — populates the manual
+   *  zone-override selector below. Empty when nothing's zoned yet
+   *  (today's real state) or there's nothing to suggest at all. */
+  zoneOptions?: ZoneOverrideOption[];
+  /** The ?overrideZone value the page was loaded with, if any — reflects
+   *  the selector's current choice back after a navigation. */
+  selectedZoneRuleId?: string;
 }) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(finalizeConciergeQuote, initialState);
+  // Lazy initializer only runs on mount — a zone-override change alone
+  // (new `suggestion` prop, same component instance) would NOT re-run
+  // this and reset the draft. The order detail page works around that
+  // by keying <ConciergeQuoteForm> on the override, forcing a fresh
+  // mount whenever the selected zone changes.
   const [lines, setLines] = useState<FeeLineRow[]>(() => {
     if (existingFeeLines.length > 0) {
       return existingFeeLines.map((l) => ({ label: l.label, amount: (l.amountCents / 100).toFixed(2) }));
@@ -199,6 +221,46 @@ export function ConciergeQuoteForm({
       ) : null}
 
       <input type="hidden" name="orderId" value={orderId} />
+      {/* Whichever rule actually produced the suggestion above — auto-
+          matched by mileage, or manually chosen below — so finalizing
+          snapshots the correct one. Re-verified server-side either way,
+          never trusted just because it's in the form (see
+          finalizeConciergeQuote's own comment). */}
+      <input type="hidden" name="pricingRuleId" value={suggestion?.pricingRuleId ?? ""} />
+
+      {zoneOptions.length > 0 ? (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="zoneOverride" className="font-sans text-sm font-medium text-navy-deep">
+            Pricing zone
+          </label>
+          <select
+            id="zoneOverride"
+            defaultValue={selectedZoneRuleId ?? ""}
+            onChange={(e) => {
+              const params = new URLSearchParams(window.location.search);
+              if (e.target.value) {
+                params.set("overrideZone", e.target.value);
+              } else {
+                params.delete("overrideZone");
+              }
+              router.push(`?${params.toString()}`);
+            }}
+            className="w-full rounded-sm border border-navy/20 bg-white px-4 py-2.5 font-sans text-sm text-charcoal focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-1"
+          >
+            <option value="">Auto-matched by distance</option>
+            {zoneOptions.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.zoneLabel}
+              </option>
+            ))}
+          </select>
+          <p className="font-sans text-xs text-charcoal/50">
+            Preview and quote against a different active zone than the one distance would normally match — e.g. a
+            property that needs Estate-Rural handling despite being closer by mileage. Switching this resets the
+            fee lines below to the newly chosen zone&apos;s suggestion.
+          </p>
+        </div>
+      ) : null}
 
       {suggestion ? <SuggestionPanel suggestion={suggestion} /> : null}
 

@@ -7,6 +7,8 @@ import { selectZoneMatch, type PricingRuleRow } from "./repository";
 function zoneRow(overrides: Partial<PricingRuleRow>): PricingRuleRow {
   return {
     id: "rule-id",
+    isActive: true,
+    updatedAt: new Date("2026-01-01"),
     baseFeeCents: 0,
     perMileCents: 0,
     minFeeCents: null,

@@ -763,6 +763,14 @@ export const pricingRules = pgTable("pricing_rules", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+  // Added 2026-09-18 alongside the safe-activation workflow — set
+  // explicitly by create/update/activate (pricing-management.ts), same
+  // pattern zip_mileage.updatedAt already uses. Existing rows backfill
+  // to their own createdAt at migration time, an honest "last touched"
+  // answer rather than a fabricated one.
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   serviceLabel: text("service_label"),
   baseFeeCents: integer("base_fee_cents").notNull(),
   perMileCents: integer("per_mile_cents").notNull(),
