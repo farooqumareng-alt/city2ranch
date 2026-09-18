@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { commonGroceryItems } from "@/lib/db/schema";
-import { requireManager } from "@/lib/auth/roles";
+import { requireSuperAdmin } from "@/lib/auth/roles";
 import { groceryItemCreateSchema, groceryItemUpdateSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
@@ -23,9 +23,14 @@ function pgErrorCode(error: unknown): string | undefined {
  *  principle, by anything wanting the full reference list — the public
  *  consumer, getCommonGroceryItems() in src/lib/grocery-items.ts, stays
  *  separate and un-gated (it's used from the guest-open /request-service
- *  form). */
+ *  form).
+ *
+ *  Tightened from requireManager() to requireSuperAdmin() 2026-09-18
+ *  (panel redesign) — the Grocery Catalog moved to super_admin-only in
+ *  the sidebar per the user's own mockup; every action in this file
+ *  moved with it so the real gate matches. */
 export async function listGroceryItems() {
-  await requireManager();
+  await requireSuperAdmin();
   const db = getDb();
   return db.select().from(commonGroceryItems).orderBy(commonGroceryItems.sortOrder);
 }
@@ -43,7 +48,7 @@ export async function createGroceryItem(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireManager();
+  await requireSuperAdmin();
 
   const parsed = groceryItemCreateSchema.safeParse({
     name: formData.get("name"),
@@ -111,7 +116,7 @@ export async function updateGroceryItem(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireManager();
+  await requireSuperAdmin();
 
   const parsed = groceryItemUpdateSchema.safeParse({ name: formData.get("name") });
   if (!parsed.success) {
@@ -142,7 +147,7 @@ export async function updateGroceryItem(
 /** Plain hard delete — nothing references this table by foreign key, and
  *  a gap left in sortOrder is harmless (ORDER BY works regardless). */
 export async function deleteGroceryItem(itemId: string): Promise<void> {
-  await requireManager();
+  await requireSuperAdmin();
   const db = getDb();
   await db.delete(commonGroceryItems).where(eq(commonGroceryItems.id, itemId));
   revalidatePath(LIST_PATH);

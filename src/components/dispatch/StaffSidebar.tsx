@@ -4,19 +4,17 @@ import { PanelSidebar } from "@/components/layout/PanelSidebar";
 // directive, "simplify navigation... group existing functionality
 // into understandable areas") — this flat list had grown to 9 links
 // spanning three genuinely different concerns (day-to-day dispatch
-// work, configuring business rules, managing people). Group labels
-// match the directive's own Super Admin outline as closely as real
-// routes allow; the link label itself stays "ZIP Coverage", not the
-// directive's "Service Areas" — that page's own title/heading already
-// says "ZIP Coverage" everywhere, and a link reading "Service Areas"
-// landing on a page that says something else would be a new
-// inconsistency, not a fix for one. "Payments" isn't included as its
-// own group — it doesn't exist as a top-level page. Drivers/Customers
-// DO now (2026-09-18, any-staff read-only lookup pages — see
-// DriversLookupList.tsx/CustomersLookupList.tsx's own comments), which
-// is what the original redesign actually asked for; the detail pages
-// they link to (and Team's own driver management) stay
-// super_admin-only, unaffected — see ADMIN_LINKS' own comment below.
+// work, configuring business rules, managing people). Labels were
+// revisited again 2026-09-18 (panel redesign, plain-noun pass) — a
+// link's label and the page it lands on now always agree ("Coverage"/
+// "Grocery Catalog" renamed at the page level too, not just here — see
+// each page's own comment), the standing rule this file has followed
+// since Priority 7. "Payments" isn't included as its own group — it
+// doesn't exist as a top-level page. Drivers/Customers DO (2026-09-18,
+// any-staff read-only lookup pages — see DriversLookupList.tsx/
+// CustomersLookupList.tsx's own comments); the detail pages they link
+// to (and Team's own driver management) stay super_admin-only,
+// unaffected — see ADMIN_LINKS' own comment below.
 //
 // exact: true — /internal/dispatch is now the Orders home (formerly
 // "Overview", separate from Work Queue — the two merged into one
@@ -45,9 +43,23 @@ const STAFF_LINKS = [
 const BUSINESS_LINKS = [
   { href: "/internal/dispatch/stores", label: "Stores", group: "Business" },
   { href: "/internal/dispatch/pricing", label: "Pricing", group: "Business" },
-  { href: "/internal/dispatch/zip-coverage", label: "ZIP Coverage", group: "Business" },
-  { href: "/internal/dispatch/grocery-items", label: "Grocery Items", group: "Business" },
+  // Renamed from "ZIP Coverage" 2026-09-18 (panel redesign) — the
+  // page's own title/heading renamed to match, so this doesn't
+  // reintroduce the exact link-vs-page-heading mismatch this comment
+  // used to warn against for the old "Service Areas" naming.
+  { href: "/internal/dispatch/zip-coverage", label: "Coverage", group: "Business" },
 ];
+
+// Super_admin-only, but still the "Business" group — appended
+// immediately after BUSINESS_LINKS (not inside ADMIN_LINKS below) so
+// PanelSidebar's group header only renders once; it renders a new
+// header whenever a link's group differs from the *immediately
+// preceding* link's, so a same-named group has to stay contiguous.
+// Moved here from manager+ 2026-09-18 (panel redesign) — the user's own
+// mockup lists Grocery Catalog only under Super Admin, not Manager, a
+// deliberate narrowing from the old Grocery Items; see
+// grocery-item-management.ts's own comment for the matching gate change.
+const GROCERY_CATALOG_LINK = { href: "/internal/dispatch/grocery-items", label: "Grocery Catalog", group: "Business" };
 
 // Only shown to a super_admin — display-only convenience, not the
 // enforcement boundary. requireSuperAdmin() on each of these pages is
@@ -86,13 +98,16 @@ export function StaffSidebar({
   userEmail?: string;
   isSuperAdmin?: boolean;
   /** canPerform(staffMember.role, "configure_business") — manager or
-   *  super_admin. Plain staff sees only Orders/Inbox. */
+   *  super_admin. Plain staff sees only Orders/Inbox/Drivers/Customers. */
   canConfigureBusiness?: boolean;
 }) {
   const links = [
     ...STAFF_LINKS,
     ...(canConfigureBusiness ? BUSINESS_LINKS : []),
-    ...(isSuperAdmin ? [...ADMIN_LINKS, SETTINGS_LINK] : []),
+    // GROCERY_CATALOG_LINK is deliberately here, not inside ADMIN_LINKS
+    // below — see its own comment on why it has to stay contiguous
+    // with BUSINESS_LINKS' "Business" group.
+    ...(isSuperAdmin ? [GROCERY_CATALOG_LINK, ...ADMIN_LINKS, SETTINGS_LINK] : []),
   ];
   return <PanelSidebar links={links} userEmail={userEmail} accountType="Staff" />;
 }

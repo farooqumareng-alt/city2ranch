@@ -5,12 +5,17 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
 import { listGroceryItems, deleteGroceryItem } from "@/lib/actions/grocery-item-management";
-import { requireManager } from "@/lib/auth/roles";
+import { requireSuperAdmin } from "@/lib/auth/roles";
 
-export const metadata: Metadata = { title: "Grocery Items" };
+// Renamed from "Grocery Items" to "Grocery Catalog" (2026-09-18, panel
+// redesign), applied to the page's own title/heading too, not just the
+// sidebar link — see zip-coverage/page.tsx's identical treatment.
+// Moved to super_admin-only in the same pass, per the user's own
+// mockup (was manager+) — see StaffSidebar.tsx's own comment.
+export const metadata: Metadata = { title: "Grocery Catalog" };
 
 export default async function GroceryItemsPage() {
-  await requireManager();
+  await requireSuperAdmin();
   const items = await listGroceryItems();
 
   // Rows already arrive ordered so every category's items are
@@ -32,7 +37,7 @@ export default async function GroceryItemsPage() {
       <div className="flex flex-wrap items-end justify-between gap-6">
         <SectionHeading
           eyebrow="BUSINESS"
-          title="Grocery Items"
+          title="Grocery Catalog"
           description="The reference list customers pick from when building a shopping list on the service-request form."
         />
         <Button href="/internal/dispatch/grocery-items/new" variant="navy">

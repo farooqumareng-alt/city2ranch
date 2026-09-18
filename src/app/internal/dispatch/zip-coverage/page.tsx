@@ -8,7 +8,12 @@ import { JobActionButton } from "@/components/driver/JobActionButton";
 import { listZipMileage, deleteZipMileage } from "@/lib/actions/zip-mileage-management";
 import { requireManager } from "@/lib/auth/roles";
 
-export const metadata: Metadata = { title: "ZIP Coverage" };
+// Renamed from "ZIP Coverage" to "Coverage" (2026-09-18, panel
+// redesign) — a shorter, plainer noun; applied to the page's own
+// title/heading too, not just the sidebar link, so the two don't
+// disagree (see StaffSidebar.tsx's own comment on why that matters).
+// URL unchanged.
+export const metadata: Metadata = { title: "Coverage" };
 
 export default async function ZipCoveragePage() {
   await requireManager();
@@ -19,7 +24,7 @@ export default async function ZipCoveragePage() {
       <div className="flex flex-wrap items-end justify-between gap-6">
         <SectionHeading
           eyebrow="BUSINESS"
-          title="ZIP Coverage"
+          title="Coverage"
           description="Every ZIP a price can be computed for. This is the raw mileage data behind Service Zones' Active status — a ZIP with no row here shows as Developing or Outside on the public site."
         />
         <Button href="/internal/dispatch/zip-coverage/new" variant="navy">

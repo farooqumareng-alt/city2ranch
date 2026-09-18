@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
 import { requireSuperAdmin } from "@/lib/auth/roles";
-import { listStaff, listDrivers, setStaffActive, setDriverActive } from "@/lib/actions/team-management";
+import { listStaff, listDrivers, setDriverActive } from "@/lib/actions/team-management";
 import { AddStaffForm } from "@/components/forms/AddStaffForm";
 import { AddDriverForm } from "@/components/forms/AddDriverForm";
-import { RoleSelect } from "@/components/dispatch/RoleSelect";
 import { ActiveToggleButton } from "@/components/dispatch/ActiveToggleButton";
 
 export const metadata: Metadata = { title: "Team" };
@@ -23,6 +23,13 @@ const ROLE_LABELS: Record<string, string> = {
  * /internal/dispatch/admin URL, which Business Overview now occupies
  * (approved UX blueprint, Phase 5's People group). No behavior change,
  * only the URL.
+ *
+ * Staff row simplified 2026-09-18 (panel redesign) — one plain display
+ * row (Name/Email, Role, Status, Last Login) plus a single Edit link,
+ * replacing the old inline role-select + two toggle buttons per row;
+ * changing Role/Status now happens on a dedicated edit page (mirrors
+ * the Pricing/Customer edit-page pattern already used elsewhere), not
+ * inline. Drivers below are untouched — not part of this redesign.
  */
 export default async function TeamAdminPage() {
   await requireSuperAdmin();
@@ -51,15 +58,13 @@ export default async function TeamAdminPage() {
                     {member.label ? `${member.label} · ` : ""}
                     {ROLE_LABELS[member.role] ?? member.role}
                     {!member.isActive ? " · Disabled" : ""}
+                    {" · Last login "}
+                    {member.lastSignInAt ? new Date(member.lastSignInAt).toLocaleDateString() : "never"}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  <RoleSelect staffId={member.id} currentRole={member.role} />
-                  <ActiveToggleButton
-                    action={setStaffActive.bind(null, member.id)}
-                    isActive={member.isActive}
-                  />
-                </div>
+                <Button href={`/internal/dispatch/admin/team/${member.id}/edit`} variant="outline-dark" size="md">
+                  Edit
+                </Button>
               </Row>
             ))}
           </RowList>
