@@ -6,8 +6,18 @@ import { withTimeout } from "@/lib/timeout";
 
 // 2026-09-20 incident: a real Supabase auth.getUser() call with no
 // timeout on every gated page — see withTimeout()'s own doc comment
-// for the full failure mode this guards against.
-const AUTH_CHECK_TIMEOUT_MS = 5000;
+// for the full failure mode this guards against. Shortened from 5000ms
+// after root-causing the same incident further: the admin panel still
+// 504'd with the 5s timeout in place, meaning Vercel's own platform-
+// level function timeout (unknown exact value on this Hobby-tier
+// project, not configurable/inspectable from here) was shorter than
+// 5s once combined with the rest of the request — this value needs
+// real margin under whatever that ceiling is, not just "generous."
+// Real-world queries against this exact Supabase project measured
+// under 1s even from a cold connection (see the deep-test investigation
+// this incident produced) — 3s is still comfortably above normal
+// latency, just no longer competing with the platform's own timeout.
+const AUTH_CHECK_TIMEOUT_MS = 3000;
 
 /**
  * Supabase client for server components, server actions, and route

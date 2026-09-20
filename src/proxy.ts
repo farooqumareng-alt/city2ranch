@@ -7,7 +7,12 @@ import { withTimeout } from "@/lib/timeout";
 // to call Supabase's auth.getUser() with no timeout — see
 // withTimeout()'s own doc comment for the failure mode this guards
 // against (a hung auth check here hung literally every page).
-const AUTH_CHECK_TIMEOUT_MS = 5000;
+// Shortened from 5000ms — see the matching comment in
+// src/lib/supabase/server.ts for why: the platform's own function
+// timeout turned out to be shorter than 5s once combined with the
+// rest of the request, so this needs real margin under that ceiling,
+// not just "generous" relative to normal latency.
+const AUTH_CHECK_TIMEOUT_MS = 3000;
 
 /**
  * Refreshes the Supabase auth session cookie on every request.
