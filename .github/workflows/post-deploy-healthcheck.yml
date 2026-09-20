@@ -1,0 +1,70 @@
+name: Post-deploy health check
+
+# Added 2026-09-20 after a real incident: vercel.json's cron schedule
+# silently rejected every deployment for 7 days (Hobby plan only
+# allows daily crons), and nothing surfaced that failure anywhere — the
+# site quietly kept serving week-old code the whole time. This exists
+# so a broken or stale deploy is a loud, visible GitHub Actions failure
+# within minutes of a push, not something discovered by chance later.
+on:
+  push:
+    branches: [main]
+  # Lets you re-run this manually from the Actions tab to check current
+  # production health at any time, not just right after a push.
+  workflow_dispatch:
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    # Job-level env, not per-step — a step's own `if:` is evaluated
+    # before that step's own `env:` block would apply, so checking
+    # env.VERCEL_TOKEN in a later step's `if:` only works if it's set
+    # here, at the job level.
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: prj_ONWUjkDfNVPXlgEDs8xC7kz7OoFh
+      VERCEL_ORG_ID: team_voQfCBWgZdIJ8joleojpKiJP
+    steps:
+      - name: Give Vercel time to build and deploy
+        run: sleep 90
+
+      - name: Basic site health (no secrets required)
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://www.city2ranch.com/)
+          echo "Homepage responded with HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::Homepage did not return 200 (got $status) — production may be down."
+            exit 1
+          fi
+
+      # Stronger check: confirms THIS commit's own deployment actually
+      # went live and succeeded, not just "some page responds" — the
+      # cron incident's stale deployment also responded 200 the whole
+      # time, so the check above alone would have missed it entirely.
+      # Requires a VERCEL_TOKEN repo secret (Vercel dashboard -> Account
+      # Settings -> Tokens); skipped with a warning if it isn't set yet.
+      - name: Confirm this commit's deployment is READY on Vercel
+        if: ${{ env.VERCEL_TOKEN != '' }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            response=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&limit=1")
+            state=$(echo "$response" | node -e "process.stdin.on('data',d=>{try{console.log(JSON.parse(d).deployments?.[0]?.readyState||'')}catch(e){console.log('')}})")
+            sha=$(echo "$response" | node -e "process.stdin.on('data',d=>{try{console.log(JSON.parse(d).deployments?.[0]?.meta?.githubCommitSha||'')}catch(e){console.log('')}})")
+            echo "Latest deployment: state=$state sha=$sha (expecting $GITHUB_SHA)"
+            if [ "$sha" = "$GITHUB_SHA" ] && [ "$state" = "READY" ]; then
+              echo "Deployment for this commit is READY."
+              exit 0
+            fi
+            if [ "$sha" = "$GITHUB_SHA" ] && { [ "$state" = "ERROR" ] || [ "$state" = "CANCELED" ]; }; then
+              echo "::error::Deployment for this commit failed (state=$state) — check the Vercel dashboard."
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "::error::No READY deployment for commit $GITHUB_SHA after waiting — check the Vercel dashboard."
+          exit 1
+
+      - name: Vercel deployment check skipped
+        if: ${{ env.VERCEL_TOKEN == '' }}
+        run: echo "::warning::VERCEL_TOKEN secret not set — only the basic homepage check ran. Add a token (Vercel dashboard -> Account Settings -> Tokens -> repo secret VERCEL_TOKEN) to also verify each deploy actually goes live, which is what would have caught the 7-day outage."

@@ -2,6 +2,12 @@ import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
+import { withTimeout } from "@/lib/timeout";
+
+// 2026-09-20 incident: a real Supabase auth.getUser() call with no
+// timeout on every gated page — see withTimeout()'s own doc comment
+// for the full failure mode this guards against.
+const AUTH_CHECK_TIMEOUT_MS = 5000;
 
 /**
  * Supabase client for server components, server actions, and route
@@ -48,11 +54,27 @@ export async function createSupabaseServerClient() {
  * memoization — so the second call becomes free, without weakening the
  * "every action re-verifies itself" security posture at all: it's the
  * same underlying check, just not repeated on the wire.
+ *
+ * Time-bounded (2026-09-20) — a slow/hung Supabase Auth response used
+ * to hang this indefinitely, which meant every gated page render hung
+ * with it until Vercel's own function timeout killed the connection
+ * (a browser-level "page couldn't load" failure, nothing logged). A
+ * timeout here degrades to "treat as signed out" instead — every
+ * caller already redirects to /sign-in on a null user, the same fail-
+ * closed behavior a real signed-out visitor gets, never a hang. A
+ * genuine error from Supabase (not just slowness) still propagates
+ * normally — this only guards against never settling.
  */
 export const getCurrentUser = cache(async () => {
   const supabase = await createSupabaseServerClient();
+  const getUser = supabase.auth.getUser();
+  // Supabase's UserResponse is a discriminated union (a null user always
+  // pairs with a real AuthError) — this synthetic "timed out" value
+  // isn't a real API response, so it's asserted past that union rather
+  // than fabricating a fake AuthError just to satisfy the shape.
+  const timedOut = { data: { user: null }, error: null } as unknown as Awaited<typeof getUser>;
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await withTimeout(getUser, AUTH_CHECK_TIMEOUT_MS, timedOut);
   return user;
 });
