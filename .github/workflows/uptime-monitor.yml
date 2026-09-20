@@ -1,0 +1,29 @@
+name: Uptime monitor
+
+# A GitHub-native stand-in for a third-party uptime monitor
+# (UptimeRobot/Better Uptime) — pings production independently of any
+# push, on a schedule, so a failure between deploys (not just right
+# after one) still gets caught. A failed run here triggers GitHub's own
+# default email notification to the repo's owner/watchers, the same
+# alerting job a paid monitor would do, at no extra cost or new account.
+on:
+  schedule:
+    # Every 15 minutes. GitHub may delay a scheduled run under load —
+    # treat this as "usually within ~15-20 minutes," not a guaranteed
+    # SLA; a dedicated uptime service is still worth adding later if
+    # tighter timing ever matters.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping production
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://www.city2ranch.com/)
+          echo "https://www.city2ranch.com/ responded with HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::Production homepage did not return 200 (got $status)."
+            exit 1
+          fi
