@@ -1,6 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
+import { withTimeout } from "@/lib/timeout";
+
+// 2026-09-20 incident: this runs on every request site-wide, and used
+// to call Supabase's auth.getUser() with no timeout — see
+// withTimeout()'s own doc comment for the failure mode this guards
+// against (a hung auth check here hung literally every page).
+const AUTH_CHECK_TIMEOUT_MS = 5000;
 
 /**
  * Refreshes the Supabase auth session cookie on every request.
@@ -46,7 +53,19 @@ export async function proxy(request: NextRequest) {
   // Triggers a token refresh (and the setAll above) if the session is
   // stale. Must be getUser(), not getSession() — getSession() trusts the
   // cookie as-is without revalidating against Supabase.
-  await supabase.auth.getUser();
+  //
+  // Time-bounded: a hung/slow Supabase Auth response here used to hang
+  // this middleware on every single request site-wide, which a browser
+  // shows as a hard "page couldn't load" failure. On timeout, this
+  // request's cookies simply don't get refreshed this one time — the
+  // response still proceeds instead of hanging; a genuinely stale
+  // session just tries again on the next request rather than the
+  // whole site going down with one slow auth check.
+  const getUser = supabase.auth.getUser();
+  // Same discriminated-union caveat as getCurrentUser() (server.ts) —
+  // this synthetic value isn't a real API response.
+  const timedOut = { data: { user: null }, error: null } as unknown as Awaited<typeof getUser>;
+  await withTimeout(getUser, AUTH_CHECK_TIMEOUT_MS, timedOut);
 
   return response;
 }
