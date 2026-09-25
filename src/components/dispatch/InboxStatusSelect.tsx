@@ -41,7 +41,7 @@ export function InboxStatusSelect({
 
   return (
     <form action={formAction} className="flex flex-col items-start gap-1">
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {STATUS_OPTIONS.map((option) => (
           <button
             key={option.value}
@@ -49,7 +49,11 @@ export function InboxStatusSelect({
             name="status"
             value={option.value}
             disabled={pending || option.value === currentStatus}
-            className={`rounded-full border px-3 py-1 font-sans text-xs transition-colors disabled:cursor-default ${
+            // Same size as WorkQueueBoard.tsx's own tab pills (px-4 py-1.5
+            // text-sm) — the first pass used text-xs/px-3, smaller than
+            // every other pill control in the app, which is what read as
+            // "too small."
+            className={`rounded-full border px-4 py-1.5 font-sans text-sm transition-colors disabled:cursor-default ${
               option.value === currentStatus
                 ? "border-navy-deep bg-navy-deep text-white"
                 : "border-navy/15 text-charcoal/70 hover:border-gold disabled:opacity-50"
