@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
@@ -98,92 +97,124 @@ export function WorkQueueBoard({
       {visible.length === 0 ? (
         <EmptyState message={query.trim() ? "No matches in this tab." : "Nothing here right now."} />
       ) : (
-        <div className="flex flex-col gap-6">
-          {visible.map((item) => {
-            const canCancel = item.kind === "order" && item.status ? canTransition(item.status, "cancelled") : false;
-            const canFail = item.kind === "order" && item.status ? canTransition(item.status, "failed") : false;
-            return (
-              <Card key={`${item.kind}-${item.id}`} className="flex flex-col gap-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="font-serif text-lg text-navy-deep">
-                      {item.authUserId ? (
-                        <Link
-                          href={`/internal/dispatch/admin/customers/${item.authUserId}`}
-                          className="underline decoration-navy-deep/20 hover:text-gold"
-                        >
-                          {item.customerName}
-                        </Link>
-                      ) : (
-                        item.customerName
-                      )}{" "}
-                      —{" "}
+        <div className="overflow-x-auto">
+          <table className="w-full font-sans text-sm">
+            <thead>
+              <tr className="border-b border-navy/10 text-left text-charcoal/50">
+                <th className="pb-2 pr-4 font-medium">Customer</th>
+                <th className="pb-2 pr-4 font-medium">Service Type</th>
+                <th className="pb-2 pr-4 font-medium">Date</th>
+                <th className="pb-2 pr-4 font-medium">Status</th>
+                <th className="pb-2 pr-4 font-medium">Driver</th>
+                <th className="pb-2 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((item) => {
+                const canCancel =
+                  item.kind === "order" && item.status ? canTransition(item.status, "cancelled") : false;
+                const canFail = item.kind === "order" && item.status ? canTransition(item.status, "failed") : false;
+                const detail =
+                  item.retailerOrderNumber ||
+                  item.deliveryCity ||
+                  item.customerPhone ||
+                  item.referralSource ||
+                  item.requestedDeliveryDate;
+                return (
+                  <tr key={`${item.kind}-${item.id}`} className="border-b border-navy/10 align-top">
+                    <td className="py-3 pr-4">
+                      <p className="text-navy-deep">
+                        {item.authUserId ? (
+                          <Link
+                            href={`/internal/dispatch/admin/customers/${item.authUserId}`}
+                            className="underline decoration-navy-deep/20 hover:text-gold"
+                          >
+                            {item.customerName}
+                          </Link>
+                        ) : (
+                          item.customerName
+                        )}
+                      </p>
+                      {detail ? (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-xs text-charcoal/50 hover:text-gold">
+                            Details
+                          </summary>
+                          <div className="mt-1 flex flex-col gap-0.5 text-xs text-charcoal/60">
+                            {item.retailerOrderNumber ? <span>Order #{item.retailerOrderNumber}</span> : null}
+                            {item.deliveryCity ? (
+                              <span>
+                                {item.deliveryCity}, {item.deliveryState} {item.deliveryZip}
+                              </span>
+                            ) : null}
+                            {item.customerPhone ? <span>{item.customerPhone}</span> : null}
+                            {item.requestedDeliveryDate ? (
+                              <span>Requested for {formatPlainDate(item.requestedDeliveryDate)}</span>
+                            ) : null}
+                            {item.referralSource ? (
+                              <span className="font-medium text-gold">Referred by: {item.referralSource}</span>
+                            ) : null}
+                          </div>
+                        </details>
+                      ) : null}
+                    </td>
+                    <td className="py-3 pr-4 text-charcoal/70">
                       {item.kind === "request"
                         ? "Concierge Request"
                         : (item.storeName ?? (item.serviceType === "concierge" ? "Concierge" : "City Pickup"))}
-                    </p>
-                    <p className="font-sans text-xs text-charcoal/60">
-                      {item.retailerOrderNumber ? `Order #${item.retailerOrderNumber} · ` : ""}
-                      {item.deliveryCity ? `${item.deliveryCity}, ${item.deliveryState} ${item.deliveryZip} · ` : ""}
-                      {item.customerPhone}
-                    </p>
-                    <p className="font-sans text-xs text-charcoal/60">
-                      {item.kind === "request" ? "Submitted" : "Placed"} {item.createdAt.toLocaleString()}
-                      {item.requestedDeliveryDate ? ` · Requested for ${formatPlainDate(item.requestedDeliveryDate)}` : ""}
-                    </p>
-                    {item.referralSource ? (
-                      <p className="font-sans text-xs font-medium text-gold">Referred by: {item.referralSource}</p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    {item.status ? (
-                      <StatusBadge status={item.status} />
-                    ) : (
-                      // A raw, not-yet-converted request has no order
-                      // status yet — a plain pill, not StatusBadge, since
-                      // that component's labels are all order-lifecycle
-                      // copy (e.g. quote_pending reads "Preparing your
-                      // quote," which isn't true of a request nobody has
-                      // touched yet).
-                      <span className="inline-flex items-center rounded-full border border-navy/15 bg-navy/5 px-2.5 py-1 font-sans text-xs font-medium text-navy-deep">
-                        Under review
-                      </span>
-                    )}
-                    {item.totalCents != null && item.totalCents > 0 ? (
-                      <span className="font-sans text-sm text-charcoal/70">
-                        ${(item.totalCents / 100).toFixed(2)}
-                      </span>
-                    ) : null}
-                    {item.driverName ? (
-                      <span className="font-sans text-xs text-charcoal/60">Driver: {item.driverName}</span>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 border-t border-navy/10 pt-4">
-                  {item.kind === "request" ? (
-                    <Button href={item.href} variant="outline-dark">
-                      Start Quote
-                    </Button>
-                  ) : (
-                    <>
-                      <Link
-                        href={item.href}
-                        className="font-sans text-sm font-medium text-navy-deep underline decoration-navy/20 hover:text-gold"
-                      >
-                        {item.bucket === "needs_quote" ? "Build Quote →" : "Open Service Record →"}
-                      </Link>
-                      {item.bucket === "ready_to_dispatch" ? (
-                        <AssignDriverForm orderId={item.id} driverOptions={driverOptions} />
+                    </td>
+                    <td className="py-3 pr-4 text-charcoal/70">{item.createdAt.toLocaleDateString()}</td>
+                    <td className="py-3 pr-4">
+                      {item.status ? (
+                        <StatusBadge status={item.status} />
+                      ) : (
+                        // A raw, not-yet-converted request has no order
+                        // status yet — a plain pill, not StatusBadge, since
+                        // that component's labels are all order-lifecycle
+                        // copy (e.g. quote_pending reads "Preparing your
+                        // quote," which isn't true of a request nobody has
+                        // touched yet).
+                        <span className="inline-flex items-center rounded-full border border-navy/15 bg-navy/5 px-2.5 py-1 font-sans text-xs font-medium text-navy-deep">
+                          Under review
+                        </span>
+                      )}
+                      {item.totalCents != null && item.totalCents > 0 ? (
+                        <p className="mt-1 text-xs text-charcoal/60">${(item.totalCents / 100).toFixed(2)}</p>
                       ) : null}
-                      {canCancel ? <OrderExceptionForm orderId={item.id} action={cancelOrder} label="Cancel" /> : null}
-                      {canFail ? <OrderExceptionForm orderId={item.id} action={failOrder} label="Flag failed" /> : null}
-                    </>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
+                    </td>
+                    <td className="py-3 pr-4 text-charcoal/70">{item.driverName ?? "—"}</td>
+                    <td className="py-3">
+                      <div className="flex flex-wrap items-center gap-3">
+                        {item.kind === "request" ? (
+                          <Button href={item.href} variant="outline-dark" size="md">
+                            Start Quote
+                          </Button>
+                        ) : (
+                          <>
+                            <Link
+                              href={item.href}
+                              className="font-medium text-navy-deep underline decoration-navy/20 hover:text-gold"
+                            >
+                              {item.bucket === "needs_quote" ? "Build Quote →" : "Open Record →"}
+                            </Link>
+                            {item.bucket === "ready_to_dispatch" ? (
+                              <AssignDriverForm orderId={item.id} driverOptions={driverOptions} />
+                            ) : null}
+                            {canCancel ? (
+                              <OrderExceptionForm orderId={item.id} action={cancelOrder} label="Cancel" />
+                            ) : null}
+                            {canFail ? (
+                              <OrderExceptionForm orderId={item.id} action={failOrder} label="Flag failed" />
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

@@ -1140,6 +1140,32 @@ export const orderMessages = pgTable("order_messages", {
   body: text("body").notNull(),
 });
 
+/**
+ * A driver-scoped thread, not order-scoped — added 2026-09-24 (panel
+ * redesign round 2, the Drivers table's "Message" action) for things
+ * staff need to tell a driver that aren't about one specific job (a
+ * schedule change, a documents reminder), same reasoning orderMessages'
+ * own doc comment gives for staying single-purpose rather than one
+ * unified inbox. Can't reuse orderMessages — its orderId is NOT NULL.
+ * readAt (null = unread) matches the notifications table's own
+ * convention, used here to badge the driver app's new Inbox tab.
+ */
+export const driverMessages = pgTable("driver_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  driverId: uuid("driver_id")
+    .notNull()
+    .references(() => drivers.id, { onDelete: "cascade" }),
+  // Only 'staff' and 'driver' ever apply here, same "no reason for a
+  // near-duplicate enum" reasoning orderMessages' own comment gives.
+  authorType: auditActorTypeEnum("author_type").notNull(),
+  authorId: uuid("author_id"),
+  body: text("body").notNull(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+});
+
 export const blogPostStatusEnum = pgEnum("blog_post_status", ["draft", "published"]);
 
 /**

@@ -7,6 +7,11 @@ const DRIVER_LINKS = [
   // as StaffSidebar's Dashboard link.
   { href: "/internal/driver", label: "Today's Jobs", exact: true },
   { href: "/internal/driver/history", label: "History" },
+  // Added 2026-09-24 (panel redesign round 2) alongside driver_messages —
+  // no unread-count badge here (PanelSidebar's PanelLink has no such
+  // concept, shared as-is across all three panels); the Inbox page's own
+  // heading shows the unread count instead.
+  { href: "/internal/driver/inbox", label: "Inbox" },
 ];
 
 export function DriverSidebar({

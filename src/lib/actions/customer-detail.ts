@@ -3,7 +3,14 @@
 import { desc, eq, isNotNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
-import { customerPlaces, customerProfiles, memberships, orders, serviceRequests } from "@/lib/db/schema";
+import {
+  customerPlaces,
+  customerProfiles,
+  memberships,
+  orders,
+  recurringServicePlans,
+  serviceRequests,
+} from "@/lib/db/schema";
 import { requireStaff, requireSuperAdmin } from "@/lib/auth/roles";
 import { getHouseholdData } from "@/lib/household";
 import { profileUpdateSchema } from "@/lib/validation/schemas";
@@ -44,6 +51,14 @@ import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
  * over an already-fetched, still-small dataset" scoping as
  * WorkQueueBoard.tsx, a real limitation to revisit if the customer
  * count grows large, not built around preemptively.
+ *
+ * lifetimeValueCents/nextOrderAt added 2026-09-24 (panel redesign
+ * round 2, Customers list) — both derived from real columns, nothing
+ * fabricated: lifetimeValueCents is the same paidAt-filtered sum
+ * getCustomerDetail()'s own totalSpentCents uses, aggregated per
+ * customer instead of computed in JS from one customer's own order
+ * history; nextOrderAt is the customer's active recurring plan's own
+ * nextRunAt, null for a customer with no active plan (never guessed).
  */
 export async function listCustomersForLookup() {
   await requireStaff();
@@ -57,6 +72,13 @@ export async function listCustomersForLookup() {
       phone: sql<string | null>`coalesce(max(${customerProfiles.phone}), max(${orders.customerPhone}))`,
       orderCount: sql<number>`count(*)`,
       lastOrderAt: sql<Date>`max(${orders.createdAt})`,
+      lifetimeValueCents: sql<number>`sum(case when ${orders.paidAt} is not null then ${orders.totalCents} else 0 end)`,
+      nextOrderAt: sql<string | null>`(
+        SELECT min(${recurringServicePlans.nextRunAt})
+        FROM ${recurringServicePlans}
+        WHERE ${recurringServicePlans.authUserId} = ${orders.authUserId}
+        AND ${recurringServicePlans.status} = 'active'
+      )`,
     })
     .from(orders)
     .leftJoin(customerProfiles, eq(customerProfiles.authUserId, orders.authUserId))

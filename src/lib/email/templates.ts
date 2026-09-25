@@ -410,6 +410,27 @@ export function driverJobOfferedEmail(fields: {
 }
 
 /**
+ * Sent when staff message a driver from the Drivers table (2026-09-24,
+ * panel redesign round 2) — same best-effort, never-blocks-the-send
+ * pattern as driverJobOfferedEmail above; the only channel a driver has
+ * today besides opening the app themselves (no push/SMS infra exists).
+ */
+export function driverMessageEmail(fields: { driverName: string; body: string; inboxUrl: string }) {
+  const title = "New Message";
+  return {
+    subject: `${title} — City2Ranch`,
+    html: renderShell(
+      title,
+      `
+        <p style="margin:0 0 20px;">Hi ${escapeHtml(fields.driverName)}, City2Ranch sent you a message:</p>
+        <p style="margin:0 0 20px; white-space:pre-wrap;">${escapeHtml(fields.body)}</p>
+        ${ctaButton("View Message", fields.inboxUrl)}
+      `
+    ),
+  };
+}
+
+/**
  * Sent when a super admin adds an existing City2Ranch account as a
  * driver (2026-09-08's hiring workflow) — the account already exists,
  * so unlike a brand-new invite (Supabase's own invite email covers

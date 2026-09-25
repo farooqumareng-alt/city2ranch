@@ -12,6 +12,8 @@ export type CustomerLookupRow = {
   phone: string | null;
   orderCount: number;
   lastOrderAt: string;
+  lifetimeValueCents: number;
+  nextOrderAt: string | null;
 };
 
 function matchesSearch(row: CustomerLookupRow, query: string): boolean {
@@ -72,6 +74,10 @@ export function CustomersLookupList({ customers }: { customers: CustomerLookupRo
                   {customer.orderCount} order{customer.orderCount === 1 ? "" : "s"}
                   {" · Last order "}
                   {new Date(customer.lastOrderAt).toLocaleDateString()}
+                  {" · Lifetime value $"}
+                  {(customer.lifetimeValueCents / 100).toFixed(2)}
+                  {" · Next order "}
+                  {customer.nextOrderAt ? new Date(customer.nextOrderAt).toLocaleDateString() : "—"}
                 </p>
               </div>
             </Row>

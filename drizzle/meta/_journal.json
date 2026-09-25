@@ -421,6 +421,13 @@
       "when": 1789698517900,
       "tag": "0059_pricing_rules_manager_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1790350302648,
+      "tag": "0060_sharp_carnage",
+      "breakpoints": true
     }
   ]
 }
