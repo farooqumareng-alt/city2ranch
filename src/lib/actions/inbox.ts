@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { serviceAreaLeads, foundingMembers, contactMessages } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
+import { looksLikeSpam } from "@/lib/inbox-spam";
 import type { ActionResult } from "@/lib/actions/types";
 import type { InboxSource, InboxEntry } from "@/lib/inbox-types";
 
@@ -36,7 +37,7 @@ export async function listInboxEntries(): Promise<InboxEntry[]> {
     db.select().from(contactMessages).orderBy(desc(contactMessages.createdAt)),
   ]);
 
-  const entries: InboxEntry[] = [
+  const entries: Omit<InboxEntry, "isLikelySpam">[] = [
     ...waitlist.map((row) => ({
       id: row.id,
       source: "waitlist" as const,
@@ -73,7 +74,7 @@ export async function listInboxEntries(): Promise<InboxEntry[]> {
   ];
 
   entries.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  return entries;
+  return entries.map((entry) => ({ ...entry, isLikelySpam: looksLikeSpam(entry) }));
 }
 
 /** Bound as `setInboxEntryStatus.bind(null, source, id)`. Each source
