@@ -48,10 +48,15 @@ export default async function GroceryItemsPage() {
       {items.length === 0 ? (
         <EmptyState message="No grocery items yet." />
       ) : (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-4">
           {sections.map((section) => (
-            <section key={section.category} className="flex flex-col gap-3">
-              <h3 className="font-serif text-lg text-navy-deep">{section.category}</h3>
+            <details key={section.category} open className="group flex flex-col gap-3">
+              <summary className="cursor-pointer list-none font-serif text-lg text-navy-deep marker:content-none">
+                <span className="inline-block w-4 text-charcoal/40 transition-transform group-open:rotate-90">
+                  &#9656;
+                </span>{" "}
+                {section.category}
+              </summary>
               <RowList>
                 {section.items.map((item) => (
                   <Row key={item.id}>
@@ -69,7 +74,7 @@ export default async function GroceryItemsPage() {
                   </Row>
                 ))}
               </RowList>
-            </section>
+            </details>
           ))}
         </div>
       )}

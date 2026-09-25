@@ -93,6 +93,27 @@ export async function listStaff() {
     .orderBy(staff.createdAt);
 }
 
+// Same set the driver's own "Today's Jobs" page
+// (src/app/internal/driver/page.tsx) already uses to decide what counts
+// as a driver's current queue — not calendar-day-bound (an order offered
+// at 11pm and finished at 1am is still "today's job" from the driver's
+// side), just "not yet terminal." pending_acceptance included: an
+// offered-but-not-yet-accepted job is still sitting in that driver's
+// queue, same as ACTIVE_DRIVING_STATUSES (operations-dashboard.ts) plus
+// the one pre-acceptance state that dashboard deliberately excludes for
+// its own different purpose (driversOutNow — someone who hasn't
+// accepted yet isn't "out" driving).
+const DRIVER_QUEUE_STATUSES = ["pending_acceptance", "driver_assigned", "picked_up", "in_transit"] as const;
+// sql.join, not a raw interpolated array — drizzle's sql`` tag doesn't
+// decompose a JS array into an IN-list on its own (it would bind the
+// whole array as a single parameter), so the list is built as its own
+// chunk of SQL the same way an IN-list has to be everywhere else in
+// this codebase that isn't a plain inArray() query-builder call.
+const driverQueueStatusList = sql.join(
+  DRIVER_QUEUE_STATUSES.map((s) => sql`${s}`),
+  sql.raw(", ")
+);
+
 /**
  * Used by the Team page's Drivers table (super_admin, with account
  * management) and, since 2026-09-18, the plain-staff Drivers lookup
@@ -100,6 +121,11 @@ export async function listStaff() {
  * to requireStaff() because this shape (name/phone/isActive/createdAt/
  * email) has always been free of HR/compliance data; the Team page's
  * own page-level requireSuperAdmin() gate is unaffected by this change.
+ *
+ * todaysJobCount/lastActivityAt added 2026-09-24 (panel redesign round
+ * 2, Drivers table) — both computed from orders.driverId/updatedAt,
+ * nothing fabricated: a driver with zero orders shows 0/null, never a
+ * guessed value.
  */
 export async function listDrivers() {
   await requireStaff();
@@ -112,6 +138,14 @@ export async function listDrivers() {
       isActive: drivers.isActive,
       createdAt: drivers.createdAt,
       email: sql<string | null>`(SELECT email FROM auth.users WHERE id = ${drivers.authUserId})`,
+      todaysJobCount: sql<number>`(
+        SELECT count(*) FROM ${orders}
+        WHERE ${orders.driverId} = ${drivers.id}
+        AND ${orders.status} IN (${driverQueueStatusList})
+      )`,
+      lastActivityAt: sql<string | null>`(
+        SELECT max(${orders.updatedAt}) FROM ${orders} WHERE ${orders.driverId} = ${drivers.id}
+      )`,
     })
     .from(drivers)
     .orderBy(drivers.createdAt);

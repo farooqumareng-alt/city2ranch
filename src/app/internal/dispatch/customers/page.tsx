@@ -35,6 +35,8 @@ export default async function CustomersPage() {
             phone: r.phone,
             orderCount: Number(r.orderCount),
             lastOrderAt: new Date(r.lastOrderAt).toISOString(),
+            lifetimeValueCents: Number(r.lifetimeValueCents),
+            nextOrderAt: r.nextOrderAt ? new Date(r.nextOrderAt).toISOString() : null,
           }))}
       />
     </div>
