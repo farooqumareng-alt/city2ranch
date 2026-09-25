@@ -26,18 +26,36 @@ export function getDb() {
   //
   // `max`: postgres-js's default (10) per serverless instance, multiplied
   // across however many concurrent instances Vercel spins up, is what
-  // exhausted the pooler in session mode (EMAXCONNSESSION). But `max: 1`
-  // has a real cost of its own under transaction mode: a page that fires
-  // several genuinely-independent queries via Promise.all (e.g. the
-  // account dashboard, /request-service's prefill data) can't actually
-  // run them concurrently with only one physical connection — they
-  // serialize through it, and each round trip to the pooler costs real
-  // cross-region latency. Transaction mode's whole design is multiplexing
-  // many short-lived client connections onto a shared backend pool (unlike
-  // session mode's one-dedicated-backend-connection-per-session), so a
-  // small per-instance max here is safe headroom, not a repeat of the
+  // exhausted the pooler in session mode (EMAXCONNSESSION) — a past,
+  // different incident. But `max: 1` has a real cost of its own under
+  // transaction mode: a page that fires several genuinely-independent
+  // queries via Promise.all (e.g. the account dashboard, /request-
+  // service's prefill data) can't actually run them concurrently with
+  // only one physical connection — they serialize through it, and each
+  // round trip to the pooler costs real cross-region latency.
+  // Transaction mode's whole design is multiplexing many short-lived
+  // client connections onto a shared backend pool (unlike session
+  // mode's one-dedicated-backend-connection-per-session), so a small
+  // per-instance max here is safe headroom, not a repeat of the
   // session-mode problem.
-  const client = postgres(connectionString, { prepare: false, max: 5 });
+  //
+  // Raised from 5 to 10 (2026-09-24 incident) — `max: 5` was directly
+  // confirmed, by reproducing the exact failure locally, to hang
+  // indefinitely for Business Overview's real access pattern: 3
+  // sequential single-row queries (one per nested requireStaff() call
+  // in its auth chain) immediately followed by its own genuine 8-way
+  // concurrent Promise.all. That's up to 11 simultaneous logical
+  // connection demands against a pool of 5 — not just "a bit slower
+  // waiting for a free connection," a real hang, reproduced with a
+  // fresh, otherwise-idle client, with no other traffic involved. The
+  // same exact query sequence completes in ~1.2s once max is high
+  // enough to actually serve that peak. This project's pooler is
+  // Supavisor in transaction mode (port 6543, prepare: false below) —
+  // the mode built specifically to absorb many more logical client
+  // connections than physical backend ones, unlike the session-mode
+  // incident above; 10 stays well inside that design, not a return to
+  // the original per-instance-max-times-many-instances problem.
+  const client = postgres(connectionString, { prepare: false, max: 10 });
   cached = drizzle(client, { schema });
   return cached;
 }
