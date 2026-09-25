@@ -572,6 +572,12 @@ export const zipMileageCreateSchema = z.object({
     return String(miles);
   }),
   label: optionalText,
+  // Required going forward (2026-09-25, Coverage page county grouping) —
+  // every existing row was backfilled with real data in the same
+  // migration that added this column (see 0061's own comment), so a new
+  // ZIP shouldn't be allowed to skip it and silently fall into an
+  // "uncategorized" bucket on the grouped Coverage page.
+  county: requiredText("County"),
 });
 export type ZipMileageCreateInput = z.infer<typeof zipMileageCreateSchema>;
 

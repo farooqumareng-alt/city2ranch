@@ -847,6 +847,16 @@ export const zipMileage = pgTable("zip_mileage", {
   // See stores.market. zip stays globally unique regardless — this is
   // metadata for a future market-filtered admin view, not a lookup key.
   market: text("market").notNull().default("default"),
+  // Added 2026-09-25 for the Coverage page's county grouping. Nullable —
+  // backfilled for every existing row in this same migration (real
+  // county data, sourced from the Census Bureau's 2020 ZCTA5-to-county
+  // relationship file, majority-land-area county per ZIP; 4 ZIPs with no
+  // ZCTA of their own resolved via the Census geocoder's reverse lookup
+  // instead — see the migration's own comment), but a brand-new ZIP
+  // added later through the Add ZIP form could in principle be saved
+  // without one if that form's own validation ever changes, so this
+  // isn't NOT NULL at the schema level.
+  county: text("county"),
 });
 
 /**

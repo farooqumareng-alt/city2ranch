@@ -20,8 +20,8 @@ function pgErrorCode(error: unknown): string | undefined {
     : undefined;
 }
 
-const CREATE_FIELDS = ["zip", "roundTripMiles", "label"];
-const UPDATE_FIELDS = ["roundTripMiles", "label"];
+const CREATE_FIELDS = ["zip", "roundTripMiles", "label", "county"];
+const UPDATE_FIELDS = ["roundTripMiles", "label", "county"];
 const LIST_PATH = "/internal/dispatch/zip-coverage";
 
 /** Backs both the admin ZIP Coverage list and, indirectly, every
@@ -44,6 +44,7 @@ export async function createZipMileage(
     zip: formData.get("zip"),
     roundTripMiles: formData.get("roundTripMiles"),
     label: formData.get("label"),
+    county: formData.get("county"),
   });
   if (!parsed.success) {
     return {
@@ -92,6 +93,7 @@ export async function updateZipMileage(
   const parsed = zipMileageUpdateSchema.safeParse({
     roundTripMiles: formData.get("roundTripMiles"),
     label: formData.get("label"),
+    county: formData.get("county"),
   });
   if (!parsed.success) {
     return {

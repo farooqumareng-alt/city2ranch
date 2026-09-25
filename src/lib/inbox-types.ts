@@ -23,6 +23,10 @@ export type InboxEntry = {
    *  "message" field to show. */
   message: string | null;
   status: "new" | "contacted" | "converted" | "closed";
+  /** Heuristic, computed in listInboxEntries() via looksLikeSpam() — see
+   *  its own doc comment. Informational/filtering only, never hides or
+   *  deletes anything on its own. */
+  isLikelySpam: boolean;
 };
 
 export const SOURCE_LABELS: Record<InboxSource, string> = {

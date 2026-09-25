@@ -11,6 +11,7 @@ export type ZipMileageDefaults = {
   zip: string;
   roundTripMiles: string;
   label: string | null;
+  county: string | null;
 };
 
 /** Shared create/edit form for the admin ZIP Coverage screen. The `zip`
@@ -72,6 +73,15 @@ export function ZipMileageForm({
           hint="Internal reference only."
           defaultValue={values?.label ?? entry?.label ?? ""}
           error={fieldErrors?.label}
+        />
+        <TextField
+          name="county"
+          label="County"
+          placeholder="e.g. Parker County"
+          hint="Used to group the Coverage list."
+          required
+          defaultValue={values?.county ?? entry?.county ?? ""}
+          error={fieldErrors?.county}
         />
       </div>
 
