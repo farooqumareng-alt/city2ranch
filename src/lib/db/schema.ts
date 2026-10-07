@@ -113,6 +113,36 @@ export const foundingMembers = pgTable("founding_members", {
 });
 
 /**
+ * Public driver recruiting applications (/drive, 2026-10-06) — before
+ * this, the only way to become a driver was a super_admin inviting a
+ * specific person by email (inviteDriver, team-management.ts); there was
+ * no public way to apply at all. Self-attested license/insurance only —
+ * no document upload here, same reasoning as every other guest-open lead
+ * form; real verification stays the existing Hiring & Compliance step on
+ * the driver's own profile once approved. Reuses leadStatusEnum, same as
+ * every other guest lead table — "converted" means approveDriverApplication
+ * (team-management.ts) successfully created a real drivers row.
+ */
+export const driverApplications = pgTable("driver_applications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  city: text("city").notNull(),
+  zip: text("zip").notNull(),
+  // "Year, make, and model" as one field — same single-field convention
+  // as foundingMembers.propertyLocation above, not three separate columns.
+  vehicle: text("vehicle").notNull(),
+  hasLicenseAndInsurance: boolean("has_license_and_insurance").notNull(),
+  availability: text("availability"),
+  motivation: text("motivation"),
+  status: leadStatusEnum("status").notNull().default("new"),
+});
+
+/**
  * General "Private Service" inquiries from /request-service — guest-open,
  * free-text, top-of-funnel. NOT the real City Pickup order flow (see
  * `orders` below) — this table intentionally stays simple and unlinked

@@ -613,4 +613,29 @@ export const blogPostSchema = z.object({
   content: requiredText("Content"),
   coverImageUrl: optionalText,
 });
+
+/**
+ * Public driver application (/drive, 2026-10-06). hasLicenseAndInsurance
+ * isn't `requiredText` — a native checkbox submits "on" or nothing at
+ * all, never an empty string, so this just coerces whatever arrives into
+ * a real boolean; the form's own `required` attribute is what actually
+ * stops a submission without it from reaching the server in the first
+ * place (same division of labor as every other client+server pair in
+ * this app).
+ */
+export const driverApplicationSchema = z.object({
+  name: requiredText("Name"),
+  email,
+  phone,
+  city: requiredText("City"),
+  zip,
+  vehicle: requiredText("Vehicle"),
+  hasLicenseAndInsurance: z
+    .string()
+    .optional()
+    .transform((v) => v === "on"),
+  availability: optionalText,
+  motivation: optionalText,
+});
+export type DriverApplicationInput = z.infer<typeof driverApplicationSchema>;
 export type BlogPostInput = z.infer<typeof blogPostSchema>;

@@ -4,7 +4,7 @@ import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
-import { drivers, orders, staff } from "@/lib/db/schema";
+import { drivers, driverApplications, orders, staff } from "@/lib/db/schema";
 import { requireStaff, requireSuperAdmin } from "@/lib/auth/roles";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getResend } from "@/lib/email/resend";
@@ -291,9 +291,11 @@ export async function addStaffMember(
 }
 
 /**
- * Invites a new driver by email — no pre-existing City2Ranch account
- * required (2026-09-08). Two paths, both ending in the same `drivers`
- * row:
+ * The real account-creation logic behind both inviteDriver (the Team
+ * page's Add Driver form) and approveDriverApplication (the Inbox's
+ * Approve button on a driver application) — extracted 2026-10-06 so
+ * approving an application doesn't duplicate this. Two paths, both
+ * ending in the same `drivers` row:
  *   - No account yet: supabase.auth.admin.inviteUserByEmail() creates
  *     one and sends Supabase's own invite email in the same call — the
  *     old "they need to sign in first, then try again" round trip this
@@ -303,29 +305,20 @@ export async function addStaffMember(
  *     customer): attach the driver row directly and send a plain
  *     "you've been added" notice instead, since there's no invite link
  *     to send someone who can already sign in.
- * Named `inviteDriver`, not `addDriver`, to make that distinction
- * visible at the call site — this is still bound to the same form/UI.
+ * Deliberately returns a bare ActionResult with no `values`/`fieldErrors`
+ * — those are specific to repopulating a live form on error, which only
+ * inviteDriver's caller has; approveDriverApplication has no form to
+ * repopulate (it's a one-click button).
  */
-export async function inviteDriver(
-  _prev: ActionResult | undefined,
-  formData: FormData
-): Promise<ActionResult> {
-  await requireSuperAdmin();
-
-  const parsed = addDriverSchema.safeParse({
-    email: formData.get("email"),
-    name: formData.get("name"),
-    phone: formData.get("phone"),
-  });
-  if (!parsed.success) {
-    return {
-      ok: false,
-      message: "Please correct the highlighted fields.",
-      fieldErrors: firstFieldErrors(parsed.error.flatten().fieldErrors),
-      values: valuesFromFormData(formData, ["email", "name", "phone"]),
-    };
-  }
-  const { email, name, phone } = parsed.data;
+async function createDriverAccount({
+  email,
+  name,
+  phone,
+}: {
+  email: string;
+  name: string;
+  phone: string;
+}): Promise<ActionResult> {
   const db = getDb();
 
   try {
@@ -338,23 +331,15 @@ export async function inviteDriver(
         redirectTo: `${siteUrl}/auth/callback`,
       });
       if (error || !data.user) {
-        console.error("[inviteDriver] inviteUserByEmail failed", error);
-        return {
-          ok: false,
-          message: "We couldn't send that invite right now. Please try again shortly.",
-          values: valuesFromFormData(formData, ["email", "name", "phone"]),
-        };
+        console.error("[createDriverAccount] inviteUserByEmail failed", error);
+        return { ok: false, message: "We couldn't send that invite right now. Please try again shortly." };
       }
       authUserId = data.user.id;
     }
 
     const existing = await db.select({ id: drivers.id }).from(drivers).where(eq(drivers.authUserId, authUserId));
     if (existing[0]) {
-      return {
-        ok: false,
-        message: "That person is already a driver.",
-        values: valuesFromFormData(formData, ["email", "name", "phone"]),
-      };
+      return { ok: false, message: "That person is already a driver." };
     }
 
     await db.insert(drivers).values({ authUserId, name, phone });
@@ -374,19 +359,81 @@ export async function inviteDriver(
           html,
         });
       } catch (error) {
-        console.error("[inviteDriver] driverAddedEmail send failed", error);
+        console.error("[createDriverAccount] driverAddedEmail send failed", error);
       }
     }
   } catch (error) {
-    console.error("[inviteDriver] failed", error);
+    console.error("[createDriverAccount] failed", error);
+    return { ok: false, message: "We couldn't add that driver right now. Please try again shortly." };
+  }
+
+  revalidatePath(ADMIN_PATH);
+  return { ok: true };
+}
+
+/** Named `inviteDriver`, not `addDriver`, to make the dual invite/attach
+ *  distinction createDriverAccount's own doc comment describes visible
+ *  at the call site — this is still bound to the same form/UI as before
+ *  the 2026-10-06 extraction; behavior is unchanged. */
+export async function inviteDriver(
+  _prev: ActionResult | undefined,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireSuperAdmin();
+
+  const parsed = addDriverSchema.safeParse({
+    email: formData.get("email"),
+    name: formData.get("name"),
+    phone: formData.get("phone"),
+  });
+  if (!parsed.success) {
     return {
       ok: false,
-      message: "We couldn't add that driver right now. Please try again shortly.",
+      message: "Please correct the highlighted fields.",
+      fieldErrors: firstFieldErrors(parsed.error.flatten().fieldErrors),
       values: valuesFromFormData(formData, ["email", "name", "phone"]),
     };
   }
 
-  revalidatePath(ADMIN_PATH);
+  const result = await createDriverAccount(parsed.data);
+  if (!result.ok) {
+    return { ...result, values: valuesFromFormData(formData, ["email", "name", "phone"]) };
+  }
+  return result;
+}
+
+/**
+ * Bound as `approveDriverApplication.bind(null, applicationId)` from the
+ * Inbox's own "Approve" button (InboxList.tsx) — one click, no retyping,
+ * reusing createDriverAccount() above with the application's own
+ * name/email/phone. Marks the application "converted" only on success;
+ * a failure (e.g. "already a driver") leaves it exactly as it was so
+ * staff can see the error and retry.
+ */
+export async function approveDriverApplication(
+  applicationId: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by useActionState's calling convention (via ApproveDriverApplicationButton), unused here since there's no field data to round-trip
+  _prev: ActionResult | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- same as above
+  _formData: FormData
+): Promise<ActionResult> {
+  await requireSuperAdmin();
+  const db = getDb();
+
+  const rows = await db
+    .select({ name: driverApplications.name, email: driverApplications.email, phone: driverApplications.phone })
+    .from(driverApplications)
+    .where(eq(driverApplications.id, applicationId));
+  const application = rows[0];
+  if (!application) {
+    return { ok: false, message: "This application no longer exists." };
+  }
+
+  const result = await createDriverAccount(application);
+  if (!result.ok) return result;
+
+  await db.update(driverApplications).set({ status: "converted" }).where(eq(driverApplications.id, applicationId));
+  revalidatePath("/internal/dispatch/inbox");
   return { ok: true };
 }
 

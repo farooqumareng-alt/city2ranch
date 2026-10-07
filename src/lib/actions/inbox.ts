@@ -3,7 +3,7 @@
 import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
-import { serviceAreaLeads, foundingMembers, contactMessages } from "@/lib/db/schema";
+import { serviceAreaLeads, foundingMembers, contactMessages, driverApplications } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
 import { looksLikeSpam } from "@/lib/inbox-spam";
 import type { ActionResult } from "@/lib/actions/types";
@@ -23,18 +23,20 @@ const LIST_PATH = "/internal/dispatch/inbox";
  * Work Queue's needs_quote bucket); reusing that word here would blur
  * two genuinely different concepts.
  *
- * Deliberately three separate queries merged in application code, not
- * a SQL UNION — the three tables have different columns and no shared
- * key, and there's no meaningful performance concern at this volume.
+ * Deliberately separate queries merged in application code, not
+ * a SQL UNION — the underlying tables have different columns and no
+ * shared key, and there's no meaningful performance concern at this
+ * volume. Gained a 4th source, driver applications (/drive), 2026-10-06.
  */
 export async function listInboxEntries(): Promise<InboxEntry[]> {
   await requireStaff();
   const db = getDb();
 
-  const [waitlist, founders, contacts] = await Promise.all([
+  const [waitlist, founders, contacts, driverApps] = await Promise.all([
     db.select().from(serviceAreaLeads).orderBy(desc(serviceAreaLeads.createdAt)),
     db.select().from(foundingMembers).orderBy(desc(foundingMembers.createdAt)),
     db.select().from(contactMessages).orderBy(desc(contactMessages.createdAt)),
+    db.select().from(driverApplications).orderBy(desc(driverApplications.createdAt)),
   ]);
 
   const entries: Omit<InboxEntry, "isLikelySpam">[] = [
@@ -71,6 +73,17 @@ export async function listInboxEntries(): Promise<InboxEntry[]> {
       message: row.message,
       status: row.status,
     })),
+    ...driverApps.map((row) => ({
+      id: row.id,
+      source: "driver_application" as const,
+      createdAt: row.createdAt,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      context: `${row.vehicle} · ${row.city}, ${row.zip} · ${row.hasLicenseAndInsurance ? "Licensed & insured" : "No license/insurance on file"}`,
+      message: [row.motivation, row.availability ? `Available: ${row.availability}` : null].filter(Boolean).join(" · ") || null,
+      status: row.status,
+    })),
   ];
 
   entries.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -94,7 +107,13 @@ export async function setInboxEntryStatus(
       : "new";
 
   const table =
-    source === "waitlist" ? serviceAreaLeads : source === "founding_member" ? foundingMembers : contactMessages;
+    source === "waitlist"
+      ? serviceAreaLeads
+      : source === "founding_member"
+        ? foundingMembers
+        : source === "driver_application"
+          ? driverApplications
+          : contactMessages;
 
   try {
     const db = getDb();
