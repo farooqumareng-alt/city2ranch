@@ -110,6 +110,43 @@ export function TextareaField({
   );
 }
 
+/** No `fieldBase`/outer-wrapper reuse with the other fields above — a
+ *  checkbox's label sits beside the control, not above it, so it needs
+ *  its own layout, not a variant of theirs. */
+export function CheckboxField({
+  name,
+  label,
+  error,
+  required,
+  hint,
+  className = "",
+  ...rest
+}: BaseFieldProps & Omit<InputHTMLAttributes<HTMLInputElement>, "name" | "id" | "className" | "type">) {
+  const errorId = `${name}-error`;
+  return (
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      <label htmlFor={name} className="flex items-start gap-2.5 font-sans text-sm text-navy-deep">
+        <input
+          id={name}
+          name={name}
+          type="checkbox"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+          required={required}
+          className="mt-0.5 h-4 w-4 rounded-sm border-navy/30 text-navy focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-1"
+          {...rest}
+        />
+        <span>
+          {label}
+          {required ? <span className="text-gold"> *</span> : null}
+        </span>
+      </label>
+      {hint ? <p className="pl-7 font-sans text-xs text-charcoal/60">{hint}</p> : null}
+      <ErrorText id={errorId} message={error} />
+    </div>
+  );
+}
+
 export function SelectField({
   name,
   label,

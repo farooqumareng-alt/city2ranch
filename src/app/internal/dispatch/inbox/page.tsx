@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Inbox" };
  * heuristic — see that component's own doc comment.
  */
 export default async function InboxPage() {
-  await requireStaff();
+  const staffMember = await requireStaff();
   const entries = await listInboxEntries();
 
   return (
@@ -22,9 +22,9 @@ export default async function InboxPage() {
       <SectionHeading
         eyebrow="STAFF"
         title="Inbox"
-        description="Service Area waitlist signups, Founding Member applications, and Contact/Support messages — everything that comes in before it's a real order."
+        description="Service Area waitlist signups, Founding Member applications, Driver applications, and Contact/Support messages — everything that comes in before it's a real order."
       />
-      <InboxList entries={entries} />
+      <InboxList entries={entries} isSuperAdmin={staffMember.role === "super_admin"} />
     </div>
   );
 }

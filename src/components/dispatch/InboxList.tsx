@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
 import { InboxStatusSelect } from "@/components/dispatch/InboxStatusSelect";
+import { ApproveDriverApplicationButton } from "@/components/dispatch/ApproveDriverApplicationButton";
 import { SOURCE_LABELS, type InboxEntry } from "@/lib/inbox-types";
 
 type TabKey = "inbox" | "spam" | "all";
@@ -21,7 +22,7 @@ const TABS: { key: TabKey; label: string; match: (entry: InboxEntry) => boolean 
  * are what staff want to see first; nothing is ever deleted, so a
  * misflagged entry is always one click away on "All" or "Likely Spam".
  */
-export function InboxList({ entries }: { entries: InboxEntry[] }) {
+export function InboxList({ entries, isSuperAdmin }: { entries: InboxEntry[]; isSuperAdmin: boolean }) {
   const [tab, setTab] = useState<TabKey>("inbox");
   const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
 
@@ -80,7 +81,12 @@ export function InboxList({ entries }: { entries: InboxEntry[] }) {
                 ) : null}
                 <p className="font-sans text-[11px] text-charcoal/40">{entry.createdAt.toLocaleString()}</p>
               </div>
-              <InboxStatusSelect source={entry.source} id={entry.id} currentStatus={entry.status} />
+              <div className="flex flex-col items-start gap-2">
+                <InboxStatusSelect source={entry.source} id={entry.id} currentStatus={entry.status} />
+                {entry.source === "driver_application" && isSuperAdmin && entry.status !== "converted" ? (
+                  <ApproveDriverApplicationButton applicationId={entry.id} />
+                ) : null}
+              </div>
             </Row>
           ))}
         </RowList>

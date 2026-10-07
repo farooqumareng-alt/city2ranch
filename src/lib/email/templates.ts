@@ -195,6 +195,30 @@ export function foundingMemberEmail(fields: {
   });
 }
 
+export function driverApplicationEmail(fields: {
+  name: string;
+  email: string;
+  phone: string;
+  city: string;
+  zip: string;
+  vehicle: string;
+  hasLicenseAndInsurance: boolean;
+  availability?: string;
+  motivation?: string;
+}) {
+  return wrap("New Driver Application", {
+    Name: fields.name,
+    Email: fields.email,
+    Phone: fields.phone,
+    City: fields.city,
+    ZIP: fields.zip,
+    Vehicle: fields.vehicle,
+    "Has license & insurance": fields.hasLicenseAndInsurance ? "Yes" : "No",
+    Availability: fields.availability,
+    "Why they want to drive": fields.motivation,
+  });
+}
+
 export function serviceRequestEmail(fields: {
   // Added 2026-09-01 (lifecycle audit issue #3) so this email can link
   // straight to the "Start Quote" action for this specific request,

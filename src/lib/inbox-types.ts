@@ -4,7 +4,7 @@
  * is a plain object, not a function, so it has to live somewhere else.
  * Same DB-free-module reasoning as work-queue-types.ts.
  */
-export type InboxSource = "waitlist" | "founding_member" | "contact";
+export type InboxSource = "waitlist" | "founding_member" | "contact" | "driver_application";
 
 export type InboxEntry = {
   id: string;
@@ -33,4 +33,5 @@ export const SOURCE_LABELS: Record<InboxSource, string> = {
   waitlist: "Service Area Waitlist",
   founding_member: "Founding Member",
   contact: "Contact / Support",
+  driver_application: "Driver Application",
 };
