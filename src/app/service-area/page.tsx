@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ZipCheckForm } from "@/components/forms/ZipCheckForm";
+import { SERVICE_AREAS } from "@/data/service-areas";
 import { pageSeo } from "@/lib/seo";
 
 const TITLE = "Service Area";
@@ -49,6 +51,33 @@ export default function ServiceAreaPage() {
           goes next — enter your ZIP code above to check your community or
           join the waitlist for an upcoming route.
         </p>
+      </div>
+
+      <div className="border-t border-navy/10 pt-10">
+        <SectionHeading
+          eyebrow="LAUNCH AREAS"
+          title="Explore our launch communities."
+          description="Each community below has its own page with route details, services, and answers to common questions."
+        />
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {SERVICE_AREAS.map((area) => (
+            <Link
+              key={area.slug}
+              href={`/service-area/${area.slug}`}
+              className="group flex flex-col gap-2 rounded-sm border border-navy/10 p-6 transition-colors hover:border-gold"
+            >
+              <h3 className="font-serif text-xl text-navy-deep group-hover:text-gold">
+                {area.name}, {area.state} {area.zip}
+              </h3>
+              <p className="font-sans text-sm leading-relaxed text-charcoal/70">
+                {area.tagline}
+              </p>
+              <span className="mt-2 font-sans text-sm font-medium text-navy">
+                View area details →
+              </span>
+            </Link>
+          ))}
+        </div>
       </div>
     </Container>
   );

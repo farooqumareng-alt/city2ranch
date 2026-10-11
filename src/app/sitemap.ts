@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getPublishedBlogPosts } from "@/lib/blog";
+import { SERVICE_AREAS } from "@/data/service-areas";
 
 const ROUTES = [
   "",
@@ -37,5 +38,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...staticEntries, ...postEntries];
+  // Service-area landing pages (2026-10-11) — one per launch community,
+  // generated from src/data/service-areas.ts so new areas are indexed
+  // automatically on the next deploy.
+  const areaEntries = SERVICE_AREAS.map((area) => ({
+    url: `${baseUrl}/service-area/${area.slug}`,
+    lastModified: new Date(),
+    changeFrequency: "monthly" as const,
+    priority: 0.6,
+  }));
+
+  return [...staticEntries, ...areaEntries, ...postEntries];
 }
