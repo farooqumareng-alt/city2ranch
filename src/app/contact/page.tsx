@@ -3,10 +3,15 @@ import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ContactForm } from "@/components/forms/ContactForm";
 import { SITE_PHONE_DISPLAY, SITE_PHONE_TEL } from "@/lib/constants";
+import { pageSeo } from "@/lib/seo";
+
+const TITLE = "Contact";
+const DESCRIPTION = "Get in touch with the City2Ranch concierge team.";
 
 export const metadata: Metadata = {
-  title: "Contact",
-  description: "Get in touch with the City2Ranch concierge team.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...pageSeo({ path: "/contact", title: TITLE, description: DESCRIPTION }),
 };
 
 export default async function ContactPage({
@@ -25,6 +30,7 @@ export default async function ContactPage({
       <SectionHeading
         eyebrow="CONTACT"
         title="Get in Touch"
+        level="h1"
         description="Questions about service, routes, or becoming a founding member? Send us a message and a concierge will respond."
       />
       <p className="font-sans text-sm text-charcoal/70">

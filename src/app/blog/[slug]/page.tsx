@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { getPublishedBlogPostBySlug, paragraphsFor, excerptFor } from "@/lib/blog";
+import { absoluteUrl, DEFAULT_OG_IMAGE } from "@/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -12,7 +13,25 @@ export async function generateMetadata({
   const { slug } = await params;
   const post = await getPublishedBlogPostBySlug(slug);
   if (!post) return { title: "Post Not Found" };
-  return { title: post.title, description: excerptFor(post) };
+  const description = excerptFor(post);
+  const url = absoluteUrl(`/blog/${slug}`);
+  return {
+    title: post.title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      url,
+      title: `${post.title} — City2Ranch`,
+      description,
+      images: [{ url: DEFAULT_OG_IMAGE, width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${post.title} — City2Ranch`,
+      description,
+      images: [DEFAULT_OG_IMAGE],
+    },
+  };
 }
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
