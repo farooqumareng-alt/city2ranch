@@ -2,11 +2,16 @@ import type { Metadata } from "next";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { WhyGrid } from "@/components/home/WhyGrid";
+import { pageSeo } from "@/lib/seo";
+
+const TITLE = "About";
+const DESCRIPTION =
+  "City2Ranch is a private rural concierge and delivery service built for ranches, estates and rural properties.";
 
 export const metadata: Metadata = {
-  title: "About",
-  description:
-    "City2Ranch is a private rural concierge and delivery service built for ranches, estates and rural properties.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...pageSeo({ path: "/about", title: TITLE, description: DESCRIPTION }),
 };
 
 export default function AboutPage() {
@@ -16,6 +21,7 @@ export default function AboutPage() {
         <SectionHeading
           eyebrow="ABOUT CITY2RANCH"
           title="A Private Service for People Who Live Differently."
+          level="h1"
           description="City2Ranch is a private rural concierge and delivery service. We connect households on ranches, estates and rural properties with the shopping, essentials and everyday conveniences of the city — through a dependable, discreet, appointment-based service rather than an on-demand delivery app."
         />
         <div className="max-w-2xl font-sans text-base leading-relaxed text-charcoal/80">

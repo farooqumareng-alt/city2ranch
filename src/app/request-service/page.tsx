@@ -3,10 +3,15 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { pageSeo } from "@/lib/seo";
+
+const TITLE = "Request Service";
+const DESCRIPTION = "Tell City2Ranch what you need — we'll route you to the right place.";
 
 export const metadata: Metadata = {
-  title: "Request Service",
-  description: "Tell City2Ranch what you need — we'll route you to the right place.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...pageSeo({ path: "/request-service", title: TITLE, description: DESCRIPTION }),
 };
 
 const CHOICES = [
@@ -62,6 +67,7 @@ export default async function RequestServicePage({
       <SectionHeading
         eyebrow="REQUEST SERVICE"
         title="What can we help you with?"
+        level="h1"
         description="Tell us what you need and we'll take it from there."
       />
       <div className="grid gap-4 sm:grid-cols-3">

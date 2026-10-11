@@ -1,16 +1,21 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { pageSeo } from "@/lib/seo";
+
+const TITLE = "Terms of Service";
+const DESCRIPTION = "The terms that govern use of City2Ranch's website and service.";
 
 export const metadata: Metadata = {
-  title: "Terms of Service",
-  description: "The terms that govern use of City2Ranch's website and service.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...pageSeo({ path: "/terms", title: TITLE, description: DESCRIPTION }),
 };
 
 export default function TermsPage() {
   return (
     <Container className="flex flex-col gap-10 py-16 sm:py-24">
-      <SectionHeading eyebrow="LEGAL" title="Terms of Service" />
+      <SectionHeading eyebrow="LEGAL" title="Terms of Service" level="h1" />
 
       <div className="flex max-w-2xl flex-col gap-6 font-sans text-sm leading-relaxed text-charcoal/80 sm:text-base">
         <p className="text-charcoal/60">

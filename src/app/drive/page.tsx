@@ -2,10 +2,16 @@ import type { Metadata } from "next";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DriverApplicationForm } from "@/components/forms/DriverApplicationForm";
+import { pageSeo } from "@/lib/seo";
+
+const TITLE = "Drive With Us";
+const DESCRIPTION =
+  "Apply to drive for City2Ranch — use your own vehicle, set your own schedule, serve your community.";
 
 export const metadata: Metadata = {
-  title: "Drive With Us",
-  description: "Apply to drive for City2Ranch — use your own vehicle, set your own schedule, serve your community.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...pageSeo({ path: "/drive", title: TITLE, description: DESCRIPTION }),
 };
 
 export default function DrivePage() {
@@ -14,6 +20,7 @@ export default function DrivePage() {
       <SectionHeading
         eyebrow="DRIVE WITH US"
         title="Deliver for City2Ranch"
+        level="h1"
         description="We're looking for reliable drivers to serve rural routes between town and the ranch. Use your own vehicle, set your own schedule, and help neighbors get what they need."
       />
 

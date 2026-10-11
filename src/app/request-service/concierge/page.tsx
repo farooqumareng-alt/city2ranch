@@ -4,16 +4,21 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { RequestServiceForm } from "@/components/forms/RequestServiceForm";
 import { getCommonGroceryItems } from "@/lib/grocery-items";
 import { SERVICE_TIERS } from "@/lib/constants";
+import { pageSeo } from "@/lib/seo";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getEffectiveOwnerId } from "@/lib/household";
 import { getOwnShoppingListsWithItems } from "@/lib/shopping-lists";
 import { getOwnProfile } from "@/lib/customer-profile";
 import { getOwnPlaces } from "@/lib/actions/places";
 
+const TITLE = "Shop for Me";
+const DESCRIPTION =
+  "Submit a private concierge shopping request to City2Ranch — groceries, essentials and errands delivered to your ranch or rural property.";
+
 export const metadata: Metadata = {
-  title: "Shop for Me",
-  description:
-    "Submit a private concierge shopping request to City2Ranch — groceries, essentials and errands delivered to your ranch or rural property.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...pageSeo({ path: "/request-service/concierge", title: TITLE, description: DESCRIPTION }),
 };
 
 // The grocery-items quick-add list is live, editable DB data (see
@@ -59,6 +64,7 @@ export default async function ConciergeRequestPage({
       <SectionHeading
         eyebrow="SHOP FOR ME"
         title="Concierge Shopping Request"
+        level="h1"
         description="Tell us about your household and what you need. A City2Ranch concierge will follow up with availability and pricing."
       />
       <div className="max-w-2xl">

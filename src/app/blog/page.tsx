@@ -4,10 +4,15 @@ import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getPublishedBlogPosts, excerptFor } from "@/lib/blog";
+import { pageSeo } from "@/lib/seo";
+
+const TITLE = "Blog";
+const DESCRIPTION = "News and notes from City2Ranch.";
 
 export const metadata: Metadata = {
-  title: "Blog",
-  description: "News and notes from City2Ranch.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...pageSeo({ path: "/blog", title: TITLE, description: DESCRIPTION }),
 };
 
 // Forced dynamic rather than relying on revalidatePath() alone — this
@@ -24,7 +29,7 @@ export default async function BlogIndexPage() {
 
   return (
     <Container className="flex flex-col gap-12 py-16 sm:py-24">
-      <SectionHeading eyebrow="CITY2RANCH" title="Blog" description="News and notes from the concierge team." />
+      <SectionHeading eyebrow="CITY2RANCH" title="Blog" level="h1" description="News and notes from the concierge team." />
 
       {posts.length === 0 ? (
         <EmptyState message="Nothing posted yet — check back soon." />

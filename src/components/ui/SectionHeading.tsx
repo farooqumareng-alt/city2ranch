@@ -1,5 +1,6 @@
 type Align = "left" | "center";
 type Tone = "dark" | "light";
+type Level = "h1" | "h2";
 
 export function SectionHeading({
   eyebrow,
@@ -7,6 +8,7 @@ export function SectionHeading({
   description,
   align = "left",
   tone = "dark",
+  level = "h2",
   className = "",
 }: {
   eyebrow?: string;
@@ -14,11 +16,14 @@ export function SectionHeading({
   description?: string;
   align?: Align;
   tone?: Tone;
+  /** Heading tag for the title. Pass "h1" for a page's single top-level heading; styling is identical. */
+  level?: Level;
   className?: string;
 }) {
   const alignClass = align === "center" ? "text-center items-center mx-auto" : "text-left items-start";
   const titleColor = tone === "dark" ? "text-navy-deep" : "text-ivory";
   const descColor = tone === "dark" ? "text-charcoal/70" : "text-ivory/75";
+  const HeadingTag = level;
 
   return (
     <div className={`flex max-w-2xl flex-col gap-4 ${alignClass} ${className}`}>
@@ -30,9 +35,9 @@ export function SectionHeading({
           </span>
         </div>
       ) : null}
-      <h2 className={`font-serif text-3xl leading-tight sm:text-4xl ${titleColor}`}>
+      <HeadingTag className={`font-serif text-3xl leading-tight sm:text-4xl ${titleColor}`}>
         {title}
-      </h2>
+      </HeadingTag>
       {description ? (
         <p className={`font-sans text-base leading-relaxed sm:text-lg ${descColor}`}>
           {description}

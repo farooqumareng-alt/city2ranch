@@ -1,16 +1,21 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { pageSeo } from "@/lib/seo";
+
+const TITLE = "Privacy Policy";
+const DESCRIPTION = "How City2Ranch collects, uses and protects your information.";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy",
-  description: "How City2Ranch collects, uses and protects your information.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...pageSeo({ path: "/privacy", title: TITLE, description: DESCRIPTION }),
 };
 
 export default function PrivacyPage() {
   return (
     <Container className="flex flex-col gap-10 py-16 sm:py-24">
-      <SectionHeading eyebrow="LEGAL" title="Privacy Policy" />
+      <SectionHeading eyebrow="LEGAL" title="Privacy Policy" level="h1" />
 
       <div className="flex max-w-2xl flex-col gap-6 font-sans text-sm leading-relaxed text-charcoal/80 sm:text-base">
         <p className="text-charcoal/60">

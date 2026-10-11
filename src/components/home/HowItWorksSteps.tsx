@@ -2,7 +2,7 @@ import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { HOW_IT_WORKS_STEPS } from "@/lib/constants";
 
-export function HowItWorksSteps() {
+export function HowItWorksSteps({ titleLevel = "h2" }: { titleLevel?: "h1" | "h2" }) {
   return (
     <section className="bg-white/40 py-16 sm:py-24">
       <Container className="flex flex-col gap-12">
@@ -10,6 +10,7 @@ export function HowItWorksSteps() {
           eyebrow="HOW IT WORKS"
           title="A Better Way to Get What You Need."
           align="center"
+          level={titleLevel}
         />
         <div className="relative grid gap-10 sm:grid-cols-3">
           <div

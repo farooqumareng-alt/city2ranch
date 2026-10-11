@@ -3,7 +3,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Card } from "@/components/ui/Card";
 import { SERVICES } from "@/lib/constants";
 
-export function ServicesGrid() {
+export function ServicesGrid({ titleLevel = "h2" }: { titleLevel?: "h1" | "h2" }) {
   return (
     <section className="bg-ivory py-16 sm:py-24">
       <Container className="flex flex-col gap-10">
@@ -11,6 +11,7 @@ export function ServicesGrid() {
           eyebrow="SERVICES"
           title="More Than Delivery."
           description="One private service for the things you don't want to drive into town for."
+          level={titleLevel}
         />
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {SERVICES.map((service) => (
