@@ -1273,3 +1273,130 @@ export const adminAuditLog = pgTable("admin_audit_log", {
   before: jsonb("before"),
   after: jsonb("after"),
 });
+
+/**
+ * Smart Pricing Engine (2026-11-04, Phase A) — the configuration and
+ * record side of src/lib/pricing/smart-engine.ts. See
+ * docs/CITY2RANCH_SMART_PRICING_ENGINE_SPEC.md.
+ *
+ * pricingPolicies / pricingRateCards are VERSIONED configuration: a
+ * new version is a new row, never an edit, so any historical quote can
+ * be traced to the exact policy and rates that produced it. Exactly
+ * one row of each may be active at a time (enforced in the repository
+ * layer when wired, the same pattern pricingRules uses). Every
+ * business value is nullable, and NULL means "not configured" — the
+ * engine reports it by name instead of inventing a number. Phase A
+ * ships with NO rows seeded: until the business sets real rates, the
+ * engine's honest answer is NOT_CONFIGURED.
+ */
+export const pricingPolicies = pgTable("pricing_policies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  version: text("version").notNull().unique(),
+  isActive: boolean("is_active").notNull().default(false),
+  targetMarginPercent: numeric("target_margin_percent", { precision: 5, scale: 2 }),
+  minContributionCents: integer("min_contribution_cents"),
+  minFeeCents: integer("min_fee_cents"),
+  autoApprovalCeilingCents: integer("auto_approval_ceiling_cents"),
+  quoteExpiryMinutes: integer("quote_expiry_minutes").notNull().default(4320),
+  roundUpToCents: integer("round_up_to_cents"),
+  urgencyPriorityPercent: numeric("urgency_priority_percent", { precision: 5, scale: 2 }),
+  urgencyRushPercent: numeric("urgency_rush_percent", { precision: 5, scale: 2 }),
+  scarcityTightPercent: numeric("scarcity_tight_percent", { precision: 5, scale: 2 }),
+  scarcityScarcePercent: numeric("scarcity_scarce_percent", { precision: 5, scale: 2 }),
+  complexityComplexPercent: numeric("complexity_complex_percent", { precision: 5, scale: 2 }),
+  scheduleOffHoursPercent: numeric("schedule_off_hours_percent", { precision: 5, scale: 2 }),
+  routeDensityCreditPercent: numeric("route_density_credit_percent", { precision: 5, scale: 2 }),
+  note: text("note"),
+});
+
+export const pricingRateCards = pgTable("pricing_rate_cards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  version: text("version").notNull().unique(),
+  isActive: boolean("is_active").notNull().default(false),
+  // 1099 compensation: flat amount per completed job, by band (the
+  // user's 2026-11-04 decision: flat per job for 1099, hourly for
+  // full-time). NOT seeded from pricing_rules' contractor cost fields —
+  // the user confirmed those are planning estimates, not the pay
+  // schedule, and deferred setting real rates.
+  contractorFlatLocalCents: integer("contractor_flat_local_cents"),
+  contractorFlatNearCents: integer("contractor_flat_near_cents"),
+  contractorFlatExtendedCents: integer("contractor_flat_extended_cents"),
+  contractorFlatRemoteCents: integer("contractor_flat_remote_cents"),
+  contractorFlatEstateRuralCents: integer("contractor_flat_estate_rural_cents"),
+  staffHourlyRateCents: integer("staff_hourly_rate_cents"),
+  vehiclePerMileCents: integer("vehicle_per_mile_cents"),
+  supportAllowanceCents: integer("support_allowance_cents"),
+  consumablesCents: integer("consumables_cents"),
+  failureAllowanceCents: integer("failure_allowance_cents"),
+  stripePercent: numeric("stripe_percent", { precision: 5, scale: 3 })
+    .notNull()
+    .default("2.900"),
+  stripeFixedCents: integer("stripe_fixed_cents").notNull().default(30),
+  note: text("note"),
+});
+
+/**
+ * One row per engine calculation — the immutable quote record. In
+ * Phase A these are written by shadow mode only (mode = "shadow"):
+ * the engine calculates alongside the live process and the row is
+ * evidence for comparison, never a price a customer was charged.
+ * requestSnapshot/components/explanation are stored whole (JSONB) so
+ * a price can be reproduced and decomposed exactly as generated.
+ */
+export const pricingQuotes = pgTable("pricing_quotes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  orderId: uuid("order_id").references(() => orders.id),
+  mode: text("mode").notNull().default("shadow"),
+  status: text("status").notNull(),
+  engineVersion: text("engine_version").notNull(),
+  policyVersion: text("policy_version").notNull(),
+  rateCardVersion: text("rate_card_version").notNull(),
+  band: text("band").notNull(),
+  requestSnapshot: jsonb("request_snapshot").notNull(),
+  components: jsonb("components"),
+  directCostCents: integer("direct_cost_cents"),
+  breakEvenCents: integer("break_even_cents"),
+  targetCents: integer("target_cents"),
+  floorCents: integer("floor_cents"),
+  finalCents: integer("final_cents"),
+  predictedContributionCents: integer("predicted_contribution_cents"),
+  confidence: text("confidence").notNull(),
+  explanation: jsonb("explanation"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  supersededById: uuid("superseded_by_id"),
+});
+
+/**
+ * What actually happened on a completed order — the learning loop's
+ * raw material. Written at completion (Phase B wiring); the table
+ * exists now so Phase A's shadow quotes have their comparison target
+ * defined. One row per order.
+ */
+export const orderActuals = pgTable("order_actuals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  orderId: uuid("order_id")
+    .notNull()
+    .unique()
+    .references(() => orders.id),
+  actualDriveMinutes: integer("actual_drive_minutes"),
+  actualShopMinutes: integer("actual_shop_minutes"),
+  actualWaitMinutes: integer("actual_wait_minutes"),
+  actualMiles: numeric("actual_miles", { precision: 6, scale: 1 }),
+  compensationType: text("compensation_type"),
+  laborPaidCents: integer("labor_paid_cents"),
+  vehicleCostCents: integer("vehicle_cost_cents"),
+  refundCents: integer("refund_cents").notNull().default(0),
+  outcome: text("outcome"),
+});
