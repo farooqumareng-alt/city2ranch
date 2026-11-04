@@ -5,13 +5,19 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { notificationPreferences } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole, isCallerEffectiveOwner } from "@/lib/household";
 import type { ActionResult } from "@/lib/actions/types";
 
 /** Used by /notifications. A customer who's never visited the page has
  *  no row yet — that's the same as every toggle being on (see the
- *  schema doc comment), not an error state. */
+ *  schema doc comment), not an error state. The id argument is
+ *  verified against the caller's session (isCallerEffectiveOwner);
+ *  an unverified id gets the same all-on default, never someone
+ *  else's saved preferences. */
 export async function getOwnNotificationPreferences(authUserId: string) {
+  if (!(await isCallerEffectiveOwner(authUserId))) {
+    return { paymentReceipts: true, recurringOrderCreated: true };
+  }
   const db = getDb();
   const rows = await db
     .select()

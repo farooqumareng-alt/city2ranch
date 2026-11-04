@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { recurringServicePlanItems, recurringServicePlans } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { canPerform, getEffectiveOwner } from "@/lib/household";
+import { canPerform, getEffectiveOwner, isCallerEffectiveOwner } from "@/lib/household";
 import { getServiceZoneStatus } from "@/lib/pricing/service-zone";
 import { recurringServicePlanCreateSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
@@ -27,8 +27,13 @@ const FORM_FIELDS = [
  * Every plan plus its items in one query — same leftJoin-and-group-in-JS
  * pattern as getOwnShoppingListsWithItems (src/lib/shopping-lists.ts),
  * for the same reason: N+1 round trips to the pooler add up.
+ * The id argument is verified against the caller's session
+ * (isCallerEffectiveOwner) like every other account getter — these
+ * rows carry delivery addresses, so an unverified id reads as "no
+ * plans", never as someone else's.
  */
 export async function getOwnRecurringServicePlans(ownerId: string) {
+  if (!(await isCallerEffectiveOwner(ownerId))) return [];
   const db = getDb();
   const rows = await db
     .select({

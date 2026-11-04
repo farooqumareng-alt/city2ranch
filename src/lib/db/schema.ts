@@ -1062,6 +1062,15 @@ export const orderDeliveryPins = pgTable("order_delivery_pins", {
     .references(() => orders.id),
   pin: text("pin").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Guess protection (2026-11-04, QA audit C2R-QA-005): failed
+  // verification attempts against this PIN, and the moment the count
+  // hit the limit and locked verification. Individual wrong guesses
+  // are deliberately NOT audit-logged (see driver-confirm-delivery.ts
+  // — a per-guess log would be a guessing oracle); the counter and
+  // the lock are state, not a log, and the lock itself is audited
+  // once when it happens.
+  attempts: integer("attempts").notNull().default(0),
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
 });
 
 /**

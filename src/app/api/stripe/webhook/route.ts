@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
@@ -14,7 +15,13 @@ import { getMembershipTierForPriceId, type MembershipTier } from "@/lib/stripe/t
 import { toMembershipStatus } from "@/lib/stripe/membership-status";
 
 function generatePin(): string {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  // 6 digits from a CSPRNG (QA audit C2R-QA-005) — this replaced a
+  // 4-digit Math.random() PIN: 10,000 possibilities from a non-crypto
+  // generator, with no attempt limit on the verify side, was a
+  // guessing attack waiting for a bored script. randomInt is
+  // uniform over the full range; padStart keeps leading-zero PINs
+  // ("004217") valid and unambiguous as strings.
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
 /** Shared by customer.subscription.created/updated/deleted — a
@@ -126,6 +133,27 @@ export async function POST(request: NextRequest) {
     }
     const { order, storeName } = row;
 
+    // Verify this completed event is for the order's CURRENT checkout
+    // session and that Stripe actually collected the order's total
+    // before treating it as payment (QA audit C2R-QA-004). The expired
+    // handler below has checked the session id all along; the
+    // completed handler — the one that marks orders paid and issues
+    // delivery PINs — checked none of the three. A superseded
+    // session's late completion, an unpaid session, or an amount that
+    // doesn't match the order must never mark an order paid: log it
+    // for manual reconciliation (the same posture as the
+    // not-payment_pending case below) and stop.
+    if (
+      order.stripeCheckoutSessionId !== session.id ||
+      session.payment_status !== "paid" ||
+      session.amount_total !== order.totalCents
+    ) {
+      console.error(
+        `[stripe webhook] checkout.session.completed for order ${order.id} failed verification — session ${session.id} (order's current session: ${order.stripeCheckoutSessionId}), payment_status "${session.payment_status}", amount_total ${session.amount_total} vs order total ${order.totalCents} — payment may need manual reconciliation`
+      );
+      return NextResponse.json({ received: true });
+    }
+
     // Idempotency: Stripe redelivers events. Only act if the order is
     // still where we left it — a second delivery of the same event (or
     // a stale one) is a safe no-op, not a re-processing. The status
@@ -166,7 +194,12 @@ export async function POST(request: NextRequest) {
       await db
         .insert(orderDeliveryPins)
         .values({ orderId: order.id, pin: deliveryPin })
-        .onConflictDoUpdate({ target: orderDeliveryPins.orderId, set: { pin: deliveryPin } });
+        .onConflictDoUpdate({
+          target: orderDeliveryPins.orderId,
+          // A fresh PIN also resets the guess counter/lock — the lock
+          // belongs to the old PIN's lifetime, not the order's.
+          set: { pin: deliveryPin, attempts: 0, lockedAt: null },
+        });
 
       await logAuditEvent({
         orderId: order.id,

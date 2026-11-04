@@ -2,6 +2,7 @@ import { cache } from "react";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { householdMembers } from "@/lib/db/schema";
+import { getCurrentUser } from "@/lib/supabase/server";
 import type { HouseholdRole } from "./household-roles";
 
 // Reaches auth.users.email via a raw correlated subquery rather than a
@@ -42,6 +43,27 @@ export const getEffectiveOwnerId = cache(async (userId: string): Promise<string>
     .where(and(eq(householdMembers.memberAuthUserId, userId), eq(householdMembers.status, "active")));
   return rows[0]?.ownerAuthUserId ?? userId;
 });
+
+/**
+ * For "use server" getters that take an owner id as an ARGUMENT
+ * (getOwnPlaces, getOwnMembership, getNotificationsSummary, …): the
+ * argument is client-controllable. Any signed-in user can invoke a
+ * server action directly with someone else's id, bypassing the pages
+ * that pass the id honestly — so the getter must verify the argument
+ * against the caller's own session before trusting it, exactly like
+ * the mutations in those same files already resolve the owner from
+ * the session. Returns false for a signed-out caller.
+ * (Remediation 2026-11-04, QA audit C2R-QA-001/002: five getters read
+ * account data — saved places incl. gate codes, membership incl. the
+ * Stripe subscription id, notification data, recurring plans — for
+ * any supplied id, with no caller check at all.)
+ */
+export async function isCallerEffectiveOwner(requestedOwnerId: string): Promise<boolean> {
+  const user = await getCurrentUser();
+  if (!user) return false;
+  const ownerId = await getEffectiveOwnerId(user.id);
+  return ownerId === requestedOwnerId;
+}
 
 /** Same resolution as getEffectiveOwnerId, but also returns the owner's
  *  email — for the one call site (submitOrder) that needs to stamp a

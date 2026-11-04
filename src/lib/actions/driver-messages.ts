@@ -33,8 +33,15 @@ export async function postDriverMessage(driverId: string, formData: FormData): P
   if (!isStaff) {
     // A driver may only post to their own thread — never trust the
     // driverId argument alone, same discipline as every other action in
-    // this app.
-    const driverRows = await db.select({ id: drivers.id }).from(drivers).where(eq(drivers.authUserId, user.id));
+    // this app. isActive matters too (QA audit C2R-QA-014): a
+    // deactivated driver keeps their auth account, so without it they
+    // kept full message access after being switched off everywhere
+    // else. The same check applies in listDriverMessages and
+    // markDriverMessagesRead below.
+    const driverRows = await db
+      .select({ id: drivers.id })
+      .from(drivers)
+      .where(and(eq(drivers.authUserId, user.id), eq(drivers.isActive, true)));
     if (driverRows[0]?.id !== driverId) return;
   }
 
@@ -101,7 +108,10 @@ export async function listDriverMessages(driverId: string) {
 
   const isStaff = await isActiveStaffMember(user.id);
   if (!isStaff) {
-    const driverRows = await db.select({ id: drivers.id }).from(drivers).where(eq(drivers.authUserId, user.id));
+    const driverRows = await db
+      .select({ id: drivers.id })
+      .from(drivers)
+      .where(and(eq(drivers.authUserId, user.id), eq(drivers.isActive, true)));
     if (driverRows[0]?.id !== driverId) return [];
   }
 
@@ -117,7 +127,10 @@ export async function markDriverMessagesRead(driverId: string): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
   const db = getDb();
-  const driverRows = await db.select({ id: drivers.id }).from(drivers).where(eq(drivers.authUserId, user.id));
+  const driverRows = await db
+    .select({ id: drivers.id })
+    .from(drivers)
+    .where(and(eq(drivers.authUserId, user.id), eq(drivers.isActive, true)));
   if (driverRows[0]?.id !== driverId) return;
 
   await db
