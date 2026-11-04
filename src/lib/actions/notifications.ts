@@ -4,13 +4,16 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { getEffectiveOwnerId } from "@/lib/household";
+import { getEffectiveOwnerId, isCallerEffectiveOwner } from "@/lib/household";
 
 const RECENT_LIMIT = 10;
 
 /** Used by GET /api/notifications — a client component can't call a
- *  DB-backed function directly, so that route is the bridge. */
+ *  DB-backed function directly, so that route is the bridge. The id
+ *  is verified against the caller's session (isCallerEffectiveOwner)
+ *  like every other account getter — see places.ts. */
 export async function getNotificationsSummary(ownerId: string) {
+  if (!(await isCallerEffectiveOwner(ownerId))) return { unreadCount: 0, items: [] };
   const db = getDb();
   const [unread, recent] = await Promise.all([
     db

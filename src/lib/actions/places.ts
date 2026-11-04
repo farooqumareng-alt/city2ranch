@@ -8,7 +8,7 @@ import { customerPlaces } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { placeSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
-import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
+import { canPerform, getEffectiveOwnerWithRole, isCallerEffectiveOwner } from "@/lib/household";
 
 const FORM_FIELDS = [
   "label",
@@ -22,8 +22,14 @@ const FORM_FIELDS = [
   "accessNotes",
 ];
 
-/** Used by /places and the order form's "use a saved place" picker. */
+/** Used by /places and the order form's "use a saved place" picker.
+ *  The id argument is verified against the caller's session
+ *  (isCallerEffectiveOwner) — as a server action this is directly
+ *  invocable with any id, and these rows include gate codes and
+ *  access notes. An unverified id reads as "no places", never as
+ *  someone else's. */
 export async function getOwnPlaces(authUserId: string) {
+  if (!(await isCallerEffectiveOwner(authUserId))) return [];
   const db = getDb();
   return db
     .select()

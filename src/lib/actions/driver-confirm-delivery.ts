@@ -11,6 +11,14 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { createNotification } from "@/lib/notifications/create";
 import type { ActionResult } from "@/lib/actions/types";
 
+/** Wrong-PIN ceiling before verification locks for this order
+ *  (QA audit C2R-QA-005). Five honest mistypings is generous — a
+ *  driver standing with the customer can always ask them to re-read
+ *  the PIN — while five guesses against a 6-digit CSPRNG PIN is not
+ *  a viable attack. Dispatch unlocks by having a fresh PIN issued
+ *  (the webhook's insert resets the counter with the PIN). */
+const MAX_PIN_ATTEMPTS = 5;
+
 /**
  * The one place `deliveryPin` is ever read back for comparison — this
  * runs server-side only and the value is never returned to the client,
@@ -56,15 +64,54 @@ export async function confirmDelivery(
   // (which exists specifically to keep this value out of what a
   // driver's own PostgREST session could ever read).
   const pinRows = await db
-    .select({ pin: orderDeliveryPins.pin })
+    .select({
+      pin: orderDeliveryPins.pin,
+      attempts: orderDeliveryPins.attempts,
+      lockedAt: orderDeliveryPins.lockedAt,
+    })
     .from(orderDeliveryPins)
     .where(eq(orderDeliveryPins.orderId, order.id));
-  const storedPin = pinRows[0]?.pin;
+  const pinRow = pinRows[0];
 
-  // Wrong PIN: no state change, no audit event — just ask the customer
-  // to confirm and try again. Not logged as a failed attempt to avoid
-  // building an unintentional PIN-guessing oracle in the audit trail.
-  if (!storedPin || enteredPin !== storedPin) {
+  // Locked by too many wrong guesses — even the correct PIN is
+  // refused until dispatch intervenes. Checked before the comparison
+  // so a locked PIN leaks nothing about whether a guess was right.
+  if (pinRow?.lockedAt) {
+    return {
+      ok: false,
+      message: "Too many incorrect PIN attempts — this delivery is locked. Contact dispatch to complete it.",
+    };
+  }
+
+  if (!pinRow || enteredPin !== pinRow.pin) {
+    // Count the wrong guess toward the lock. Individual guesses are
+    // NOT audit-logged — a per-guess log would be an unintentional
+    // PIN-guessing oracle in the audit trail — but the counter is
+    // state, and the lock itself IS logged (once, with the count) so
+    // staff can see it on the order timeline and follow up.
+    if (pinRow) {
+      const attempts = pinRow.attempts + 1;
+      const locking = attempts >= MAX_PIN_ATTEMPTS;
+      await db
+        .update(orderDeliveryPins)
+        .set({ attempts, ...(locking ? { lockedAt: new Date() } : {}) })
+        .where(eq(orderDeliveryPins.orderId, order.id));
+      if (locking) {
+        await logAuditEvent({
+          orderId: order.id,
+          actorType: "driver",
+          actorId: user?.id ?? null,
+          action: "delivery_pin_locked",
+          previousState: order.status,
+          newState: order.status,
+          metadata: { attempts },
+        });
+        return {
+          ok: false,
+          message: "Too many incorrect PIN attempts — this delivery is now locked. Contact dispatch to complete it.",
+        };
+      }
+    }
     return {
       ok: false,
       message: "That PIN doesn't match. Confirm it with the customer and try again.",

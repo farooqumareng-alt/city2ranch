@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/server";
 import { getMembershipPriceId, type MembershipTier } from "@/lib/stripe/tiers";
 import { membershipServicesConfigured } from "@/lib/env";
-import { canPerform, getEffectiveOwner } from "@/lib/household";
+import { canPerform, getEffectiveOwner, isCallerEffectiveOwner } from "@/lib/household";
 import { getMembershipSettings } from "@/lib/actions/membership-settings";
 
 // Deliberately not using src/lib/audit.ts's logAuditEvent here —
@@ -19,8 +19,12 @@ import { getMembershipSettings } from "@/lib/actions/membership-settings";
 // call in this codebase.
 
 /** Used by /membership to decide whether to show real pricing/checkout
- *  or the existing static lead-capture cards. */
+ *  or the existing static lead-capture cards. The id argument is
+ *  verified against the caller's session (isCallerEffectiveOwner) —
+ *  this row carries the Stripe subscription id, so an unverified id
+ *  must read as "no membership", never as someone else's. */
 export async function getOwnMembership(authUserId: string) {
+  if (!(await isCallerEffectiveOwner(authUserId))) return null;
   const db = getDb();
   const rows = await db.select().from(memberships).where(eq(memberships.authUserId, authUserId));
   return rows[0] ?? null;
