@@ -4,6 +4,8 @@ import {
   computeHardCost,
   computeSustainableFloor,
   computeTargetProfitPrice,
+  computeStripeFeeCents,
+  computeNetRevenueCents,
   evaluatePricingOutcome,
   type EconomicValue,
   type PricingOutcome,
@@ -19,6 +21,11 @@ export type ConciergeSuggestion = {
   hardCost: EconomicValue;
   sustainableFloor: EconomicValue;
   targetProfitPrice: EconomicValue;
+  /** Card-processing economics (Build 2 — PRC-05): the estimated fee
+   *  on suggestedTotalCents and what remains after it. Both
+   *  not_configured until the matched rule carries fee inputs. */
+  stripeFee: EconomicValue;
+  netRevenue: EconomicValue;
   outcome: PricingOutcome;
   belowTargetProfit: boolean | null;
   // Phase 2 — set only when the matched rule is zoned (see
@@ -78,11 +85,14 @@ export async function getConciergeSuggestion(
   const hardCost = computeHardCost(rule, roundTripMiles);
   const sustainableFloor = computeSustainableFloor(hardCost, rule);
   const targetProfitPrice = computeTargetProfitPrice(sustainableFloor, rule);
+  const stripeFee = computeStripeFeeCents(price.totalCents, rule);
+  const netRevenue = computeNetRevenueCents(price.totalCents, stripeFee);
   const { outcome, belowTargetProfit } = evaluatePricingOutcome(
     price.totalCents,
     hardCost,
     sustainableFloor,
-    targetProfitPrice
+    targetProfitPrice,
+    stripeFee
   );
 
   return {
@@ -95,6 +105,8 @@ export async function getConciergeSuggestion(
     hardCost,
     sustainableFloor,
     targetProfitPrice,
+    stripeFee,
+    netRevenue,
     outcome,
     belowTargetProfit,
     zoneLabel: rule.zoneLabel,

@@ -4,8 +4,9 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RowList, Row } from "@/components/ui/RowList";
-import { listPricingRules } from "@/lib/actions/pricing-management";
-import { getZoneReadiness, type ZoneStatus } from "@/lib/pricing/zone-readiness";
+import { listPricingRules, activatePricingZoneSet } from "@/lib/actions/pricing-management";
+import { getZoneReadiness, getActiveCostWarnings, summarizeZoneSet, type ZoneStatus } from "@/lib/pricing/zone-readiness";
+import { ActivateZoneSetButton } from "@/components/forms/ActivateZoneSetButton";
 import { requireManager } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Pricing" };
@@ -29,17 +30,37 @@ function formatDollars(cents: number | null): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-/** rule.zoneMinMiles/zoneMaxMiles are numeric columns, returned as
- *  strings by drizzle-orm/postgres-js — same convention noted throughout
- *  pricing/repository.ts. */
-function formatZoneMiles(min: string | null, max: string | null): string {
+/** rule.zoneMinMiles is a numeric column, returned as a string by
+ *  drizzle-orm/postgres-js — same convention noted throughout
+ *  pricing/repository.ts. Threshold semantics (Build 2): a zone is
+ *  just its starting mileage; it runs until the next zone's start. */
+function formatZoneMiles(min: string | null): string {
   if (min === null) return "";
-  return max === null ? `${Number(min)}+ mi round trip` : `${Number(min)}–${Number(max)} mi round trip`;
+  return `${Number(min)}+ mi round trip`;
 }
 
 export default async function PricingPage() {
   await requireManager();
   const rules = await listPricingRules();
+
+  // Zone-set summaries (Build 2 — QA-006): one per service type that
+  // has zoned rules, so "is this service's zone set live?" is
+  // answerable at a glance and the whole set can be activated in one
+  // action instead of zone-by-zone clicks with a silent half-state
+  // in between.
+  const zoneSets = (["pickup", "concierge"] as const)
+    .map((serviceType) => ({
+      serviceType,
+      summary: summarizeZoneSet(
+        rules
+          .filter((r) => r.serviceType === serviceType)
+          .map((r) => ({
+            ...r,
+            targetMarginPercent: r.targetMarginPercent == null ? null : Number(r.targetMarginPercent),
+          }))
+      ),
+    }))
+    .filter(({ summary }) => summary.total > 0);
 
   return (
     <div className="flex flex-col gap-10">
@@ -54,6 +75,35 @@ export default async function PricingPage() {
         </Button>
       </div>
 
+      {zoneSets.length > 0 ? (
+        <div className="flex flex-col gap-4">
+          {zoneSets.map(({ serviceType, summary }) => (
+            <div
+              key={serviceType}
+              className="flex flex-col gap-2 rounded-sm border border-navy/10 bg-ivory/60 p-5"
+            >
+              <p className="font-sans text-sm text-navy-deep">
+                {SERVICE_TYPE_LABELS[serviceType]} zones: {summary.active} of {summary.total} active
+                {summary.ready > 0 ? `, ${summary.ready} ready for review` : ""}
+                {summary.incomplete.length > 0 ? `, ${summary.incomplete.length} incomplete` : ""}.
+              </p>
+              {summary.incomplete.length > 0 ? (
+                <p className="font-sans text-xs text-charcoal/60">
+                  Incomplete:{" "}
+                  {summary.incomplete.map((z) => `${z.zoneKey} (missing: ${z.missing.join(", ")})`).join("; ")}
+                </p>
+              ) : null}
+              {summary.canActivate ? (
+                <ActivateZoneSetButton
+                  action={activatePricingZoneSet.bind(null, serviceType)}
+                  label={`Activate all ${SERVICE_TYPE_LABELS[serviceType]} zones`}
+                />
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       {rules.length === 0 ? (
         <EmptyState message="No pricing rules yet." />
       ) : (
@@ -64,6 +114,10 @@ export default async function PricingPage() {
               targetMarginPercent: rule.targetMarginPercent == null ? null : Number(rule.targetMarginPercent),
             });
             const badge = STATUS_BADGES[readiness.status];
+            const costWarnings = getActiveCostWarnings({
+              ...rule,
+              targetMarginPercent: rule.targetMarginPercent == null ? null : Number(rule.targetMarginPercent),
+            });
             return (
               <Row key={rule.id}>
                 <div>
@@ -89,11 +143,17 @@ export default async function PricingPage() {
                   <p className="font-sans text-xs text-charcoal/60">
                     {formatDollars(rule.baseFeeCents)} base + {formatDollars(rule.perMileCents)}/mile
                     {rule.minFeeCents !== null ? `, ${formatDollars(rule.minFeeCents)} minimum` : ""}
-                    {rule.zoneKey !== null ? ` · ${formatZoneMiles(rule.zoneMinMiles, rule.zoneMaxMiles)}` : ""}
+                    {rule.zoneKey !== null ? ` · ${formatZoneMiles(rule.zoneMinMiles)}` : ""}
                     {" · Updated " + new Date(rule.updatedAt).toLocaleDateString()}
                   </p>
                   {readiness.status === "incomplete" ? (
                     <p className="font-sans text-xs text-charcoal/50">Missing: {readiness.missing.join(", ")}</p>
+                  ) : null}
+                  {costWarnings.length > 0 ? (
+                    <p className="font-sans text-xs text-charcoal/50">
+                      Cost side not configured: {costWarnings.join(", ")} — orders are priced without a cost
+                      evaluation until these are set.
+                    </p>
                   ) : null}
                 </div>
                 {!rule.isActive ? (

@@ -4,6 +4,8 @@ import {
   computeHardCost,
   computeSustainableFloor,
   computeTargetProfitPrice,
+  computeStripeFeeCents,
+  computeNetRevenueCents,
   evaluatePricingOutcome,
   type CostConfig,
 } from "./compute-price";
@@ -200,5 +202,78 @@ describe("evaluatePricingOutcome", () => {
   it("leaves belowTargetProfit null when no target margin is configured", () => {
     const result = evaluatePricingOutcome(8500, hardCost, sustainableFloor, { status: "not_configured" });
     expect(result.belowTargetProfit).toBeNull();
+  });
+});
+
+describe("computeStripeFeeCents / computeNetRevenueCents (Build 2 — PRC-05)", () => {
+  const feeConfig: CostConfig = {
+    contractorFlatCostCents: null,
+    contractorPerMileCostCents: null,
+    sustainableCostAllowanceCents: null,
+    targetMarginPercent: null,
+    stripeFeePercent: 2.9,
+    stripeFeeFixedCents: 30,
+  };
+
+  it("computes percent (rounded) plus fixed on a price", () => {
+    // $100.00 → 2.9% = 290¢ + 30¢ = 320¢; net $96.80.
+    expect(computeStripeFeeCents(10000, feeConfig)).toEqual({ status: "available", cents: 320 });
+    expect(computeNetRevenueCents(10000, { status: "available", cents: 320 })).toEqual({
+      status: "available",
+      cents: 9680,
+    });
+  });
+
+  it("is not_configured when either fee input is missing — half a fee schedule is not a fee", () => {
+    expect(computeStripeFeeCents(10000, { ...feeConfig, stripeFeePercent: null })).toEqual({
+      status: "not_configured",
+    });
+    expect(computeStripeFeeCents(10000, { ...feeConfig, stripeFeeFixedCents: null })).toEqual({
+      status: "not_configured",
+    });
+    expect(computeStripeFeeCents(10000, { ...feeConfig, stripeFeePercent: undefined })).toEqual({
+      status: "not_configured",
+    });
+    expect(computeNetRevenueCents(10000, { status: "not_configured" })).toEqual({ status: "not_configured" });
+  });
+
+  it("downgrades STANDARD_PRICE to STAFF_REVIEW when the fee eats the sustainable margin", () => {
+    // Price 5000 clears the 4500 sustainable floor; after a 320 fee
+    // the business keeps 4680 — still above. Push the fee up: at a
+    // 600 fee the net (4400) falls below the floor — the exact
+    // silent-loss case PRC-05 flagged, now routed to a human.
+    const hardCost = { status: "available", cents: 3500 } as const;
+    const sustainableFloor = { status: "available", cents: 4500 } as const;
+    const targetProfitPrice = { status: "available", cents: 9000 } as const;
+
+    const smallFee = evaluatePricingOutcome(5000, hardCost, sustainableFloor, targetProfitPrice, {
+      status: "available",
+      cents: 320,
+    });
+    expect(smallFee.outcome).toBe("STANDARD_PRICE");
+    expect(smallFee.belowSustainableAfterFees).toBe(false);
+
+    const bigFee = evaluatePricingOutcome(5000, hardCost, sustainableFloor, targetProfitPrice, {
+      status: "available",
+      cents: 600,
+    });
+    expect(bigFee.outcome).toBe("STAFF_REVIEW");
+    expect(bigFee.belowSustainableAfterFees).toBe(true);
+  });
+
+  it("leaves the outcome and flag untouched when no fee is supplied or configured", () => {
+    const hardCost = { status: "available", cents: 3500 } as const;
+    const sustainableFloor = { status: "available", cents: 4500 } as const;
+    const targetProfitPrice = { status: "available", cents: 9000 } as const;
+
+    const noFeeArg = evaluatePricingOutcome(5000, hardCost, sustainableFloor, targetProfitPrice);
+    expect(noFeeArg.outcome).toBe("STANDARD_PRICE");
+    expect(noFeeArg.belowSustainableAfterFees).toBeNull();
+
+    const unconfiguredFee = evaluatePricingOutcome(5000, hardCost, sustainableFloor, targetProfitPrice, {
+      status: "not_configured",
+    });
+    expect(unconfiguredFee.outcome).toBe("STANDARD_PRICE");
+    expect(unconfiguredFee.belowSustainableAfterFees).toBeNull();
   });
 });

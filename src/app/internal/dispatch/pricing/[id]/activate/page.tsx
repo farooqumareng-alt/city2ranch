@@ -53,13 +53,14 @@ export default async function ActivatePricingRulePage({ params }: { params: Prom
   };
   const readiness = getZoneReadiness({ ...rule, targetMarginPercent: config.targetMarginPercent });
 
-  // For a zoned rule, show the economics at both ends of its mileage
-  // band (cheapest and most expensive real trip it will price) — a
-  // flat rule has no band, so just one row at its own baseFeeCents
-  // math (0 extra miles beyond the base fee itself).
+  // For a zoned rule, preview the economics at its starting mileage —
+  //  the cheapest trip it will ever price. Under threshold semantics
+  //  (Build 2) a zone has no upper end of its own (it runs until the
+  //  next zone starts), so the old band-end preview row has no honest
+  //  second mileage to show. A flat rule has no zone, so just one row
+  //  at its own baseFeeCents math (0 extra miles beyond the base fee).
   const zoneMin = rule.zoneMinMiles == null ? null : Number(rule.zoneMinMiles);
-  const zoneMax = rule.zoneMaxMiles == null ? null : Number(rule.zoneMaxMiles);
-  const previewMileages = rule.zoneKey != null ? [zoneMin ?? 0, zoneMax ?? zoneMin ?? 0] : [0];
+  const previewMileages = rule.zoneKey != null ? [zoneMin ?? 0] : [0];
 
   return (
     <div className="flex flex-col gap-10">
@@ -96,7 +97,7 @@ export default async function ActivatePricingRulePage({ params }: { params: Prom
             <p className="font-sans text-sm text-navy-deep">
               Once activated, <strong>{rule.zoneLabel ?? rule.serviceLabel}</strong> becomes the live price for{" "}
               {rule.zoneKey != null ? (
-                <>Concierge orders in the {formatZoneRange(zoneMin, zoneMax)} range</>
+                <>Concierge orders from {formatZoneRange(zoneMin)} round trip (until the next zone starts)</>
               ) : (
                 <>every {rule.serviceType === "pickup" ? "City Pickup" : "Concierge"} order</>
               )}
@@ -163,7 +164,7 @@ export default async function ActivatePricingRulePage({ params }: { params: Prom
   );
 }
 
-function formatZoneRange(min: number | null, max: number | null): string {
-  if (min == null) return "its configured";
-  return max == null ? `${min}+ mile` : `${min}–${max} mile`;
+function formatZoneRange(min: number | null): string {
+  if (min == null) return "its configured starting mileage";
+  return `${min} mile`;
 }

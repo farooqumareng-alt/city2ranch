@@ -8,7 +8,7 @@ import { pricingRules } from "@/lib/db/schema";
 import { requireManager } from "@/lib/auth/roles";
 import { pricingRuleSchema, pricingRuleUpdateSchema } from "@/lib/validation/schemas";
 import { occupiesSameZoneSlot } from "@/lib/pricing/zone-scope";
-import { getZoneReadiness } from "@/lib/pricing/zone-readiness";
+import { getZoneReadiness, summarizeZoneSet } from "@/lib/pricing/zone-readiness";
 import { logAdminAuditEvent } from "@/lib/admin-audit";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 
@@ -23,10 +23,11 @@ const CREATE_FORM_FIELDS = [
   "contractorPerMileCostCents",
   "sustainableCostAllowanceCents",
   "targetMarginPercent",
+  "stripeFeePercent",
+  "stripeFeeFixedCents",
   "zoneKey",
   "zoneLabel",
   "zoneMinMiles",
-  "zoneMaxMiles",
 ];
 // serviceType omitted — see pricingRuleUpdateSchema's own doc comment.
 const UPDATE_FORM_FIELDS = CREATE_FORM_FIELDS.filter((f) => f !== "serviceType");
@@ -44,6 +45,8 @@ function costFieldsFromForm(formData: FormData) {
     contractorPerMileCostCents: formData.get("contractorPerMileCostCents"),
     sustainableCostAllowanceCents: formData.get("sustainableCostAllowanceCents"),
     targetMarginPercent: formData.get("targetMarginPercent"),
+    stripeFeePercent: formData.get("stripeFeePercent"),
+    stripeFeeFixedCents: formData.get("stripeFeeFixedCents"),
   };
 }
 
@@ -52,19 +55,23 @@ function zoneFieldsFromForm(formData: FormData) {
     zoneKey: formData.get("zoneKey"),
     zoneLabel: formData.get("zoneLabel"),
     zoneMinMiles: formData.get("zoneMinMiles"),
-    zoneMaxMiles: formData.get("zoneMaxMiles"),
   };
 }
 
 /**
  * Cross-row zone validation (Phase 2) — zod can only see one row's own
- * fields, but "does this zone overlap another rule's zone" and "does
- * this service type already mix zoned and unzoned rows" both require
- * looking at sibling rows in (market, service_type). Checked against
- * every row regardless of isActive — an inactive row's zone could still
- * be activated later, so validating only active rows would let an
- * overlap get saved silently and only surface as a hard-fail at
- * activation or suggestion time instead of at save time.
+ * fields, but "does another zone already start at this mileage" and
+ * "does this service type already mix zoned and unzoned rows" both
+ * require looking at sibling rows in (market, service_type). Checked
+ * against every row regardless of isActive — an inactive row's zone
+ * could still be activated later, so validating only active rows
+ * would let a conflict get saved silently and only surface as a
+ * hard-fail at activation or suggestion time instead of at save time.
+ *
+ * Since Build 2's threshold semantics (2026-11-04) there is no
+ * overlap check anymore — zones can't overlap when each is just a
+ * starting mileage. The one geometric conflict left is two zones
+ * starting at the SAME mileage, which would make matching ambiguous.
  *
  * excludeId is the row being edited (never compared against itself).
  */
@@ -72,7 +79,7 @@ async function validateZoneAgainstSiblings(
   db: ReturnType<typeof getDb>,
   market: string,
   serviceType: "pickup" | "concierge",
-  zone: { zoneKey?: string; zoneMinMiles?: number; zoneMaxMiles?: number },
+  zone: { zoneKey?: string; zoneMinMiles?: number },
   excludeId?: string
 ): Promise<string | null> {
   const siblings = (
@@ -81,7 +88,6 @@ async function validateZoneAgainstSiblings(
         id: pricingRules.id,
         zoneKey: pricingRules.zoneKey,
         zoneMinMiles: pricingRules.zoneMinMiles,
-        zoneMaxMiles: pricingRules.zoneMaxMiles,
       })
       .from(pricingRules)
       .where(and(eq(pricingRules.market, market), eq(pricingRules.serviceType, serviceType)))
@@ -94,20 +100,18 @@ async function validateZoneAgainstSiblings(
       : null;
   }
 
-  // Saving a zoned rule — reject if any sibling is unzoned, or if its
-  // mileage band overlaps another zone's.
+  // Saving a zoned rule — reject if any sibling is unzoned, or if
+  // another zone already starts at the same mileage.
   if (siblings.some((row) => row.zoneKey == null)) {
     return "This service type already has a flat (non-zoned) pricing rule — it must be removed before adding zones.";
   }
 
-  const min = zone.zoneMinMiles ?? 0;
-  const max = zone.zoneMaxMiles ?? Infinity;
-  const overlaps = siblings.some((row) => {
-    const otherMin = row.zoneMinMiles == null ? 0 : Number(row.zoneMinMiles);
-    const otherMax = row.zoneMaxMiles == null ? Infinity : Number(row.zoneMaxMiles);
-    return min < otherMax && otherMin < max;
-  });
-  return overlaps ? "This zone's mileage range overlaps another zone already configured for this service type." : null;
+  const duplicateStart = siblings.some(
+    (row) => row.zoneMinMiles != null && zone.zoneMinMiles != null && Number(row.zoneMinMiles) === zone.zoneMinMiles
+  );
+  return duplicateStart
+    ? `Another zone already starts at ${zone.zoneMinMiles} miles for this service type — each zone needs its own starting mileage (a zone runs from its start until the next zone's start).`
+    : null;
 }
 
 /**
@@ -160,8 +164,11 @@ export async function createPricingRule(
         // numeric columns round-trip as strings for drizzle-orm/postgres-js
         // (same convention as zip_mileage.roundTripMiles elsewhere).
         targetMarginPercent: parsed.data.targetMarginPercent == null ? null : String(parsed.data.targetMarginPercent),
+        stripeFeePercent: parsed.data.stripeFeePercent == null ? null : String(parsed.data.stripeFeePercent),
         zoneMinMiles: parsed.data.zoneMinMiles == null ? null : String(parsed.data.zoneMinMiles),
-        zoneMaxMiles: parsed.data.zoneMaxMiles == null ? null : String(parsed.data.zoneMaxMiles),
+        // Legacy band column — threshold semantics since Build 2; the
+        // form no longer collects it and matching never reads it.
+        zoneMaxMiles: null,
       })
       .returning({ id: pricingRules.id });
 
@@ -241,8 +248,10 @@ export async function updatePricingRule(
         ...parsed.data,
         updatedAt: new Date(),
         targetMarginPercent: parsed.data.targetMarginPercent == null ? null : String(parsed.data.targetMarginPercent),
+        stripeFeePercent: parsed.data.stripeFeePercent == null ? null : String(parsed.data.stripeFeePercent),
         zoneMinMiles: parsed.data.zoneMinMiles == null ? null : String(parsed.data.zoneMinMiles),
-        zoneMaxMiles: parsed.data.zoneMaxMiles == null ? null : String(parsed.data.zoneMaxMiles),
+        // Legacy band column — see createPricingRule.
+        zoneMaxMiles: null,
       })
       .where(eq(pricingRules.id, ruleId));
 
@@ -365,6 +374,105 @@ export async function activatePricingRule(
   } catch (error) {
     console.error("[activatePricingRule] failed", error);
     return { ok: false, message: "We couldn't activate this pricing rule right now. Please try again shortly." };
+  }
+
+  revalidatePath(LIST_PATH);
+  return { ok: true };
+}
+
+/**
+ * Activate a service type's whole zone set in one transaction
+ * (Build 2, 2026-11-04 — QA audit C2R-QA-006). Per-zone activation
+ * alone left "is Concierge pricing live?" unanswerable: zones went
+ * live one click at a time, so some mileages auto-priced while others
+ * silently fell back to manual quotes, and the four seeded Concierge
+ * zones sat at Ready For Review indefinitely with no single action
+ * that meant "launch the set". This is that action:
+ *
+ * - Refuses the whole set when ANY zoned rule for the service type is
+ *   still incomplete (summarizeZoneSet — the same readiness math as
+ *   the per-row gate and the admin list), naming each incomplete zone
+ *   and what it's missing. Nothing is activated partially.
+ * - Otherwise activates every not-yet-active zoned rule atomically,
+ *   deactivating any other active row holding the same zone slot
+ *   (an older versioned row for that zoneKey), exactly like
+ *   activatePricingRule does for one slot.
+ * - Already-active zones are untouched and don't block the set.
+ */
+export async function activatePricingZoneSet(
+  serviceType: "pickup" | "concierge",
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- useActionState calling convention, same as activatePricingRule
+  _prev: ActionResult | undefined
+): Promise<ActionResult> {
+  const staffMember = await requireManager();
+
+  const db = getDb();
+  // "default" market — same placeholder as createPricingRule.
+  const rows = await db
+    .select()
+    .from(pricingRules)
+    .where(and(eq(pricingRules.market, "default"), eq(pricingRules.serviceType, serviceType)));
+  const zoned = rows.filter((r) => r.zoneKey != null);
+  if (zoned.length === 0) {
+    return { ok: false, message: "This service has no zoned pricing rules to activate." };
+  }
+
+  const summary = summarizeZoneSet(
+    zoned.map((r) => ({
+      ...r,
+      targetMarginPercent: r.targetMarginPercent == null ? null : Number(r.targetMarginPercent),
+    }))
+  );
+  if (summary.incomplete.length > 0) {
+    const detail = summary.incomplete.map((z) => `${z.zoneKey} (missing: ${z.missing.join(", ")})`).join("; ");
+    return { ok: false, message: `The zone set can't go live yet — incomplete zones: ${detail}.` };
+  }
+
+  const toActivate = zoned.filter((r) => !r.isActive);
+  if (toActivate.length === 0) {
+    return { ok: false, message: "Every zone in this set is already active." };
+  }
+
+  try {
+    let deactivatedIds: string[] = [];
+    await db.transaction(async (tx) => {
+      const candidates = await tx
+        .select({
+          id: pricingRules.id,
+          market: pricingRules.market,
+          serviceType: pricingRules.serviceType,
+          zoneKey: pricingRules.zoneKey,
+        })
+        .from(pricingRules)
+        .where(and(eq(pricingRules.market, "default"), eq(pricingRules.serviceType, serviceType)));
+      const targetIds = new Set(toActivate.map((r) => r.id));
+      deactivatedIds = candidates
+        .filter((c) => !targetIds.has(c.id) && toActivate.some((t) => occupiesSameZoneSlot(t, c)))
+        .map((c) => c.id);
+
+      if (deactivatedIds.length > 0) {
+        await tx
+          .update(pricingRules)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(inArray(pricingRules.id, deactivatedIds));
+      }
+      await tx
+        .update(pricingRules)
+        .set({ isActive: true, updatedAt: new Date() })
+        .where(inArray(pricingRules.id, [...targetIds]));
+    });
+
+    await logAdminAuditEvent({
+      actorStaffId: staffMember.id,
+      action: "pricing_zone_set_activated",
+      targetType: "pricing_rule_set",
+      targetId: serviceType,
+      before: null,
+      after: { activatedRuleIds: toActivate.map((r) => r.id), deactivatedRuleIds: deactivatedIds },
+    });
+  } catch (error) {
+    console.error("[activatePricingZoneSet] failed", error);
+    return { ok: false, message: "We couldn't activate this zone set right now. Please try again shortly." };
   }
 
   revalidatePath(LIST_PATH);

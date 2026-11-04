@@ -7,7 +7,15 @@ import { formServicesConfigured, SERVICE_UNAVAILABLE_MESSAGE } from "@/lib/env";
 import { orderSubmitSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, valuesFromFormData, type ActionResult } from "@/lib/actions/types";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { computePrice } from "@/lib/pricing/compute-price";
+import {
+  computePrice,
+  computeHardCost,
+  computeSustainableFloor,
+  computeTargetProfitPrice,
+  computeStripeFeeCents,
+  computeNetRevenueCents,
+  evaluatePricingOutcome,
+} from "@/lib/pricing/compute-price";
 import { getActivePricingRule } from "@/lib/pricing/repository";
 import { getServiceZoneStatus } from "@/lib/pricing/service-zone";
 import { logAuditEvent } from "@/lib/audit";
@@ -118,6 +126,30 @@ export async function submitOrder(
     const rule = await getActivePricingRule();
     const price = computePrice(rule, roundTripMiles);
 
+    // Economic evaluation at submission (Build 2, 2026-11-04 —
+    // PRC-02). Concierge orders have been evaluated since Phase 1;
+    // City Pickup never was — its snapshot columns stayed null on
+    // every order, so the live pickup rule (whose per-mile price is
+    // below the configured contractor per-mile cost) lost money with
+    // nothing anywhere recording it. The evaluation is RECORDED, not
+    // enforced: it never blocks or reprices a customer's submission
+    // (the outcome is staff-facing, and pickup's outcome today is
+    // STAFF_REVIEW precisely because its cost fields are unconfigured
+    // — see getActiveCostWarnings on the pricing admin). Enforcing
+    // belongs to activation/readiness, not to a customer mid-checkout.
+    const hardCost = computeHardCost(rule, roundTripMiles);
+    const sustainableFloor = computeSustainableFloor(hardCost, rule);
+    const targetProfitPrice = computeTargetProfitPrice(sustainableFloor, rule);
+    const stripeFee = computeStripeFeeCents(price.totalCents, rule);
+    const netRevenue = computeNetRevenueCents(price.totalCents, stripeFee);
+    const evaluation = evaluatePricingOutcome(
+      price.totalCents,
+      hardCost,
+      sustainableFloor,
+      targetProfitPrice,
+      stripeFee
+    );
+
     // A household member (see src/lib/household.ts) submits an order
     // that belongs to the owner's account, not a separate one of their
     // own — same effective-owner resolution approve-and-pay.ts uses for
@@ -155,6 +187,12 @@ export async function submitOrder(
         baseFeeCents: price.baseFeeCents,
         mileageFeeCents: price.mileageFeeCents,
         totalCents: price.totalCents,
+        hardCostCents: hardCost.status === "available" ? hardCost.cents : null,
+        sustainableFloorCents: sustainableFloor.status === "available" ? sustainableFloor.cents : null,
+        targetProfitPriceCents: targetProfitPrice.status === "available" ? targetProfitPrice.cents : null,
+        stripeFeeCents: stripeFee.status === "available" ? stripeFee.cents : null,
+        netRevenueCents: netRevenue.status === "available" ? netRevenue.cents : null,
+        pricingOutcome: evaluation.outcome,
       })
       .returning({ id: orders.id });
 

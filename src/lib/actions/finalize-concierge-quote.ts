@@ -117,6 +117,8 @@ export async function finalizeConciergeQuote(
             suggestion?.sustainableFloor.status === "available" ? suggestion.sustainableFloor.cents : null,
           targetProfitPriceCents:
             suggestion?.targetProfitPrice.status === "available" ? suggestion.targetProfitPrice.cents : null,
+          stripeFeeCents: suggestion?.stripeFee.status === "available" ? suggestion.stripeFee.cents : null,
+          netRevenueCents: suggestion?.netRevenue.status === "available" ? suggestion.netRevenue.cents : null,
           pricingOutcome: suggestion?.outcome ?? null,
         })
         .where(and(eq(orders.id, orderId), eq(orders.status, order.status)))

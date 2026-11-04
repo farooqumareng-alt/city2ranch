@@ -60,6 +60,17 @@ export type CostConfig = {
   sustainableCostAllowanceCents: number | null;
   /** A whole-number percent, e.g. 40 for 40% — not a fraction. */
   targetMarginPercent: number | null;
+  /** Card-processing fee inputs (Build 2, 2026-11-04 — PRC-05: the
+   *  cost model previously ignored the Stripe fee entirely, so a
+   *  price could clear every floor here and still lose money after
+   *  the actual charge). Optional in the type only so older call
+   *  sites/tests that predate the fee model keep compiling; the
+   *  pricing repository always supplies both. Absent/null means "not
+   *  configured" — after-fee values are then not_configured, never
+   *  silently treated as a $0 fee. Stage the business's real Stripe
+   *  rates (dashboard-standard 2.9% + 30¢) on the rule when known. */
+  stripeFeePercent?: number | null;
+  stripeFeeFixedCents?: number | null;
 };
 
 /**
@@ -130,31 +141,77 @@ export type PricingEvaluation = {
    *  don't block it — missing the target doesn't automatically mean the
    *  order must be rejected. */
   belowTargetProfit: boolean | null;
+  /** Whether the price, AFTER the card-processing fee is taken out,
+   *  falls below the sustainable floor — null when the fee or the
+   *  floor isn't configured. When true it downgrades an otherwise-
+   *  STANDARD_PRICE outcome to STAFF_REVIEW (see evaluatePricingOutcome):
+   *  clearing the floor before fees but not after them is exactly the
+   *  silent-loss case PRC-05 flagged. */
+  belowSustainableAfterFees: boolean | null;
 };
+
+/**
+ * The estimated card-processing (Stripe) fee on a price:
+ * percent-of-price (rounded to the cent) plus the fixed per-charge
+ * fee. Not configured unless BOTH inputs are set — a percent with no
+ * fixed fee (or vice versa) is half a fee schedule, and treating the
+ * missing half as zero would invent a number.
+ */
+export function computeStripeFeeCents(proposedPriceCents: number, config: CostConfig): EconomicValue {
+  if (config.stripeFeePercent == null || config.stripeFeeFixedCents == null) {
+    return { status: "not_configured" };
+  }
+  const cents = Math.round((proposedPriceCents * config.stripeFeePercent) / 100) + config.stripeFeeFixedCents;
+  return { status: "available", cents };
+}
+
+/** What the business actually keeps from a price once the processing
+ *  fee is taken out — the revenue every after-fee judgment uses. */
+export function computeNetRevenueCents(proposedPriceCents: number, stripeFee: EconomicValue): EconomicValue {
+  if (stripeFee.status === "not_configured") return { status: "not_configured" };
+  return { status: "available", cents: proposedPriceCents - stripeFee.cents };
+}
 
 /**
  * The one place a proposed price is judged against real configured
  * economics. Missing cost configuration is itself a reason to route to
  * a human (STAFF_REVIEW), never a reason to skip the check or assume
  * the price is fine.
+ *
+ * `stripeFee` is optional so pre-fee-model callers keep their exact
+ * behavior; when it's supplied and configured, a price that clears
+ * the sustainable floor before fees but not after them is downgraded
+ * from STANDARD_PRICE to STAFF_REVIEW (never to NOT_ECONOMICALLY_VIABLE
+ * — the fee alone doesn't make a price below hard cost, and staff
+ * review is the honest route for a fee-eaten margin).
  */
 export function evaluatePricingOutcome(
   proposedPriceCents: number,
   hardCost: EconomicValue,
   sustainableFloor: EconomicValue,
-  targetProfitPrice: EconomicValue
+  targetProfitPrice: EconomicValue,
+  stripeFee?: EconomicValue
 ): PricingEvaluation {
   const belowTargetProfit =
     targetProfitPrice.status === "available" ? proposedPriceCents < targetProfitPrice.cents : null;
 
+  const netRevenue = stripeFee ? computeNetRevenueCents(proposedPriceCents, stripeFee) : null;
+  const belowSustainableAfterFees =
+    netRevenue?.status === "available" && sustainableFloor.status === "available"
+      ? netRevenue.cents < sustainableFloor.cents
+      : null;
+
   if (hardCost.status === "not_configured" || sustainableFloor.status === "not_configured") {
-    return { outcome: "STAFF_REVIEW", belowTargetProfit };
+    return { outcome: "STAFF_REVIEW", belowTargetProfit, belowSustainableAfterFees };
   }
   if (proposedPriceCents < hardCost.cents) {
-    return { outcome: "NOT_ECONOMICALLY_VIABLE", belowTargetProfit };
+    return { outcome: "NOT_ECONOMICALLY_VIABLE", belowTargetProfit, belowSustainableAfterFees };
   }
   if (proposedPriceCents < sustainableFloor.cents) {
-    return { outcome: "STAFF_REVIEW", belowTargetProfit };
+    return { outcome: "STAFF_REVIEW", belowTargetProfit, belowSustainableAfterFees };
   }
-  return { outcome: "STANDARD_PRICE", belowTargetProfit };
+  if (belowSustainableAfterFees) {
+    return { outcome: "STAFF_REVIEW", belowTargetProfit, belowSustainableAfterFees };
+  }
+  return { outcome: "STANDARD_PRICE", belowTargetProfit, belowSustainableAfterFees };
 }

@@ -462,6 +462,28 @@ const pricingRuleCostFields = {
       }
       return percent;
     }),
+  // Card-processing fee inputs (Build 2, 2026-11-04 — PRC-05). Both
+  // blank = fee not configured (after-fee economics unavailable);
+  // setting only one is half a fee schedule, so validateZoneFields'
+  // sibling check below isn't the place for it — the pairing rule
+  // lives in validatePricingRuleFields with the other cross-field
+  // checks. 0% is a legitimate percent here (a negotiated no-percent
+  // fee schedule exists in the world), unlike targetMarginPercent
+  // where 0 has no valid meaning — hence >= 0, not > 0.
+  stripeFeePercent: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value, ctx) => {
+      if (!value) return undefined;
+      const percent = Number(value);
+      if (!Number.isFinite(percent) || percent < 0 || percent >= 100) {
+        ctx.addIssue({ code: "custom", message: "Enter a fee percent of 0 or more and under 100, or leave it blank." });
+        return z.NEVER;
+      }
+      return percent;
+    }),
+  stripeFeeFixedCents: optionalDollarsToCents("Stripe fixed fee"),
 };
 
 // Optional round-trip-mileage string input, same "blank means not
@@ -484,15 +506,18 @@ function optionalMiles(label: string) {
 }
 
 // Pricing Engine Phase 2 zone fields (see schema.ts's own doc comment
-// on pricingRules.zoneKey) — all optional, and all four blank together
+// on pricingRules.zoneKey) — all optional, and all blank together
 // is the plain flat-rate shape every existing rule uses. zoneKey/Label
 // are free text (no fixed enum — see schema.ts), not dollar/percent
-// fields, so they get no numeric transform.
+// fields, so they get no numeric transform. Since Build 2 (2026-11-04)
+// a zone is defined by its STARTING mileage only (threshold semantics —
+// the zone runs until the next zone's start), so there is no maximum
+// field anymore; the legacy zone_max_miles column is never written by
+// this form.
 const pricingRuleZoneFields = {
   zoneKey: optionalText,
   zoneLabel: optionalText,
   zoneMinMiles: optionalMiles("zone minimum miles"),
-  zoneMaxMiles: optionalMiles("zone maximum miles"),
 };
 
 // Shared by both the create and update schema below — zod's `.omit()`
@@ -500,11 +525,10 @@ const pricingRuleZoneFields = {
 // `.superRefine()`, so this cross-field zone check is defined once and
 // applied to each schema separately rather than refining before omitting.
 function validateZoneFields(
-  data: { zoneKey?: string; zoneLabel?: string; zoneMinMiles?: number; zoneMaxMiles?: number },
+  data: { zoneKey?: string; zoneLabel?: string; zoneMinMiles?: number },
   ctx: z.RefinementCtx
 ) {
-  const anyZoneFieldSet =
-    data.zoneKey != null || data.zoneLabel != null || data.zoneMinMiles != null || data.zoneMaxMiles != null;
+  const anyZoneFieldSet = data.zoneKey != null || data.zoneLabel != null || data.zoneMinMiles != null;
   if (!anyZoneFieldSet) return;
 
   if (data.zoneKey == null) {
@@ -521,14 +545,51 @@ function validateZoneFields(
     ctx.addIssue({
       code: "custom",
       path: ["zoneMinMiles"],
-      message: "Zone minimum miles is required once any zone field is set — zone maximum may stay blank for an open-ended top zone.",
+      message:
+        "Zone starting miles is required once any zone field is set — the zone runs from its start until the next zone's start.",
     });
   }
-  if (data.zoneMinMiles != null && data.zoneMaxMiles != null && data.zoneMinMiles >= data.zoneMaxMiles) {
+}
+
+/**
+ * Cross-field price/fee checks that aren't zone-specific (Build 2,
+ * 2026-11-04):
+ * - The $0 guard (QA audit C2R-QA-011): base $0 + per-mile $0 + no
+ *   minimum means computePrice returns $0 for every ZIP — a real
+ *   misconfiguration that saved silently before. (The concierge
+ *   invoice-priced path is unaffected: it never uses these fields to
+ *   compute the customer's total.)
+ * - The Stripe fee pairing rule: percent and fixed fee must be set
+ *   together or both blank — half a fee schedule would make the
+ *   after-fee economics quietly wrong instead of unavailable.
+ */
+function validatePricingRuleFields(
+  data: {
+    baseFeeCents?: number;
+    perMileCents?: number;
+    minFeeCents?: number;
+    stripeFeePercent?: number;
+    stripeFeeFixedCents?: number;
+  },
+  ctx: z.RefinementCtx
+) {
+  if (
+    data.baseFeeCents === 0 &&
+    data.perMileCents === 0 &&
+    (data.minFeeCents == null || data.minFeeCents === 0)
+  ) {
     ctx.addIssue({
       code: "custom",
-      path: ["zoneMaxMiles"],
-      message: "Zone maximum miles must be greater than zone minimum miles.",
+      path: ["baseFeeCents"],
+      message:
+        "This rule would price every trip at $0 — set a base fee, a per-mile fee, or a minimum fee.",
+    });
+  }
+  if ((data.stripeFeePercent == null) !== (data.stripeFeeFixedCents == null)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["stripeFeePercent"],
+      message: "Set both Stripe fee fields (percent and fixed), or leave both blank.",
     });
   }
 }
@@ -548,14 +609,19 @@ const pricingRuleBaseFields = {
 };
 
 const pricingRuleObject = z.object(pricingRuleBaseFields);
-export const pricingRuleSchema = pricingRuleObject.superRefine(validateZoneFields);
+export const pricingRuleSchema = pricingRuleObject
+  .superRefine(validateZoneFields)
+  .superRefine(validatePricingRuleFields);
 export type PricingRuleInput = z.infer<typeof pricingRuleSchema>;
 
 // Editing an existing rule never touches its serviceType — a rule's
 // service type is part of its identity (which corridor it belongs to),
 // not an editable attribute, the same "identifier stays stable once
 // created" discipline as zip_mileage.zip and blogPosts.slug.
-export const pricingRuleUpdateSchema = pricingRuleObject.omit({ serviceType: true }).superRefine(validateZoneFields);
+export const pricingRuleUpdateSchema = pricingRuleObject
+  .omit({ serviceType: true })
+  .superRefine(validateZoneFields)
+  .superRefine(validatePricingRuleFields);
 export type PricingRuleUpdateInput = z.infer<typeof pricingRuleUpdateSchema>;
 
 export const zipMileageCreateSchema = z.object({
