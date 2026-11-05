@@ -59,6 +59,7 @@ export default async function ServiceDetailPage({
       serviceLabel: orders.serviceLabel,
       totalCents: orders.totalCents,
       paidAt: orders.paidAt,
+      quoteExpiresAt: orders.quoteExpiresAt,
       completedAt: orders.completedAt,
       storeName: stores.name,
       storeAddressLine1: stores.addressLine1,
@@ -224,6 +225,9 @@ export default async function ServiceDetailPage({
             <>
               <p className="font-sans text-xs text-charcoal/60">
                 Final pricing confirmed before service begins.
+                {order.quoteExpiresAt
+                  ? ` This quote is valid until ${new Date(order.quoteExpiresAt).toLocaleString()}.`
+                  : ""}
               </p>
               <JobActionButton
                 action={approveAndPayOrder.bind(null, order.id)}

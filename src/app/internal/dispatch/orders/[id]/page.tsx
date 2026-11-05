@@ -17,7 +17,12 @@ import { AssignDriverForm } from "@/components/dispatch/AssignDriverForm";
 import { OrderExceptionForm } from "@/components/dispatch/OrderExceptionForm";
 import { PickupAddressForm } from "@/components/dispatch/PickupAddressForm";
 import { resolvePickupAddress, formatPickupAddress } from "@/lib/orders/pickup-address";
-import { cancelOrder, failOrder } from "@/lib/actions/staff-order-exceptions";
+import { cancelOrder, failOrder, closeStalePayment } from "@/lib/actions/staff-order-exceptions";
+import { issueOrderRefund } from "@/lib/actions/refunds";
+import { getOrderRefunds } from "@/lib/orders/refunds";
+import { refundableBalanceCents, refundedTotalCents, isStalePaymentPending } from "@/lib/orders/money";
+import { RefundForm } from "@/components/dispatch/RefundForm";
+import { CloseStalePaymentButton } from "@/components/dispatch/CloseStalePaymentButton";
 import { formatPlainDate } from "@/lib/format";
 import { getOrderMessages } from "@/lib/order-messages";
 import { OrderMessageThread } from "@/components/orders/OrderMessageThread";
@@ -79,6 +84,9 @@ export default async function ServiceRecordPage({
       serviceLabel: orders.serviceLabel,
       totalCents: orders.totalCents,
       paidAt: orders.paidAt,
+      stripePaymentIntentId: orders.stripePaymentIntentId,
+      quoteExpiresAt: orders.quoteExpiresAt,
+      updatedAt: orders.updatedAt,
       completedAt: orders.completedAt,
       cancellationReason: orders.cancellationReason,
       failureReason: orders.failureReason,
@@ -104,22 +112,28 @@ export default async function ServiceRecordPage({
   // in (ConciergeQuoteForm only renders the editable form, suggestion
   // included, when status === "quote_pending").
   const needsSuggestion = isConcierge && order.status === "quote_pending";
-  const [items, feeLines, messages, timeline, activeDrivers, conciergeSuggestion, zoneOptions] = await Promise.all([
-    isConcierge ? getOrderItems(order.id) : Promise.resolve([]),
-    isConcierge ? getOrderFeeLines(order.id) : Promise.resolve([]),
-    getOrderMessages(order.id),
-    getOrderTimeline(order.id),
-    order.status === "paid"
-      ? db.select({ id: drivers.id, name: drivers.name }).from(drivers).where(eq(drivers.isActive, true))
-      : Promise.resolve([]),
-    // ?overrideZone lets staff preview the suggestion under a different
-    // active zone than the one mileage would auto-match — re-verified
-    // server-side inside getConciergeSuggestion itself, never trusted
-    // as a real price just because it's in the URL.
-    needsSuggestion ? getConciergeSuggestion(order.deliveryZip, overrideZone) : Promise.resolve(null),
-    // Only worth fetching when there's actually a choice to offer.
-    needsSuggestion ? getActiveZonedRulesForService("concierge") : Promise.resolve([]),
-  ]);
+  const [items, feeLines, messages, timeline, activeDrivers, conciergeSuggestion, zoneOptions, refunds] =
+    await Promise.all([
+      isConcierge ? getOrderItems(order.id) : Promise.resolve([]),
+      isConcierge ? getOrderFeeLines(order.id) : Promise.resolve([]),
+      getOrderMessages(order.id),
+      getOrderTimeline(order.id),
+      order.status === "paid"
+        ? db.select({ id: drivers.id, name: drivers.name }).from(drivers).where(eq(drivers.isActive, true))
+        : Promise.resolve([]),
+      // ?overrideZone lets staff preview the suggestion under a different
+      // active zone than the one mileage would auto-match — re-verified
+      // server-side inside getConciergeSuggestion itself, never trusted
+      // as a real price just because it's in the URL.
+      needsSuggestion ? getConciergeSuggestion(order.deliveryZip, overrideZone) : Promise.resolve(null),
+      // Only worth fetching when there's actually a choice to offer.
+      needsSuggestion ? getActiveZonedRulesForService("concierge") : Promise.resolve([]),
+      // Refund history only exists once money has been captured.
+      order.paidAt ? getOrderRefunds(order.id) : Promise.resolve([]),
+    ]);
+  const refundedCents = refundedTotalCents(refunds);
+  const refundableCents = order.paidAt ? refundableBalanceCents(order.totalCents, refunds) : 0;
+  const stalePayment = isStalePaymentPending(order.status, order.updatedAt, new Date());
   const driverOptions = activeDrivers.map((d) => ({ value: d.id, label: d.name }));
   const pickupAddress = resolvePickupAddress(order);
   const canCancel = canTransition(order.status, "cancelled");
@@ -266,6 +280,52 @@ export default async function ServiceRecordPage({
               ) : (
                 <AssignDriverForm orderId={order.id} driverOptions={driverOptions} />
               )}
+            </div>
+          ) : null}
+
+          {order.paidAt ? (
+            <div className="flex flex-col gap-3 rounded-sm border border-navy/10 bg-white/60 p-6">
+              <h3 className="font-serif text-lg text-navy-deep">Payments</h3>
+              <p className="font-sans text-sm text-charcoal/70">
+                Paid ${(order.totalCents / 100).toFixed(2)}
+                {refundedCents > 0 ? ` · Refunded $${(refundedCents / 100).toFixed(2)}` : ""}
+                {refundableCents > 0 && refundedCents > 0
+                  ? ` · Refundable $${(refundableCents / 100).toFixed(2)}`
+                  : ""}
+              </p>
+              {refunds.length > 0 ? (
+                <ul className="flex flex-col gap-1">
+                  {refunds.map((refund) => (
+                    <li key={refund.id} className="font-sans text-xs text-charcoal/60">
+                      {new Date(refund.createdAt).toLocaleDateString()} — $
+                      {(refund.amountCents / 100).toFixed(2)} · {refund.status} · {refund.reason}
+                      {refund.status === "failed" && refund.error ? ` · ${refund.error}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {order.status === "cancelled" && refundableCents > 0 ? (
+                <p className="font-sans text-sm text-red-600">
+                  Refund due: this order was paid and then cancelled, and $
+                  {(refundableCents / 100).toFixed(2)} is still held. Issue the refund below — cancelling never
+                  refunds automatically.
+                </p>
+              ) : null}
+              {refundableCents > 0 ? (
+                <RefundForm orderId={order.id} action={issueOrderRefund} balanceCents={refundableCents} />
+              ) : null}
+            </div>
+          ) : null}
+
+          {stalePayment ? (
+            <div className="flex flex-col gap-3 rounded-sm border border-red-200 bg-red-50 p-6">
+              <h3 className="font-serif text-lg text-navy-deep">Stuck payment</h3>
+              <p className="font-sans text-sm text-charcoal/70">
+                This order has been awaiting payment for over 24 hours — its checkout session has lapsed, but
+                the automatic return to Priced never landed. Closing the stale payment returns the order to
+                Priced so it can be checked out again.
+              </p>
+              <CloseStalePaymentButton orderId={order.id} action={closeStalePayment} />
             </div>
           ) : null}
 

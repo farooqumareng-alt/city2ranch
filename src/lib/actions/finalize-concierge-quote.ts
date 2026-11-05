@@ -13,6 +13,7 @@ import { conciergeQuoteFinalizeSchema } from "@/lib/validation/schemas";
 import { firstFieldErrors, type ActionResult } from "@/lib/actions/types";
 import { logAuditEvent } from "@/lib/audit";
 import { logAdminAuditEvent } from "@/lib/admin-audit";
+import { quoteExpiryFrom } from "@/lib/orders/money";
 import { getResend } from "@/lib/email/resend";
 import { quoteReadyEmail } from "@/lib/email/templates";
 
@@ -22,10 +23,13 @@ import { quoteReadyEmail } from "@/lib/email/templates";
 class ConciergeQuoteRaceError extends Error {}
 
 /**
- * Replaces a concierge order's fee lines, recomputes totalCents as their
- * sum, and moves the order quote_pending -> priced. This is the one
- * place a Concierge order's price is ever set — there is no automated
- * pricing engine for it.
+ * Finalizes a concierge order's fee lines as a new quote VERSION,
+ * recomputes totalCents as their sum, and moves the order
+ * quote_pending -> priced. This is the one place a Concierge order's
+ * price is ever set — there is no automated pricing engine for it.
+ * (Before Build 3 this deleted the previous fee lines outright; the
+ * version column keeps what was previously quoted — see
+ * orderFeeLines.version in schema.ts.)
  */
 export async function finalizeConciergeQuote(
   _prev: ActionResult | undefined,
@@ -92,13 +96,23 @@ export async function finalizeConciergeQuote(
 
   try {
     await db.transaction(async (tx) => {
-      await tx.delete(orderFeeLines).where(eq(orderFeeLines.orderId, orderId));
+      // Version, don't delete (Build 3 — PRC-07): the new fee lines
+      // are written as the next version and the previous version's
+      // rows stay as the record of what was quoted before. Readers
+      // (getOrderFeeLines) only ever surface the latest version.
+      const existingLines = await tx
+        .select({ version: orderFeeLines.version })
+        .from(orderFeeLines)
+        .where(eq(orderFeeLines.orderId, orderId));
+      const nextVersion = existingLines.length === 0 ? 1 : Math.max(...existingLines.map((l) => l.version)) + 1;
+
       await tx.insert(orderFeeLines).values(
         feeLines.map((line, index) => ({
           orderId,
           label: line.label,
           amountCents: line.amountCents,
           sortOrder: index,
+          version: nextVersion,
         }))
       );
       const updated = await tx
@@ -106,6 +120,9 @@ export async function finalizeConciergeQuote(
         .set({
           status: "priced",
           totalCents,
+          // A fresh finalize is a fresh quote: its 72-hour validity
+          // window starts now (Build 3 — PRC-07).
+          quoteExpiresAt: quoteExpiryFrom(new Date()),
           updatedAt: new Date(),
           // Snapshotted once, here, alongside totalCents — never
           // recomputed or backfilled later if pricing_rules changes
