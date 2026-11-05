@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getZoneReadiness, PLACEHOLDER_BASE_FEE_CENTS } from "./zone-readiness";
+import { getZoneReadiness, getActiveCostWarnings, summarizeZoneSet, PLACEHOLDER_BASE_FEE_CENTS, type ZoneReadinessInput } from "./zone-readiness";
 
 const complete = {
   isActive: false,
@@ -65,5 +65,64 @@ describe("getZoneReadiness", () => {
   it("isActive:true even with the literal placeholder base fee still wins (never retroactively flagged)", () => {
     const result = getZoneReadiness({ ...complete, isActive: true, baseFeeCents: PLACEHOLDER_BASE_FEE_CENTS });
     expect(result.status).toBe("active");
+  });
+});
+
+describe("getActiveCostWarnings (Build 2 — PRC-02)", () => {
+  it("names every missing cost field on an active row (City Pickup's real state)", () => {
+    expect(
+      getActiveCostWarnings({
+        isActive: true,
+        baseFeeCents: 1000,
+        contractorFlatCostCents: null,
+        contractorPerMileCostCents: null,
+        sustainableCostAllowanceCents: null,
+        targetMarginPercent: null,
+      })
+    ).toEqual(["Contractor flat cost", "Contractor per-mile cost", "Sustainable cost allowance", "Target margin"]);
+  });
+
+  it("is empty for a fully configured active row and for any inactive row", () => {
+    expect(getActiveCostWarnings({ ...complete, isActive: true })).toEqual([]);
+    expect(getActiveCostWarnings(complete)).toEqual([]);
+  });
+});
+
+describe("summarizeZoneSet (Build 2 — QA-006)", () => {
+  const zoned = (zoneKey: string, overrides: Partial<ZoneReadinessInput>) => ({
+    ...complete,
+    ...overrides,
+    zoneKey,
+  });
+
+  it("ignores unzoned rows entirely", () => {
+    const summary = summarizeZoneSet([{ ...complete, zoneKey: null }]);
+    expect(summary.total).toBe(0);
+    expect(summary.canActivate).toBe(false);
+  });
+
+  it("canActivate when every zone is active or ready and at least one is ready", () => {
+    const summary = summarizeZoneSet([
+      zoned("near", { isActive: true }),
+      zoned("extended", {}),
+      zoned("remote", {}),
+    ]);
+    expect(summary).toMatchObject({ total: 3, active: 1, ready: 2, incomplete: [], canActivate: true });
+  });
+
+  it("refuses (canActivate false) and names the incomplete zone and its gaps", () => {
+    const summary = summarizeZoneSet([
+      zoned("near", {}),
+      zoned("remote", { contractorFlatCostCents: null, targetMarginPercent: null }),
+    ]);
+    expect(summary.canActivate).toBe(false);
+    expect(summary.incomplete).toEqual([
+      { zoneKey: "remote", missing: ["Contractor flat cost", "Target margin"] },
+    ]);
+  });
+
+  it("canActivate is false when the set is already fully active (nothing to do)", () => {
+    const summary = summarizeZoneSet([zoned("near", { isActive: true }), zoned("remote", { isActive: true })]);
+    expect(summary).toMatchObject({ total: 2, active: 2, ready: 0, canActivate: false });
   });
 });

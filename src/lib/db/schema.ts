@@ -835,9 +835,21 @@ export const pricingRules = pgTable("pricing_rules", {
   contractorPerMileCostCents: integer("contractor_per_mile_cost_cents"),
   sustainableCostAllowanceCents: integer("sustainable_cost_allowance_cents"),
   targetMarginPercent: numeric("target_margin_percent", { precision: 5, scale: 2 }),
+  // Card-processing fee inputs (Build 2, 2026-11-04 — PRC-05). The
+  // Phase 1 cost model stopped at fulfillment cost and never took the
+  // Stripe fee out of the price, so a quote could clear every floor
+  // and still contribute less than the floor once charged. Both
+  // nullable with the same "NULL means not configured, never $0"
+  // discipline as the four fields above — after-fee values are simply
+  // unavailable until the business stages its real Stripe rates here
+  // (dashboard-standard 2.9% + 30¢ at time of writing; the values are
+  // configuration, not code, so a Stripe pricing change is an admin
+  // edit, not a deploy).
+  stripeFeePercent: numeric("stripe_fee_percent", { precision: 5, scale: 2 }),
+  stripeFeeFixedCents: integer("stripe_fee_fixed_cents"),
   // Zone fields added 2026-09-17 (Pricing Engine Phase 2) — let a
   // service type have several active rules at once, one per distance
-  // band, instead of exactly one flat per-mile rule. All four nullable
+  // zone, instead of exactly one flat per-mile rule. All four nullable
   // and NULL across all four means "unzoned" — City Pickup's row (and
   // any future flat-rate rule) keeps them all NULL and is completely
   // unaffected; see getActivePricingRuleForZone() in repository.ts for
@@ -846,7 +858,16 @@ export const pricingRules = pgTable("pricing_rules", {
   // zoneLabel is the CUSTOMER-facing name (e.g. "Remote Service") shown
   // on the quote instead of a mileage figure — see ConciergeQuoteForm's
   // own comment on why the fee-line pre-fill never exposes mileage for
-  // a zoned rule. zoneMaxMiles = NULL means open-ended (the top zone).
+  // a zoned rule.
+  //
+  // THRESHOLD semantics since Build 2 (2026-11-04): zoneMinMiles is
+  // where a zone STARTS; the zone runs until the next zone's start.
+  // The original band model (min + max, both inclusive at match time)
+  // contradicted its own save-time validation and stranded fractional
+  // mileages between bands — see repository.ts's selectZoneMatch.
+  // zoneMaxMiles is the legacy band upper bound: no longer written by
+  // the admin form, never used in matching, kept only so historical
+  // rows keep the values they were configured with.
   zoneKey: text("zone_key"),
   zoneLabel: text("zone_label"),
   zoneMinMiles: numeric("zone_min_miles", { precision: 6, scale: 1 }),
@@ -1013,16 +1034,27 @@ export const orders = pgTable("orders", {
   // so a historical order can always show what it was actually judged
   // against, even after pricing_rules configuration changes later (see
   // computeHardCost/computeSustainableFloor/computeTargetProfitPrice/
-  // evaluatePricingOutcome in src/lib/pricing/compute-price.ts). All
-  // four null together means no evaluation ran at all — either the
-  // order predates Phase 1, or its service/market had no cost
-  // configuration at the time; never backfilled or recomputed
-  // retroactively when configuration is added later. Set once, at
-  // quote/acceptance time, alongside totalCents — never updated after.
+  // evaluatePricingOutcome in src/lib/pricing/compute-price.ts).
+  // All four null together means no evaluation ran at all — the order
+  // predates Phase 1, or (Concierge) no rule matched when the quote
+  // was finalized; never backfilled or recomputed retroactively when
+  // configuration is added later. Since Build 2 (2026-11-04), City
+  // Pickup orders are evaluated at submission too: a pickup order
+  // whose rule has no cost configuration gets pricingOutcome =
+  // STAFF_REVIEW with the three cent columns null — "evaluated, not
+  // configured" is deliberately distinguishable from "never
+  // evaluated" (all four null). Set once, at quote/acceptance time,
+  // alongside totalCents — never updated after.
   hardCostCents: integer("hard_cost_cents"),
   sustainableFloorCents: integer("sustainable_floor_cents"),
   targetProfitPriceCents: integer("target_profit_price_cents"),
   pricingOutcome: pricingOutcomeEnum("pricing_outcome"),
+  // Card-fee snapshot (Build 2, 2026-11-04 — PRC-05): the estimated
+  // Stripe fee on this order's total and what remains after it, from
+  // the same evaluation moment as the four columns above. Null when
+  // the matched rule had no fee inputs configured — never backfilled.
+  stripeFeeCents: integer("stripe_fee_cents"),
+  netRevenueCents: integer("net_revenue_cents"),
 
   stripeCheckoutSessionId: text("stripe_checkout_session_id").unique(),
   stripePaymentIntentId: text("stripe_payment_intent_id"),

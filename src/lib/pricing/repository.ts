@@ -16,8 +16,14 @@ export type PricingRuleRow = PricingRule & {
   contractorPerMileCostCents: number | null;
   sustainableCostAllowanceCents: number | null;
   targetMarginPercent: number | null;
+  stripeFeePercent: number | null;
+  stripeFeeFixedCents: number | null;
   // Phase 2 zone fields (see schema.ts's own doc comment on
   // pricingRules) — all null together means this row is unzoned/flat.
+  // Since Build 2 (2026-11-04) a zone is a THRESHOLD: zoneMinMiles is
+  // where the zone starts and it runs until the next zone's start.
+  // zoneMaxMiles is the legacy band upper bound — retained on the row
+  // for history, never used for matching anymore.
   zoneKey: string | null;
   zoneLabel: string | null;
   zoneMinMiles: number | null;
@@ -38,6 +44,8 @@ function mapRow(rule: typeof pricingRules.$inferSelect): PricingRuleRow {
     sustainableCostAllowanceCents: rule.sustainableCostAllowanceCents,
     // Drizzle/postgres-js returns `numeric` columns as strings.
     targetMarginPercent: rule.targetMarginPercent == null ? null : Number(rule.targetMarginPercent),
+    stripeFeePercent: rule.stripeFeePercent == null ? null : Number(rule.stripeFeePercent),
+    stripeFeeFixedCents: rule.stripeFeeFixedCents,
     zoneKey: rule.zoneKey,
     zoneLabel: rule.zoneLabel,
     zoneMinMiles: rule.zoneMinMiles == null ? null : Number(rule.zoneMinMiles),
@@ -98,14 +106,25 @@ export async function getActivePricingRule(serviceType: ServiceType = "pickup"):
  *    — this is the plain flat-rate shape, byte-identical to the old
  *    function's behavior, so a service that never configures zones is
  *    completely unaffected by this change.
- *  - One or more zoned rows: return whichever row's [zoneMinMiles,
- *    zoneMaxMiles ?? Infinity] band contains roundTripMiles. No match
- *    (mileage past every configured zone, e.g. beyond a 100mi top
- *    band) is null, not an invented price — the caller falls back to
- *    a fully manual quote, exactly like any other "not configured"
- *    case. More than one match (overlapping zone bands) is a real
- *    configuration bug and throws, same "hard-fail on ambiguity, never
- *    guess" posture as the >1-active-row check below.
+ *  - One or more zoned rows: THRESHOLD matching (Build 2, 2026-11-04 —
+ *    replaces the original inclusive [min, max] bands). Each zone
+ *    starts at its zoneMinMiles and runs until the next zone's start;
+ *    the match is the zone with the greatest start ≤ roundTripMiles.
+ *    Below the lowest zone's start is null, not an invented price —
+ *    the caller falls back to a fully manual quote, exactly like any
+ *    other "not configured" case. The old band semantics are gone
+ *    because they were self-contradictory: save-time validation
+ *    treated abutting bands ([0,30] then [30,60]) as non-overlapping
+ *    while this matcher treated both bounds as inclusive, so a ZIP at
+ *    exactly 30/60/80 miles matched two zones and threw, and decimal
+ *    bands like 20–49 stranded every fractional mileage in (49, 50).
+ *    Thresholds have exactly one comparator and no seams: every
+ *    mileage at or above the lowest start matches exactly one zone.
+ *    Two active zones sharing the same start is a configuration bug
+ *    and throws, same "hard-fail on ambiguity, never guess" posture
+ *    as the >1-active-row check below. zoneMaxMiles no longer
+ *    participates in matching at all (legacy column, kept for
+ *    history).
  *
  * Mixing zoned and unzoned active rows for the same service type isn't
  * a supported state — pricing-management.ts's create/update validation
@@ -155,18 +174,24 @@ export function selectZoneMatch(
     return unzoned[0];
   }
 
-  const matches = zoned.filter((r) => {
-    if (r.zoneMinMiles == null) return false; // malformed zone row — no lower bound at all
-    return roundTripMiles >= r.zoneMinMiles && (r.zoneMaxMiles == null || roundTripMiles <= r.zoneMaxMiles);
-  });
+  // Threshold matching: among zones whose start is at or below the
+  // mileage, the one with the greatest start wins. A zone row with no
+  // start at all is malformed (save-time validation requires one) and
+  // can never match.
+  const candidates = zoned
+    .filter((r) => r.zoneMinMiles != null && roundTripMiles >= r.zoneMinMiles)
+    .sort((a, b) => (b.zoneMinMiles ?? 0) - (a.zoneMinMiles ?? 0));
 
-  if (matches.length > 1) {
+  if (candidates.length === 0) return null;
+
+  const [top, second] = candidates;
+  if (second && second.zoneMinMiles === top.zoneMinMiles) {
     throw new Error(
-      `${matches.length} active pricing_rules zones overlap at ${roundTripMiles} round-trip miles for "${serviceType}" — zone bands must not overlap.`
+      `Two active pricing_rules zones for "${serviceType}" start at the same mileage (${top.zoneMinMiles}) — each zone needs its own starting mileage.`
     );
   }
 
-  return matches.length === 1 ? matches[0] : null;
+  return top;
 }
 
 /**

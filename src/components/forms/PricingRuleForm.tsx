@@ -23,10 +23,11 @@ export type PricingRuleDefaults = {
   contractorPerMileCostCents: number | null;
   sustainableCostAllowanceCents: number | null;
   targetMarginPercent: number | null;
+  stripeFeePercent: number | null;
+  stripeFeeFixedCents: number | null;
   zoneKey: string | null;
   zoneLabel: string | null;
   zoneMinMiles: number | null;
-  zoneMaxMiles: number | null;
 };
 
 /** Cents -> a plain dollar string for a text input's defaultValue — the
@@ -159,10 +160,12 @@ export function PricingRuleForm({
       <fieldset className="flex flex-col gap-4 rounded-sm border border-navy/10 bg-ivory/60 p-5">
         <legend className="font-serif text-lg text-navy-deep">Zone (optional)</legend>
         <p className="font-sans text-xs text-charcoal/60">
-          Leave all four blank for a plain flat-rate rule (City Pickup&apos;s shape today). Fill all four in to
-          make this rule apply only within a distance band — a service type can have several active zone rules
-          at once, one per band, selected automatically by the delivery ZIP&apos;s round-trip mileage. The zone
-          label is shown to the customer as the whole service fee — never a mileage or per-mile figure.
+          Leave all three blank for a plain flat-rate rule (City Pickup&apos;s shape today). Fill all three in to
+          make this rule a distance zone: a zone starts at its mileage and runs until the next zone&apos;s start,
+          so zones never overlap and no mileage falls between zones. A service type can have several active zone
+          rules at once, selected automatically by the delivery ZIP&apos;s round-trip mileage; mileage below the
+          lowest zone&apos;s start gets a manual quote. The zone label is shown to the customer as the whole
+          service fee — never a mileage or per-mile figure.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
@@ -183,18 +186,11 @@ export function PricingRuleForm({
           />
           <TextField
             name="zoneMinMiles"
-            label="Zone minimum miles (round trip)"
+            label="Zone starts at (round-trip miles)"
             placeholder="e.g. 60"
+            hint="This zone covers every trip at or above this mileage, up to the next zone's start."
             defaultValue={values?.zoneMinMiles ?? milesToString(rule?.zoneMinMiles)}
             error={fieldErrors?.zoneMinMiles}
-          />
-          <TextField
-            name="zoneMaxMiles"
-            label="Zone maximum miles (round trip)"
-            placeholder="e.g. 80"
-            hint="Leave blank for an open-ended top zone (no upper limit)."
-            defaultValue={values?.zoneMaxMiles ?? milesToString(rule?.zoneMaxMiles)}
-            error={fieldErrors?.zoneMaxMiles}
           />
         </div>
       </fieldset>
@@ -239,6 +235,22 @@ export function PricingRuleForm({
             hint="A true margin, not a markup — e.g. 40 means the target price recovers 40% profit after cost."
             defaultValue={values?.targetMarginPercent ?? rule?.targetMarginPercent ?? ""}
             error={fieldErrors?.targetMarginPercent}
+          />
+          <TextField
+            name="stripeFeePercent"
+            label="Stripe fee (%)"
+            placeholder="Not configured"
+            hint="Card-processing percent taken out of every charge (e.g. 2.9). Set together with the fixed fee — after-fee economics stay unavailable until both are set."
+            defaultValue={values?.stripeFeePercent ?? rule?.stripeFeePercent ?? ""}
+            error={fieldErrors?.stripeFeePercent}
+          />
+          <TextField
+            name="stripeFeeFixedCents"
+            label="Stripe fixed fee ($)"
+            placeholder="Not configured"
+            hint="Fixed per-charge fee (e.g. 0.30)."
+            defaultValue={values?.stripeFeeFixedCents ?? centsToDollarString(rule?.stripeFeeFixedCents)}
+            error={fieldErrors?.stripeFeeFixedCents}
           />
         </div>
       </fieldset>

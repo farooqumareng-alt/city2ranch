@@ -71,8 +71,8 @@ export default async function EditPricingRulePage({
           rule={{
             ...rule,
             targetMarginPercent,
+            stripeFeePercent: rule.stripeFeePercent == null ? null : Number(rule.stripeFeePercent),
             zoneMinMiles: rule.zoneMinMiles == null ? null : Number(rule.zoneMinMiles),
-            zoneMaxMiles: rule.zoneMaxMiles == null ? null : Number(rule.zoneMaxMiles),
           }}
           submitLabel="Save Changes"
         />

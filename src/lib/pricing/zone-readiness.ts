@@ -61,3 +61,70 @@ export function getZoneReadiness(rule: ZoneReadinessInput): ZoneReadiness {
 
   return { status: missing.length === 0 ? "ready_for_review" : "incomplete", missing };
 }
+
+/**
+ * Display-only companion to getZoneReadiness for a row that is ALREADY
+ * active (Build 2, 2026-11-04 — PRC-02's warning half). The
+ * isActive-wins rule above means an active row's missing cost fields
+ * are never reported by readiness — correct for the activation gate,
+ * but it left City Pickup's live rule (active, every cost field null)
+ * looking fully configured on the admin list while its orders were
+ * being priced with no cost evaluation at all. This names the gaps
+ * for display next to the Active badge; it changes no gate behavior.
+ */
+export function getActiveCostWarnings(rule: ZoneReadinessInput): string[] {
+  if (!rule.isActive) return [];
+  const missing: string[] = [];
+  if (rule.contractorFlatCostCents == null) missing.push("Contractor flat cost");
+  if (rule.contractorPerMileCostCents == null) missing.push("Contractor per-mile cost");
+  if (rule.sustainableCostAllowanceCents == null) missing.push("Sustainable cost allowance");
+  if (rule.targetMarginPercent == null) missing.push("Target margin");
+  return missing;
+}
+
+export type ZoneSetSummary = {
+  total: number;
+  active: number;
+  ready: number;
+  /** Inactive zones that are NOT ready, with what they're missing —
+   *  the reason a set activation would be refused. */
+  incomplete: { zoneKey: string; missing: string[] }[];
+  /** True when the whole set can go live in one action: at least one
+   *  zone exists, nothing is incomplete, and at least one zone is
+   *  ready (not yet active) — a fully-active set has nothing to do. */
+  canActivate: boolean;
+};
+
+/**
+ * The set-level view the per-row readiness badges can't express
+ * (Build 2, 2026-11-04 — QA-006): a zoned service is only really
+ * "configured" when its zones go live TOGETHER. Activating them one
+ * at a time left Concierge in a half-state where some mileages
+ * auto-priced and others silently fell back to manual quotes, with
+ * nothing anywhere saying the set was incomplete. Pure and shared by
+ * the admin list's summary and activatePricingZoneSet's gate — same
+ * never-disagree discipline as getZoneReadiness itself.
+ */
+export function summarizeZoneSet(
+  rules: (ZoneReadinessInput & { zoneKey: string | null })[]
+): ZoneSetSummary {
+  const zoned = rules.filter((r) => r.zoneKey != null);
+  let active = 0;
+  let ready = 0;
+  const incomplete: { zoneKey: string; missing: string[] }[] = [];
+
+  for (const rule of zoned) {
+    const readiness = getZoneReadiness(rule);
+    if (readiness.status === "active") active += 1;
+    else if (readiness.status === "ready_for_review") ready += 1;
+    else incomplete.push({ zoneKey: rule.zoneKey as string, missing: readiness.missing });
+  }
+
+  return {
+    total: zoned.length,
+    active,
+    ready,
+    incomplete,
+    canActivate: zoned.length > 0 && incomplete.length === 0 && ready > 0,
+  };
+}
