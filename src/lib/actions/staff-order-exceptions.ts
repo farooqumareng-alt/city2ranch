@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
 import { requireStaff } from "@/lib/auth/roles";
 import { assertTransition } from "@/lib/orders/status";
+import { isStalePaymentPending } from "@/lib/orders/money";
 import { logAuditEvent } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/actions/types";
@@ -106,4 +107,69 @@ export async function failOrder(
     "failureReason",
     null
   );
+}
+
+/**
+ * Close out a STUCK payment_pending order (Build 3, 2026-11-04 —
+ * QA-012). Normally the Stripe expired webhook reverts
+ * payment_pending -> priced when a checkout session lapses; when
+ * that delivery is missed, the order sits in payment_pending forever
+ * (the audit found one stuck since 2026-09-09) — the customer can't
+ * pay, staff can't re-quote, and the order is invisible to every
+ * other flow. This is the manual version of the webhook's revert:
+ * same target state, same CAS discipline, plus clearing the dead
+ * session id so a fresh checkout can be created cleanly.
+ *
+ * The 24-hour guard (isStalePaymentPending) is the safety: a live
+ * checkout session can legitimately sit in payment_pending for up to
+ * a day, so anything younger is refused rather than raced against a
+ * customer who might be mid-payment.
+ */
+export async function closeStalePayment(
+  _prev: ActionResult | undefined,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireStaff();
+  const user = await getCurrentUser();
+
+  const orderId = String(formData.get("orderId") ?? "");
+  if (!orderId) return { ok: false, message: "Missing order." };
+
+  const db = getDb();
+  const rows = await db.select().from(orders).where(eq(orders.id, orderId));
+  const order = rows[0];
+  if (!order) return { ok: false, message: "Order not found." };
+
+  if (!isStalePaymentPending(order.status, order.updatedAt, new Date())) {
+    return {
+      ok: false,
+      message:
+        "This order isn't a stale payment — it either isn't awaiting payment, or hasn't been waiting 24 hours yet.",
+    };
+  }
+
+  assertTransition(order.status, "priced");
+  const updated = await db
+    .update(orders)
+    .set({ status: "priced", stripeCheckoutSessionId: null, updatedAt: new Date() })
+    .where(and(eq(orders.id, orderId), eq(orders.status, "payment_pending")))
+    .returning({ id: orders.id });
+  if (updated.length === 0) {
+    return { ok: false, message: "This order was already updated — refresh the page and try again." };
+  }
+
+  await logAuditEvent({
+    orderId,
+    actorType: "staff",
+    actorId: user?.id ?? null,
+    action: "stale_payment_closed",
+    previousState: "payment_pending",
+    newState: "priced",
+    metadata: { staleSince: order.updatedAt.toISOString(), clearedSessionId: order.stripeCheckoutSessionId },
+  });
+
+  revalidatePath("/internal/dispatch/queue");
+  revalidatePath("/internal/dispatch");
+  revalidatePath(`/internal/dispatch/orders/${orderId}`);
+  return { ok: true };
 }

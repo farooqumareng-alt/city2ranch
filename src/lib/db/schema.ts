@@ -1056,6 +1056,14 @@ export const orders = pgTable("orders", {
   stripeFeeCents: integer("stripe_fee_cents"),
   netRevenueCents: integer("net_revenue_cents"),
 
+  // Quote validity (Build 3, 2026-11-04 — PRC-07). Set when a price
+  // is finalized (Concierge quote finalize, City Pickup submission):
+  // the moment after which approve-and-pay refuses the quote and
+  // staff must re-issue it. 72 hours by default (see
+  // src/lib/orders/money.ts). Null on orders priced before this
+  // column existed — a legacy quote is never retroactively expired.
+  quoteExpiresAt: timestamp("quote_expires_at", { withTimezone: true }),
+
   stripeCheckoutSessionId: text("stripe_checkout_session_id").unique(),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   paidAt: timestamp("paid_at", { withTimezone: true }),
@@ -1174,6 +1182,41 @@ export const orderFeeLines = pgTable("order_fee_lines", {
   label: text("label").notNull(),
   amountCents: integer("amount_cents").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
+  // Quote version (Build 3, 2026-11-04 — PRC-07). Before this,
+  // re-finalizing a quote DELETED every prior fee line and inserted
+  // the new set, so the price a customer was originally quoted left
+  // no trace anywhere. Now each finalize writes a new version and
+  // readers (src/lib/orders/concierge.ts) use only the latest —
+  // the full history of what was quoted, and when, survives.
+  version: integer("version").notNull().default(1),
+});
+
+/**
+ * A refund against an order's captured payment (Build 3, 2026-11-04 —
+ * PRC-06: before this, cancelling a paid order moved no money at all;
+ * there was no refund path anywhere in the codebase). One row per
+ * refund ATTEMPT: inserted as "pending" before the Stripe call (its
+ * id is the Stripe idempotency key, so a retried submission can never
+ * double-refund), then resolved to "succeeded" with the Stripe refund
+ * id or "failed" with the error. Refunds are issued manually by staff
+ * from the Service Record (manual-with-prompt: cancelling a paid
+ * order surfaces the amount still held, it never auto-refunds).
+ * status is plain text, app-validated: pending | succeeded | failed.
+ */
+export const orderRefunds = pgTable("order_refunds", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  orderId: uuid("order_id")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  stripeRefundId: text("stripe_refund_id").unique(),
+  amountCents: integer("amount_cents").notNull(),
+  reason: text("reason").notNull(),
+  status: text("status").notNull().default("pending"),
+  actorStaffId: uuid("actor_staff_id").references(() => staff.id),
+  error: text("error"),
 });
 
 /**

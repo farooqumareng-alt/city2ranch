@@ -9,6 +9,7 @@ import { getStripe } from "@/lib/stripe/server";
 import { assertTransition } from "@/lib/orders/status";
 import { logAuditEvent } from "@/lib/audit";
 import { paymentServicesConfigured } from "@/lib/env";
+import { isQuoteExpired } from "@/lib/orders/money";
 import { canPerform, getEffectiveOwnerWithRole } from "@/lib/household";
 import type { ActionResult } from "@/lib/actions/types";
 
@@ -61,6 +62,23 @@ export async function approveAndPayOrder(
   // race (see the real guard on the UPDATE below); it's just the fast
   // path for the common non-concurrent case.
   if (order.status !== "priced") redirect(`/my-services/${orderId}`);
+
+  // An expired quote is never charged against (Build 3 — PRC-07):
+  // the price was finalized more than the validity window ago, and
+  // costs/rules may have moved since. Staff re-finalize a Concierge
+  // quote (a fresh version with a fresh window); a City Pickup
+  // customer places a new request. Checked BEFORE the Stripe session
+  // is created so an expired quote never produces a live checkout.
+  // Orders priced before quote_expires_at existed have it null and
+  // are never expired by this check (isQuoteExpired's contract).
+  if (isQuoteExpired(order.quoteExpiresAt, new Date())) {
+    return {
+      ok: false,
+      message:
+        "This quote has expired. Please contact City2Ranch — we'll re-issue it at current pricing before you pay.",
+    };
+  }
+
   assertTransition(order.status, "payment_pending");
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";

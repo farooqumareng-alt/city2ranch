@@ -19,6 +19,7 @@ import {
 import { getActivePricingRule } from "@/lib/pricing/repository";
 import { getServiceZoneStatus } from "@/lib/pricing/service-zone";
 import { logAuditEvent } from "@/lib/audit";
+import { quoteExpiryFrom } from "@/lib/orders/money";
 import { canPerform, getEffectiveOwner, getEffectiveOwnerWithRole } from "@/lib/household";
 
 const FORM_FIELDS = [
@@ -181,6 +182,12 @@ export async function submitOrder(
         requestedDeliveryDate: data.requestedDeliveryDate,
         serviceType: "pickup",
         status: "priced",
+        // A pickup price is a quote too — same 72-hour validity as a
+        // finalized Concierge quote (Build 3 — PRC-07). If the
+        // customer comes back after it lapses, approve-and-pay
+        // refuses and they place a fresh request at current pricing
+        // rather than checking out against a stale number.
+        quoteExpiresAt: quoteExpiryFrom(new Date()),
         pricingRuleId: rule.id,
         serviceLabel: rule.serviceLabel,
         roundTripMiles: String(roundTripMiles),
