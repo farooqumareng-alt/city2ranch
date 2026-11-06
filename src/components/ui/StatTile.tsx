@@ -21,7 +21,15 @@ export function StatTile({
   return (
     <div className="flex flex-col gap-1">
       <p className="font-sans text-[11px] uppercase tracking-[0.1em] text-charcoal/50">{label}</p>
-      <p className={`font-serif text-2xl ${tone === "critical" ? "text-red-600" : "text-navy-deep"}`}>{value}</p>
+      {/* Sans + semibold since UI modernization Phase 1 (2026-11-04):
+          in the app panels the number IS the content, and dashboard
+          figures read faster in the data face than in the display
+          serif. The serif stays for public-site headings. */}
+      <p
+        className={`font-sans text-2xl font-semibold tracking-tight ${tone === "critical" ? "text-red-600" : "text-navy-deep"}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }

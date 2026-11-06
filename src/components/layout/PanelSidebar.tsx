@@ -93,15 +93,20 @@ export function PanelSidebar({
   managingRole?: string;
 }) {
   const pathname = usePathname();
+  // App-surface navigation (UI modernization Phase 1, 2026-11-04): on
+  // desktop the sidebar is a floating white card on the gray app
+  // canvas, links are rounded-lg rows, and the active link is a solid
+  // navy pill — the SaaS sidebar pattern, in brand tokens. Mobile
+  // keeps the flat horizontal-scroll row (no card) it has always had.
   const linkBase =
-    "whitespace-nowrap rounded-sm px-3 py-2 font-sans text-sm transition-colors hover:bg-white hover:text-gold";
-  const activeClass = "bg-white font-medium text-navy-deep";
+    "whitespace-nowrap rounded-lg px-3 py-2 font-sans text-sm transition-colors hover:bg-navy/5 hover:text-navy-deep";
+  const activeClass = "bg-navy-deep font-medium text-white shadow-sm hover:bg-navy-deep hover:text-white";
   const inactiveClass = "text-charcoal/70";
 
   return (
     <nav
       aria-label="Panel"
-      className="flex shrink-0 flex-row gap-1 overflow-x-auto border-b border-navy/10 pb-3 md:w-48 md:flex-col md:gap-1 md:border-b-0 md:border-r md:border-navy/10 md:pb-0 md:pr-6"
+      className="flex shrink-0 flex-row gap-1 overflow-x-auto border-b border-navy/10 pb-3 md:w-56 md:flex-col md:gap-1 md:rounded-xl md:border md:border-navy/10 md:bg-surface md:p-3 md:shadow-card md:pb-3"
     >
       {userEmail ? (
         <div className="mb-1 hidden flex-col gap-0.5 border-b border-navy/10 pb-3 md:flex">

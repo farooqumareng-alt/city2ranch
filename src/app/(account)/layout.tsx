@@ -35,14 +35,18 @@ export default async function AccountLayout({
   const profile = await getOwnProfile(owner.id);
 
   return (
-    <Container className="flex flex-col gap-8 py-12 sm:py-16 md:flex-row md:items-start md:gap-10">
-      <AccountSidebar
-        userEmail={user.email}
-        userName={profile?.name ?? undefined}
-        managingEmail={managingEmail}
-        managingRole={managingRole}
-      />
-      <div className="min-w-0 flex-1">{children}</div>
-    </Container>
+    // App canvas — see internal/dispatch/layout.tsx (UI modernization
+    // Phase 1, 2026-11-04).
+    <div className="h-full bg-app-bg">
+      <Container className="flex flex-col gap-8 py-10 sm:py-12 md:flex-row md:items-start md:gap-8">
+        <AccountSidebar
+          userEmail={user.email}
+          userName={profile?.name ?? undefined}
+          managingEmail={managingEmail}
+          managingRole={managingRole}
+        />
+        <div className="min-w-0 flex-1">{children}</div>
+      </Container>
+    </div>
   );
 }
