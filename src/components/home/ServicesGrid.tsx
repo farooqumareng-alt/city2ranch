@@ -15,7 +15,7 @@ export function ServicesGrid({ titleLevel = "h2" }: { titleLevel?: "h1" | "h2" }
         />
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {SERVICES.map((service) => (
-            <Card key={service.name}>
+            <Card key={service.name} variant="brand">
               <h3 className="font-serif text-lg text-navy-deep">
                 {service.name}
               </h3>

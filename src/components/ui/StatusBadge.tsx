@@ -36,16 +36,29 @@ const TONE_CLASSES: Record<Tone, string> = {
   neutral: "bg-navy/5 text-navy-deep border-navy/15",
 };
 
+// The dot is the at-a-glance signal (UI modernization Phase 1,
+// 2026-11-04) — a driver or dispatcher scanning a list reads color
+// before text. Same tone, saturated: the pill background is a tint,
+// the dot is the tone at full strength.
+const TONE_DOT_CLASSES: Record<Tone, string> = {
+  success: "bg-emerald-500",
+  warning: "bg-amber-500",
+  critical: "bg-red-500",
+  neutral: "bg-navy/40",
+};
+
 /** A colored status pill for an order — every existing render of
  *  ORDER_STATUS_LABELS across the app is plain, uncolored text today
  *  (quote_pending and completed look identical); this is the first
  *  place status gets a semantic color. Label text still comes from
  *  ORDER_STATUS_LABELS — one source of truth, not duplicated copy. */
 export function StatusBadge({ status }: { status: OrderStatus }) {
+  const tone = STATUS_TONE[status];
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 font-sans text-xs font-medium whitespace-nowrap ${TONE_CLASSES[STATUS_TONE[status]]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-sans text-xs font-medium whitespace-nowrap ${TONE_CLASSES[tone]}`}
     >
+      <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE_DOT_CLASSES[tone]}`} />
       {ORDER_STATUS_LABELS[status]}
     </span>
   );

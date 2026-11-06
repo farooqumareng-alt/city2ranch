@@ -11,6 +11,22 @@
   --color-ivory: #f7f3ea;
   --color-gold: #c9a45c;
   --color-gold-light: #e2c98d;
+
+  /* App-surface palette (UI modernization Phase 1, 2026-11-04) — the
+     signed-in panels (staff dispatch, driver, customer account) sit
+     on a light neutral canvas with solid white cards, the modern SaaS
+     dashboard structure, while the public site keeps the ivory brand
+     canvas above. The hue is a blue-gray so it sits naturally under
+     the navy brand rather than fighting it. */
+  --color-app-bg: #eef0f3;
+  --color-surface: #ffffff;
+}
+
+@theme {
+  /* Soft, layered card shadows for app surfaces — depth from shadow,
+     not from heavy borders or gradients. */
+  --shadow-card: 0 1px 2px rgb(7 26 51 / 0.04), 0 1px 3px rgb(7 26 51 / 0.07);
+  --shadow-card-hover: 0 4px 12px rgb(7 26 51 / 0.08), 0 2px 4px rgb(7 26 51 / 0.06);
 }
 
 @theme inline {
@@ -23,6 +39,8 @@
   --color-ivory: var(--color-ivory);
   --color-gold: var(--color-gold);
   --color-gold-light: var(--color-gold-light);
+  --color-app-bg: var(--color-app-bg);
+  --color-surface: var(--color-surface);
 
   --font-serif: var(--font-heading);
   --font-sans: var(--font-body);
