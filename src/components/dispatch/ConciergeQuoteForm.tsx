@@ -182,7 +182,7 @@ export function ConciergeQuoteForm({
 
   if (!isEditable) {
     return (
-      <div className="flex flex-col gap-4 rounded-sm border border-navy/10 bg-white/60 p-6">
+      <div className="flex flex-col gap-4 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
         <h3 className="font-serif text-lg text-navy-deep">Quote</h3>
         <dl className="flex flex-col gap-2 font-sans text-sm">
           {existingFeeLines.map((line, i) => (
@@ -212,7 +212,7 @@ export function ConciergeQuoteForm({
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-6 rounded-sm border border-navy/10 bg-white/60 p-6">
+    <form action={formAction} className="flex flex-col gap-6 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
       <h3 className="font-serif text-lg text-navy-deep">Build Quote</h3>
       {state && !state.ok ? (
         <p role="alert" className="font-sans text-sm text-red-600">

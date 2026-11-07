@@ -62,7 +62,7 @@ export default async function DriverDetailPage({ params }: { params: Promise<{ i
         </Card>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-sm border border-navy/10 bg-white/60 p-6">
+      <div className="flex flex-col gap-2 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
         <p className="font-sans text-sm text-navy-deep">
           {driver.phone ?? "No phone on file"}
           {driver.label ? ` · ${driver.label}` : ""}

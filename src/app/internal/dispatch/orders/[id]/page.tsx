@@ -168,7 +168,7 @@ export default async function ServiceRecordPage({
               ) : (
                 <ul className="mt-2 flex flex-col gap-2">
                   {items.map((item) => (
-                    <li key={item.id} className="rounded-sm border border-navy/10 bg-white/60 p-3">
+                    <li key={item.id} className="rounded-lg border border-navy/10 bg-surface p-3">
                       <p className="font-sans text-sm text-navy-deep">
                         {item.itemName} <span className="text-charcoal/60">— {item.quantity}</span>
                       </p>
@@ -247,7 +247,7 @@ export default async function ServiceRecordPage({
               selectedZoneRuleId={overrideZone}
             />
           ) : (
-            <div className="flex flex-col gap-2 rounded-sm border border-navy/10 bg-white/60 p-6">
+            <div className="flex flex-col gap-2 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
               <h3 className="font-serif text-lg text-navy-deep">Price</h3>
               <p className="font-sans text-sm text-charcoal/70">{order.serviceLabel}</p>
               <p className="font-serif text-3xl text-navy-deep">${(order.totalCents / 100).toFixed(2)}</p>
@@ -271,7 +271,7 @@ export default async function ServiceRecordPage({
           ) : null}
 
           {order.status === "paid" ? (
-            <div className="flex flex-col gap-3 rounded-sm border border-navy/10 bg-white/60 p-6">
+            <div className="flex flex-col gap-3 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
               <h3 className="font-serif text-lg text-navy-deep">Assign Driver</h3>
               {!pickupAddress ? (
                 <p className="font-sans text-xs text-red-600">
@@ -284,7 +284,7 @@ export default async function ServiceRecordPage({
           ) : null}
 
           {order.paidAt ? (
-            <div className="flex flex-col gap-3 rounded-sm border border-navy/10 bg-white/60 p-6">
+            <div className="flex flex-col gap-3 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
               <h3 className="font-serif text-lg text-navy-deep">Payments</h3>
               <p className="font-sans text-sm text-charcoal/70">
                 Paid ${(order.totalCents / 100).toFixed(2)}
@@ -330,7 +330,7 @@ export default async function ServiceRecordPage({
           ) : null}
 
           {canCancel || canFail ? (
-            <div className="flex flex-wrap gap-4 rounded-sm border border-navy/10 bg-white/60 p-6">
+            <div className="flex flex-wrap gap-4 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
               {canCancel ? <OrderExceptionForm orderId={order.id} action={cancelOrder} label="Cancel" /> : null}
               {canFail ? <OrderExceptionForm orderId={order.id} action={failOrder} label="Flag failed" /> : null}
             </div>

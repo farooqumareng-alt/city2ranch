@@ -50,7 +50,7 @@ export function CustomersLookupList({ customers }: { customers: CustomerLookupRo
           placeholder="Name, email, or phone"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-sm border border-navy/20 bg-white px-4 py-2.5 font-sans text-sm text-charcoal placeholder:text-charcoal/40 focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-1"
+          className="w-full rounded-lg border border-navy/20 bg-white px-4 py-2.5 font-sans text-sm text-charcoal placeholder:text-charcoal/40 focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-1"
         />
       </div>
 

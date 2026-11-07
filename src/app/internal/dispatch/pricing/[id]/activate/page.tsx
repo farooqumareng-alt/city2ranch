@@ -93,7 +93,7 @@ export default async function ActivatePricingRulePage({ params }: { params: Prom
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-4 rounded-sm border border-navy/10 bg-white/60 p-6">
+          <div className="flex flex-col gap-4 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
             <p className="font-sans text-sm text-navy-deep">
               Once activated, <strong>{rule.zoneLabel ?? rule.serviceLabel}</strong> becomes the live price for{" "}
               {rule.zoneKey != null ? (

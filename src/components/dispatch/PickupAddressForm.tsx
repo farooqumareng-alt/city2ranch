@@ -32,7 +32,7 @@ export function PickupAddressForm({
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
 
   return (
-    <form action={formAction} className="flex flex-col gap-3 rounded-sm border border-navy/10 bg-white/60 p-6">
+    <form action={formAction} className="flex flex-col gap-3 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
       <h3 className="font-serif text-lg text-navy-deep">Pickup Address</h3>
       {state && !state.ok ? (
         <p role="alert" className="font-sans text-sm text-red-600">
