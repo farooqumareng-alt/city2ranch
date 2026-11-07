@@ -45,7 +45,7 @@ function DeclineButton({
         type="text"
         name="reason"
         placeholder="Reason (optional)"
-        className="w-full rounded-sm border border-navy/20 bg-white px-3 py-2 font-sans text-xs text-charcoal placeholder:text-charcoal/40 focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-1"
+        className="w-full rounded-lg border border-navy/20 bg-white px-3 py-2 font-sans text-xs text-charcoal placeholder:text-charcoal/40 focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-1"
       />
       <Button type="submit" variant="outline-dark" size="lg" disabled={pending} className="w-full">
         {pending ? "Declining…" : "Decline"}

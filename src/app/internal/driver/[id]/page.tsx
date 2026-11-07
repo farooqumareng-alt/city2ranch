@@ -99,7 +99,7 @@ export default async function DriverJobDetailPage({
       </div>
 
       {order.status === "pending_acceptance" ? (
-        <div className="rounded-sm border border-gold/40 bg-gold/10 p-4">
+        <div className="rounded-xl border border-navy/10 bg-surface p-4 shadow-card">
           <p className="font-sans text-sm text-navy-deep">
             You&apos;ve been offered this job. Accept it to start working it, or decline to send it back.
           </p>
@@ -132,9 +132,9 @@ export default async function DriverJobDetailPage({
       {order.serviceType === "concierge" && items.length > 0 ? (
         <div>
           <h3 className="font-serif text-lg text-navy-deep">Shopping List</h3>
-          <ul className="mt-1 flex flex-col gap-1">
+          <ul className="mt-2 flex flex-col gap-2">
             {items.map((item) => (
-              <li key={item.id} className="font-sans text-sm text-charcoal/70">
+              <li key={item.id} className="rounded-lg border border-navy/10 bg-surface px-3 py-2 font-sans text-sm text-charcoal/70">
                 {item.itemName} <span className="text-charcoal/50">— {item.quantity}</span>
                 {item.notes ? <span className="text-charcoal/50"> ({item.notes})</span> : null}
               </li>

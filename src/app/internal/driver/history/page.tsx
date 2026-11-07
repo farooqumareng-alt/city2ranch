@@ -52,6 +52,7 @@ export default async function DriverHistoryPage() {
       {recentOrders.length === 0 ? (
         <EmptyState message="Nothing completed in the last week yet." />
       ) : (
+        <div className="rounded-xl border border-navy/10 bg-surface px-4 shadow-card sm:px-5">
         <RowList>
           {recentOrders.map((order) => (
             <Row key={order.id}>
@@ -65,6 +66,7 @@ export default async function DriverHistoryPage() {
             </Row>
           ))}
         </RowList>
+        </div>
       )}
     </div>
   );

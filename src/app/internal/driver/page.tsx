@@ -72,7 +72,7 @@ export default async function DriverPage() {
           <div className="flex flex-col gap-3">
             {pendingOrders.map((order) => (
               <Link key={order.id} href={`/internal/driver/${order.id}`}>
-                <Card className="flex flex-wrap items-center justify-between gap-3 hover:shadow-md">
+                <Card className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-serif text-base text-navy-deep">
                       {order.serviceType === "concierge" ? "Concierge Order" : `Pickup: ${order.storeName}`}
@@ -98,7 +98,7 @@ export default async function DriverPage() {
           <div className="flex flex-col gap-3">
             {inProgressOrders.map((order) => (
               <Link key={order.id} href={`/internal/driver/${order.id}`}>
-                <Card className="flex flex-wrap items-center justify-between gap-3 hover:shadow-md">
+                <Card className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-serif text-base text-navy-deep">
                       {order.serviceType === "concierge" ? "Concierge Order" : `Pickup: ${order.storeName}`}
