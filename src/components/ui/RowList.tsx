@@ -31,7 +31,7 @@ export function Row({
     <div className={`flex flex-wrap items-center justify-between gap-4 py-4 ${className}`}>{children}</div>
   );
   return href ? (
-    <Link href={href} className="block hover:bg-white/50">
+    <Link href={href} className="block transition-colors hover:bg-navy/[0.03]">
       {inner}
     </Link>
   ) : (

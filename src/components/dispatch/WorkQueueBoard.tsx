@@ -90,14 +90,14 @@ export function WorkQueueBoard({
           placeholder="Customer, phone, order #, or driver"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-sm border border-navy/20 bg-white px-4 py-2.5 font-sans text-sm text-charcoal placeholder:text-charcoal/40 focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-1"
+          className="w-full rounded-lg border border-navy/20 bg-white px-4 py-2.5 font-sans text-sm text-charcoal placeholder:text-charcoal/40 focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-1"
         />
       </div>
 
       {visible.length === 0 ? (
         <EmptyState message={query.trim() ? "No matches in this tab." : "Nothing here right now."} />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-xl border border-navy/10 bg-surface p-4 shadow-card sm:p-5">
           <table className="w-full font-sans text-sm">
             <thead>
               <tr className="border-b border-navy/10 text-left text-charcoal/50">
@@ -121,7 +121,7 @@ export function WorkQueueBoard({
                   item.referralSource ||
                   item.requestedDeliveryDate;
                 return (
-                  <tr key={`${item.kind}-${item.id}`} className="border-b border-navy/10 align-top">
+                  <tr key={`${item.kind}-${item.id}`} className="border-b border-navy/10 align-top transition-colors last:border-b-0 hover:bg-navy/[0.02]">
                     <td className="py-3 pr-4">
                       <p className="text-navy-deep">
                         {item.authUserId ? (

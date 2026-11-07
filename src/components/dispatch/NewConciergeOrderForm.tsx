@@ -123,7 +123,7 @@ export function NewConciergeOrderForm({
       ) : null}
 
       {source?.shoppingList ? (
-        <div className="rounded-sm border border-navy/10 bg-ivory p-4">
+        <div className="rounded-lg border border-navy/10 bg-app-bg p-4">
           <p className="font-sans text-xs font-semibold uppercase tracking-[0.15em] text-charcoal/50">
             Original request, as submitted
           </p>
@@ -149,7 +149,7 @@ export function NewConciergeOrderForm({
           <input type="hidden" name="deliveryCity" value={source!.city} />
           <input type="hidden" name="deliveryState" value={source!.state} />
           <input type="hidden" name="deliveryZip" value={source!.zip} />
-          <fieldset className="flex flex-col gap-3 rounded-sm border border-navy/10 bg-white/60 p-5">
+          <fieldset className="flex flex-col gap-3 rounded-xl border border-navy/10 bg-surface shadow-card p-5">
             <legend className="font-serif text-lg text-navy-deep">Customer &amp; Delivery Address</legend>
             <p className="font-sans text-xs text-charcoal/50">
               As submitted with the original request — read-only here so a quote can&apos;t accidentally

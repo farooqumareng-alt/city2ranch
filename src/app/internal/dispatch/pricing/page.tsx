@@ -80,7 +80,7 @@ export default async function PricingPage() {
           {zoneSets.map(({ serviceType, summary }) => (
             <div
               key={serviceType}
-              className="flex flex-col gap-2 rounded-sm border border-navy/10 bg-ivory/60 p-5"
+              className="flex flex-col gap-2 rounded-xl border border-navy/10 bg-surface shadow-card p-5"
             >
               <p className="font-sans text-sm text-navy-deep">
                 {SERVICE_TYPE_LABELS[serviceType]} zones: {summary.active} of {summary.total} active

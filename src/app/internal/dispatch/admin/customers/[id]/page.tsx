@@ -83,7 +83,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         </Card>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-sm border border-navy/10 bg-white/60 p-6">
+      <div className="flex flex-col gap-2 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
         <p className="font-sans text-sm text-navy-deep">
           {customer.phone ?? "No phone on file"}
           {customer.stats.customerSince

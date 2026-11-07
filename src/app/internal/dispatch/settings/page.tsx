@@ -20,7 +20,7 @@ export default async function StaffSettingsPage() {
     <div className="flex flex-col gap-10">
       <SectionHeading eyebrow="STAFF" title="Settings" description="Platform-wide switches." />
 
-      <div className="flex flex-col gap-4 rounded-sm border border-navy/10 bg-white/60 p-6">
+      <div className="flex flex-col gap-4 rounded-xl border border-navy/10 bg-surface shadow-card p-6">
         {!stripeReady ? (
           <p className="font-sans text-xs text-charcoal/60">
             Stripe subscription pricing isn&apos;t fully configured yet (STRIPE_SECRET_KEY and a
